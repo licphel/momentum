@@ -25,8 +25,12 @@
 import org.gradle.internal.os.OperatingSystem
 
 plugins {
+  id 'java-library'
   id 'maven-publish'
 }
+
+group = 'net.fmhi'
+version = property('fmhi_version')
 
 ext {
   switch (OperatingSystem.current()) {
@@ -48,89 +52,91 @@ ext {
   }
 }
 
-subprojects {
-  apply plugin: 'java-library'
-  apply plugin: 'maven-publish'
+def lwjglVersion = property('lwjgl_version')
 
-  group = 'net.fmhi'
-  version = property('fmhi_version')
+java {
+  toolchain { languageVersion = JavaLanguageVersion.of(25) }
+  withJavadocJar()
+  withSourcesJar()
+}
 
-  java {
-    toolchain {
-      languageVersion = JavaLanguageVersion.of(25)
-    }
-    withJavadocJar()
-    withSourcesJar()
+repositories { mavenCentral() }
+
+dependencies {
+  compileOnly 'org.jspecify:jspecify:1.0.0'
+
+  implementation 'org.apache.logging.log4j:log4j-core:2.25.4'
+  implementation 'org.apache.logging.log4j:log4j-api:2.25.4'
+
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.21.1'
+  implementation 'com.ibm.icu:icu4j:76.1'
+
+  implementation platform('io.netty:netty-bom:4.1.118.Final')
+  implementation 'io.netty:netty-handler'
+  implementation 'io.netty:netty-transport'
+
+  implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+  implementation 'org.lwjgl:lwjgl'
+  implementation 'org.lwjgl:lwjgl-opengl'
+  implementation 'org.lwjgl:lwjgl-glfw'
+  implementation 'org.lwjgl:lwjgl-freetype'
+  implementation 'org.lwjgl:lwjgl-harfbuzz'
+  implementation 'org.lwjgl:lwjgl-openal'
+
+  runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+  runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+  runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+  runtimeOnly "org.lwjgl:lwjgl-freetype::${lwjglNatives}"
+  runtimeOnly "org.lwjgl:lwjgl-harfbuzz::${lwjglNatives}"
+  runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
+
+  testImplementation platform('org.junit:junit-bom:5.10.0')
+  testImplementation 'org.junit.jupiter:junit-jupiter'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+tasks.withType(JavaCompile).configureEach {
+  it.options.encoding = "UTF-8"
+  it.options.compilerArgs.add("-Xlint:all")
+  it.options.compilerArgs.add("-Werror")
+}
+
+tasks.withType(Javadoc).configureEach {
+  options.addBooleanOption('Xdoclint:all,-missing,-html5', true)
+  failOnError = false
+}
+
+tasks.withType(Test).configureEach { useJUnitPlatform() }
+
+publishing {
+  publications {
+    maven(MavenPublication) { from components.java }
   }
-
   repositories {
-    mavenCentral()
+    maven { name = 'Local'; url = layout.buildDirectory.dir('repo') }
   }
+}
 
-  dependencies {
-    compileOnly 'org.jspecify:jspecify:1.0.0'
+tasks.register('copyDependencies', Copy) {
+  from(configurations.runtimeClasspath)
+  into(layout.buildDirectory.dir('libs'))
+}
 
-    implementation 'org.apache.logging.log4j:log4j-core:2.25.4'
-    implementation 'org.apache.logging.log4j:log4j-api:2.25.4'
-
-    testImplementation platform('org.junit:junit-bom:5.10.0')
-    testImplementation 'org.junit.jupiter:junit-jupiter'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+tasks.jar {
+  dependsOn('copyDependencies')
+  manifest {
+    attributes(
+        'Main-Class': 'net.fmhi.Main',
+        'Class-Path': configurations.runtimeClasspath.files.collect { it.name }.join(' ')
+    )
   }
+}
 
-  tasks.withType(JavaCompile).configureEach {
-    it.options.encoding = "UTF-8"
-    it.options.compilerArgs.add("-Xlint:all")
-    it.options.compilerArgs.add("-Werror")
-  }
-
-  tasks.withType(Javadoc).configureEach {
-    options.addBooleanOption('Xdoclint:all,-missing,-html5', true)
-    failOnError = false
-  }
-
-  tasks.withType(Test).configureEach {
-    useJUnitPlatform()
-  }
-
-  publishing {
-    publications {
-      maven(MavenPublication) {
-        from components.java
-
-        pom {
-          name = project.name
-          description = 'fmhi: java game development framework'
-          url = 'https://github.com/licphel/fmhi'
-
-          licenses {
-            license {
-              name = 'MIT'
-              url = 'https://opensource.org/licenses/MIT'
-            }
-          }
-
-          developers {
-            developer {
-              id = 'licphel'
-              name = 'Licphel'
-            }
-          }
-
-          scm {
-            connection = 'scm:git:git://github.com/licphel/fmhi.git'
-            developerConnection = 'scm:git:ssh://github.com:licphel/fmhi.git'
-            url = 'https://github.com/licphel/fmhi'
-          }
-        }
-      }
-    }
-
-    repositories {
-      maven {
-        name = 'Local'
-        url = layout.buildDirectory.dir('repo')
-      }
-    }
-  }
+tasks.register('run', JavaExec) {
+  group = 'application'
+  description = 'Runs the smoke test'
+  mainClass.set('net.fmhi.Main')
+  classpath = sourceSets.main.runtimeClasspath
+  workingDir = rootProject.projectDir
+  enableAssertions = true
 }

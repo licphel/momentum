@@ -1,8 +1,8 @@
 # Fmhi
 
-[![License](https://img.shields.io/badge/License-MIT-2563eb?style=for-the-badge)](./LICENSE)
-[![Java](https://img.shields.io/badge/Java-25%2B-f59e0b?style=for-the-badge&logo=openjdk&logoColor=white)](https://jdk.java.net/25/)
-[![Gradle](https://img.shields.io/badge/Gradle-9.x-02303a?style=for-the-badge&logo=gradle&logoColor=white)](https://gradle.org)
+[![License](https://img.shields.io/badge/License-MIT-2563eb?fmt=for-the-badge)](./LICENSE)
+[![Java](https://img.shields.io/badge/Java-25%2B-f59e0b?fmt=for-the-badge&logo=openjdk&logoColor=white)](https://jdk.java.net/25/)
+[![Gradle](https://img.shields.io/badge/Gradle-9.x-02303a?fmt=for-the-badge&logo=gradle&logoColor=white)](https://gradle.org)
 
 **Fmhi is a modular, backend-agnostic application framework for the modern JVM.**
 It gives you GPU-accelerated 2D and 3D rendering, spatial audio, high-quality
@@ -40,24 +40,6 @@ This means you can:
 Backend selection uses `ServiceLoader` — zero runtime reflection hacks, zero
 annotation processing, zero global registries.
 
-### A layered stack, not a monolith
-
-Fmhi is organized as a strict layered graph. Each module depends only on the
-layer directly beneath it. You pull in exactly what your application needs, and
-the dependency graph is shallow enough to reason about in your head.
-
-| Layer        | Module                             | Depends on        |
-|--------------|------------------------------------|-------------------|
-| Foundation   | `fmhi-core`                      | —                 |
-| Abstractions | `fmhi-gfx`, `fmhi-audio`, `fmhi-text` | `core` |
-| Toolkits     | `fmhi-sprite`, `fmhi-ui`        | `gfx` + `text`    |
-| Backends     | `fmhi-opengl`, `fmhi-glfw`, `fmhi-openal`, `fmhi-harfbuzz`, `fmhi-freetype` | corresponding API |
-
-Foundation provides math, events, resource I/O, and SPI utilities — no
-graphics, no audio. Graphics knows nothing about audio. The UI toolkit depends
-on graphics and text, and nothing else. This isn't a diagram on a whiteboard;
-it's enforced by the Gradle module graph.
-
 ### Modern Java, no compromises
 
 Fmhi targets JDK 25+. No lowest-common-denominator bytecode, no pre-Java-17
@@ -81,10 +63,7 @@ you.
 
 Every public API in Fmhi follows a small set of rules:
 
-- **Factory methods over constructors** — `open()`, `load()`, `create()`.
-  Acquire implementations through `fmhi-core`'s `Service` utility, never by
-  calling `new` on a concrete class.
-- **Constructor injection over global state** — receive a `Graphics` or
+- **Constructor injection over global state** — receive a `Device` or
   `AudioContext` as a parameter. No static singletons, no ambient context. Your
   code is testable with mocks or stubs by construction.
 - **Fluent defaults on interfaces** — common operations ship as `default`
