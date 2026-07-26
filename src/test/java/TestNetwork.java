@@ -35,7 +35,7 @@ import java.util.concurrent.TimeUnit;
 /**
  * Localhost smoke test for the network handshake and packet exchange.
  */
-public class MainNet {
+public class TestNetwork {
 
   // -- test packet: echo request with a string payload --
 

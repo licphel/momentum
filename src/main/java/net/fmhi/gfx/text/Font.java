@@ -64,7 +64,7 @@ public interface Font extends AutoCloseable {
    * @param device the graphics device
    * @param buf    the font file contents
    * @return the opened font, or {@code null} if no font backend is available
-   *         or the data cannot be parsed
+   * or the data cannot be parsed
    */
   static @Nullable Font open(Device device, ByteBuffer buf) {
     try {
@@ -107,7 +107,7 @@ public interface Font extends AutoCloseable {
    * @param glyphIndex the internal glyph index
    * @param fontStyle  a bitmask of style flags defined on {@link Font}
    * @return the rasterized glyph, or {@code null} if the glyph has no visual
-   *         representation
+   * representation
    */
   @Nullable Glyph rasterizeGlyph(int glyphIndex, int fontStyle);
 

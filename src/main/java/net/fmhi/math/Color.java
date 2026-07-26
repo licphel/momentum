@@ -64,6 +64,29 @@ public record Color(float red, float green, float blue, float alpha) {
   }
 
   /**
+   * Creates a color from an ARGB hex string like {@code "#FF7744"} (opaque)
+   * or {@code "#FF774488"} (with alpha).
+   *
+   * <p>Accepts {@code #RGB}, {@code #ARGB}, {@code #RRGGBB}, or
+   * {@code #AARRGGBB} forms. The leading {@code #} is optional.
+   *
+   * @param hex the hex color string
+   * @return the parsed color
+   * @throws IllegalArgumentException if the string cannot be parsed
+   */
+  public static Color createHex(String hex) {
+    String s = hex.startsWith("#") ? hex.substring(1) : hex;
+    int v = Integer.parseUnsignedInt(s, 16);
+    return switch (s.length()) {
+      case 3 -> create((v >> 8 & 0xF) * 17, (v >> 4 & 0xF) * 17, (v & 0xF) * 17);
+      case 4 -> create((v >> 8 & 0xF) * 17, (v >> 4 & 0xF) * 17, (v & 0xF) * 17, (v >> 12 & 0xF) * 17);
+      case 6 -> create(v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF);
+      case 8 -> create(v >> 16 & 0xFF, v >> 8 & 0xFF, v & 0xFF, v >> 24 & 0xFF);
+      default -> throw new IllegalArgumentException("Invalid hex color: " + hex);
+    };
+  }
+
+  /**
    * Creates a color from 0 to 255 byte channels.
    *
    * @param red   red channel (0–255)

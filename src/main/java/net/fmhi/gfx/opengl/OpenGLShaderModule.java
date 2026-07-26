@@ -24,13 +24,20 @@
 
 package net.fmhi.gfx.opengl;
 
+import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.shader.ShaderModule;
 import net.fmhi.gfx.shader.ShaderModuleDesc;
 import net.fmhi.util.Handle;
 import net.fmhi.util.InternalApi;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.PointerBuffer;
+import org.lwjgl.system.MemoryStack;
+import org.lwjgl.system.MemoryUtil;
+
+import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.util.spvc.Spvc.*;
 
 /**
  * Compiles a single GLSL shader stage.
@@ -47,8 +54,10 @@ public final class OpenGLShaderModule implements ShaderModule, Handle {
     this.desc = desc;
 
     ctx.submit(() -> {
+      ByteBuffer spirv = ctx.getShaderCompiler().compile(desc.code(), desc.type());
+      String glsl = spirvToGLSL(spirv);
       handle = glCreateShader(OpenGLUtils.shaderType(desc.type()));
-      glShaderSource(handle, desc.code());
+      glShaderSource(handle, glsl);
       glCompileShader(handle);
 
       if (glGetShaderi(handle, GL_COMPILE_STATUS) == GL_FALSE) {
@@ -57,6 +66,52 @@ public final class OpenGLShaderModule implements ShaderModule, Handle {
         handle = 0;
       }
     });
+  }
+
+  /**
+   * Translates SPIR-V to GLSL (SPIRV-Cross).
+   *
+   * @param spirv SPIR-V binary in host endianness
+   * @return GLSL source text
+   * @throws GraphicsException if translation fails
+   */
+  static String spirvToGLSL(ByteBuffer spirv) {
+    try (var stack = MemoryStack.stackPush()) {
+      PointerBuffer pointer = stack.mallocPointer(1);
+
+      spvc_context_create(pointer);
+      long context = pointer.get(0);
+
+      spvc_context_parse_spirv(context, spirv.asIntBuffer(), spirv.remaining() / 4, pointer);
+      long parsedIr = pointer.get(0);
+
+      spvc_context_create_compiler(context, SPVC_BACKEND_GLSL, parsedIr,
+          SPVC_CAPTURE_MODE_TAKE_OWNERSHIP, pointer);
+      long compiler = pointer.get(0);
+
+      spvc_compiler_build_combined_image_samplers(compiler);
+
+      spvc_compiler_create_compiler_options(compiler, pointer);
+      long opts = pointer.get(0);
+      spvc_compiler_options_set_uint(opts, SPVC_COMPILER_OPTION_GLSL_VERSION, 330);
+      spvc_compiler_options_set_bool(opts, SPVC_COMPILER_OPTION_GLSL_ES, false);
+      spvc_compiler_options_set_bool(opts,
+          SPVC_COMPILER_OPTION_GLSL_ENABLE_420PACK_EXTENSION, true);
+      spvc_compiler_options_set_bool(opts,
+          SPVC_COMPILER_OPTION_GLSL_SEPARATE_SHADER_OBJECTS, true);
+      spvc_compiler_install_compiler_options(compiler, opts);
+
+      spvc_compiler_compile(compiler, pointer);
+      long resultPtr = pointer.get(0);
+      if (resultPtr == 0) {
+        spvc_context_destroy(context);
+        throw new GraphicsException("SPIRV-Cross translation produced null");
+      }
+      String glsl = MemoryUtil.memUTF8(resultPtr);
+
+      spvc_context_destroy(context);
+      return glsl;
+    }
   }
 
   @Override

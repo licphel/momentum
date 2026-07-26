@@ -162,17 +162,21 @@ public final class OpenGLPipeline implements Pipeline {
    * @param eboHandle         the GL index buffer handle (0 if not indexed)
    * @return a GL VAO handle configured for this (VBO, instance-VBO, IBO) triple
    */
-  public int acquireVao(int vboHandle, int instanceVboHandle, int eboHandle) {
+  public int acquireVao(int vboHandle, int instanceVboHandle, int eboHandle, int instanceBase) {
+    boolean useCache = instanceBase == 0;
     VaoKey key = new VaoKey(vboHandle, instanceVboHandle, eboHandle);
-    Integer cached = vaoCache.get(key);
-    if (cached != null) {
-      return cached;
+    if (useCache) {
+      Integer cached = vaoCache.get(key);
+      if (cached != null) {
+        return cached;
+      }
     }
 
     int vao = glGenVertexArrays();
     ctx.cache.bindVao(vao);
 
     VertexLayout layout = desc.vertexLayout();
+    int instanceByteOffset = instanceBase * layout.instanceStride;
 
     // Set up per-instance attributes (from instance VBO, divisor > 0)
     if (instanceVboHandle != 0 && layout.instanceStride > 0) {
@@ -182,10 +186,11 @@ public final class OpenGLPipeline implements Pipeline {
           glEnableVertexAttribArray(attr.location());
           int glType = OpenGLUtils.vertexAttribType(attr.type());
           if (isIntType(attr.type()) && !attr.normalized()) {
-            glVertexAttribIPointer(attr.location(), attr.components(), glType, layout.instanceStride, attr.offset());
+            glVertexAttribIPointer(attr.location(), attr.components(), glType, layout.instanceStride,
+                attr.offset() + instanceByteOffset);
           } else {
             glVertexAttribPointer(attr.location(), attr.components(), glType, attr.normalized(), layout.instanceStride,
-                attr.offset());
+                attr.offset() + instanceByteOffset);
           }
           glVertexAttribDivisor(attr.location(), attr.divisor());
         }
@@ -212,7 +217,9 @@ public final class OpenGLPipeline implements Pipeline {
     }
 
     ctx.cache.bindVao(0);
-    vaoCache.put(key, vao);
+    if (useCache) {
+      vaoCache.put(key, vao);
+    }
     return vao;
   }
 

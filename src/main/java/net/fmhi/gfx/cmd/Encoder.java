@@ -123,6 +123,18 @@ public interface Encoder extends AutoCloseable {
   void setInstanceBuffer(@Nullable BufferObject buffer);
 
   /**
+   * Sets the base instance offset for subsequent instanced draw calls.
+   *
+   * <p>The offset is the number of instances to skip in the instance
+   * buffer. Passing 0 restores the default (start from the first
+   * instance).
+   *
+   * @param baseInstance the instance offset
+   */
+  default void setInstanceBase(int baseInstance) {
+  }
+
+  /**
    * Binds a render pipeline for subsequent draw calls.
    *
    * <p>The pipeline's state (blend, depth, stencil, rasterization, shader)

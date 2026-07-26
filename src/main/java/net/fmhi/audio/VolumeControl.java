@@ -33,89 +33,89 @@ import java.util.concurrent.CopyOnWriteArrayList;
 /**
  * A node in an audio volume hierarchy.
  *
- * <p>Emitters form a tree where each node's effective volume is the product
+ * <p>controls form a tree where each node's effective volume is the product
  * of its own local volume and the effective volumes of all its ancestors. This enables category-level volume control,
- * where adjusting a parent emitter affects all descendants.
+ * where adjusting a parent control affects all descendants.
  *
  * <p>This class is thread-safe.
  *
  * @see Clip
  */
-public final class Emitter {
+public final class VolumeControl {
   private final String name;
-  private final List<Emitter> children = new CopyOnWriteArrayList<>();
-  private @Nullable Emitter parent;
+  private final List<VolumeControl> children = new CopyOnWriteArrayList<>();
+  private @Nullable VolumeControl parent;
   private volatile float volume = 1.0F;
 
   /**
-   * Creates a root emitter with the given name.
+   * Creates a root control with the given name.
    *
-   * @param name human-readable label for this emitter
+   * @param name human-readable label for this control
    */
-  public Emitter(String name) {
+  public VolumeControl(String name) {
     this.name = name;
     parent = null;
   }
 
-  private Emitter(String name, Emitter parent) {
+  private VolumeControl(String name, VolumeControl parent) {
     this.name = name;
     this.parent = parent;
   }
 
   /**
-   * Returns this emitter's name.
+   * Returns this control's name.
    *
-   * @return the emitter name
+   * @return the control name
    */
   public String name() {
     return name;
   }
 
   /**
-   * Returns the parent emitter.
+   * Returns the parent control.
    *
-   * @return the parent emitter, or {@code null} if this is a root
+   * @return the parent control, or {@code null} if this is a root
    */
-  public @Nullable Emitter parent() {
+  public @Nullable VolumeControl parent() {
     return parent;
   }
 
   /**
-   * Returns an unmodifiable view of this emitter's direct children.
+   * Returns an unmodifiable view of this control's direct children.
    *
-   * @return unmodifiable list of child emitters
+   * @return unmodifiable list of child controls
    */
-  public List<Emitter> children() {
+  public List<VolumeControl> children() {
     return Collections.unmodifiableList(children);
   }
 
   /**
-   * Creates a new child emitter and attaches it to this emitter.
+   * Creates a new child control and attaches it to this control.
    *
    * @param childName name for the new child
-   * @return the newly created child emitter
+   * @return the newly created child control
    */
-  public Emitter derive(String childName) {
-    Emitter child = new Emitter(childName, this);
+  public VolumeControl derive(String childName) {
+    VolumeControl child = new VolumeControl(childName, this);
     children.add(child);
     return child;
   }
 
   /**
-   * Detaches a direct child from this emitter.
+   * Detaches a direct child from this control.
    *
-   * <p>Has no effect if the given emitter is not a direct child.
+   * <p>Has no effect if the given control is not a direct child.
    *
-   * @param child the child emitter to detach
+   * @param child the child control to detach
    */
-  public void remove(Emitter child) {
+  public void remove(VolumeControl child) {
     if (children.remove(child)) {
       child.parent = null;
     }
   }
 
   /**
-   * Returns this emitter's local volume, not accounting for ancestors.
+   * Returns this control's local volume, not accounting for ancestors.
    *
    * @return local volume, where {@code 0.0} is silent and {@code 1.0} is full
    */
@@ -124,7 +124,7 @@ public final class Emitter {
   }
 
   /**
-   * Sets this emitter's local volume.
+   * Sets this control's local volume.
    *
    * <p>Values below {@code 0.0} are clamped to {@code 0.0}.
    *
@@ -135,9 +135,9 @@ public final class Emitter {
   }
 
   /**
-   * Returns the effective volume as seen by clips played through this emitter.
+   * Returns the effective volume as seen by clips played through this control.
    *
-   * <p>Computed as the product of this emitter's local volume and the
+   * <p>Computed as the product of this control's local volume and the
    * effective volume of all ancestors.
    *
    * @return effective volume
@@ -148,7 +148,7 @@ public final class Emitter {
 
   @Override
   public String toString() {
-    return String.format("Emitter[name='%s', volume=%.2f, effective=%.2f, children=%d]", name, volume,
+    return String.format("VolumeControl[name='%s', volume=%.2f, effective=%.2f, children=%d]", name, volume,
         effectiveVolume(), children.size());
   }
 }

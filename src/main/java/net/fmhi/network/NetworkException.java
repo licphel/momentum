@@ -34,7 +34,6 @@ import java.io.Serial;
  *
  * <p>Covers connection failures, protocol violations, and problems encountered during packet encoding or decoding.
  */
-@NullMarked
 public class NetworkException extends RuntimeException {
   @Serial
   private static final long serialVersionUID = 2026070400L;

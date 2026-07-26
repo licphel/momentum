@@ -27,14 +27,14 @@ package net.fmhi.gfx;
 import net.fmhi.gfx.pipe.*;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.text.Font;
-import net.fmhi.gfx.text.TextFormat;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
 import net.fmhi.gfx.texture.TextureFilter;
-import net.fmhi.math.Color;
 import org.jspecify.annotations.Nullable;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Lazy-initialized built-in 2D pipelines and resource-set layouts.
@@ -75,36 +75,8 @@ public final class BuiltinGfx {
     }
     init = true;
 
-    ShaderModule vertCol = device.getShaderModule(new ShaderModuleDesc(ShaderType.VERTEX, """
-        #version 330 core
-        layout(location = 0) in vec3 i_pos; layout(location = 1) in vec4 i_col;
-        out vec4 o_col;
-        layout(std140) uniform T { mat4 u_vp; };
-        void main() { o_col = i_col; gl_Position = u_vp * vec4(i_pos, 1.0); }
-        """));
-    ShaderModule fragCol = device.getShaderModule(new ShaderModuleDesc(ShaderType.FRAGMENT, """
-        #version 330 core
-        in vec4 o_col; layout(location = 0) out vec4 f;
-        void main() { f = o_col; }
-        """));
-    ShaderProgram spCol = device.getShaderProgram(vertCol, fragCol);
-
-    ShaderModule vertTex = device.getShaderModule(new ShaderModuleDesc(ShaderType.VERTEX, """
-        #version 330 core
-        layout(location = 0) in vec3 i_pos; layout(location = 1) in vec4 i_col;
-        layout(location = 2) in vec2 i_uv;
-        out vec4 o_col; out vec2 o_uv;
-        layout(std140) uniform T { mat4 u_vp; };
-        void main() { o_col = i_col; o_uv = i_uv; gl_Position = u_vp * vec4(i_pos, 1.0); }
-        """));
-    ShaderModule fragTex = device.getShaderModule(new ShaderModuleDesc(ShaderType.FRAGMENT, """
-        #version 330 core
-        in vec4 o_col; in vec2 o_uv;
-        uniform sampler2D u_tex;
-        layout(location = 0) out vec4 f;
-        void main() { f = o_col * texture(u_tex, o_uv); }
-        """));
-    ShaderProgram spTex = device.getShaderProgram(vertTex, fragTex);
+    ShaderProgram spCol = ShaderProgram.load(device, "/shaders/builtin_color.vert.hlsl", "/shaders/builtin_color.frag.hlsl");
+    ShaderProgram spTex = ShaderProgram.load(device, "/shaders/builtin_texture.vert.hlsl", "/shaders/builtin_texture.frag.hlsl");
 
     rslColor = ResourceSetLayout.bake(
         new Slot(1, "T", ShaderType.VERTEX_BIT, ResourceType.UNIFORM_BUFFER));

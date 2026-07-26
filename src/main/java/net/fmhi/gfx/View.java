@@ -41,7 +41,6 @@ import org.jspecify.annotations.Nullable;
  *
  * <h3>Lifecycle</h3>
  * <ol>
- *   <li>Obtain a {@code View} from a {@link net.fmhi.gfx.spi.ViewProvider ViewProvider}.</li>
  *   <li>Configure state — title, size, decorations, etc. — before calling {@link #initialize()}.</li>
  *   <li>Call {@link #initialize()}.</li>
  *   <li>Each frame, call {@link #pollEvents()}, render, then {@link #present()}.</li>
@@ -166,7 +165,7 @@ public abstract class View implements AutoCloseable {
    * Presents the most recent rendering result to the screen.
    *
    * <p>This is a synchronous operation. To present correctly from a rendering thread, wrap the
-   * call in {@link net.fmhi.gfx.Device#submit(Runnable)}.
+   * call in {@link Device#submit(Runnable)}.
    */
   public abstract void present();
 

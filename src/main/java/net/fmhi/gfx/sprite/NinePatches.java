@@ -22,10 +22,11 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.texture;
+package net.fmhi.gfx.sprite;
 
-import net.fmhi.gfx.mesh.dim2.Drawable2D;
 import net.fmhi.gfx.mesh.dim2.VertexBuilder2D;
+import net.fmhi.gfx.texture.Texture;
+import net.fmhi.gfx.texture.TexturePart;
 import net.fmhi.math.Box2D;
 
 /**
@@ -114,7 +115,7 @@ public final class NinePatches implements Drawable2D {
   }
 
   private static TexturePart slice(TexturePart texPart, float u, float v,
-                                                        float w, float h) {
+                                   float w, float h) {
     float w0 = texPart.width();
     float h0 = texPart.height();
     return new TexturePart(texPart, Box2D.create(w0 * u, h0 * v, w0 * w, h0 * h));
@@ -126,18 +127,14 @@ public final class NinePatches implements Drawable2D {
    * <p>The source region parameters {@code (u, v, uw, vh)} are ignored — this drawable uses
    * its own internal grid derived from the source texture.
    *
-   * @param g  the g to draw with
-   * @param x  the X position in world units
-   * @param y  the Y position in world units
-   * @param w  the destination width in world units
-   * @param h  the destination height in world units
-   * @param u  ignored
-   * @param v  ignored
-   * @param uw ignored
-   * @param vh ignored
+   * @param g the g to draw with
+   * @param x the X position in world units
+   * @param y the Y position in world units
+   * @param w the destination width in world units
+   * @param h the destination height in world units
    */
   @Override
-  public void draw(VertexBuilder2D g, float x, float y, float w, float h, float u, float v, float uw, float vh) {
+  public void draw(VertexBuilder2D g, float x, float y, float w, float h) {
     int nw = cntX(w);
     int nh = cntY(h);
 
@@ -214,6 +211,11 @@ public final class NinePatches implements Drawable2D {
       g.drawTexture(bottomLeft, x, by, atw, ath);
       g.drawTexture(bottomRight, rx, by, atw, ath);
     }
+  }
+
+  @Override
+  public void draw(VertexBuilder2D g, float x, float y, float w, float h, float u, float v, float uw, float vh) {
+    draw(g, x, y, w, h);
   }
 
   private int cntX(float mw) {

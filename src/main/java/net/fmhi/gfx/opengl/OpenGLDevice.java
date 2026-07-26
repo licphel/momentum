@@ -140,6 +140,11 @@ public final class OpenGLDevice implements Device {
   }
 
   @Override
+  public ShaderCompiler getShaderCompiler() {
+    return new ShadercCompiler();
+  }
+
+  @Override
   public Pipeline getRenderPipeline(PipelineDesc desc) {
     return new OpenGLPipeline(this, desc);
   }

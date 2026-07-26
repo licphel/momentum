@@ -24,8 +24,13 @@
 
 package net.fmhi.gfx.shader;
 
+import net.fmhi.gfx.Device;
+import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.pipe.PipelineDesc;
 import org.jspecify.annotations.Nullable;
+
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 /**
  * A linked shader program composed of one or more compiled {@link ShaderModule} instances.
@@ -45,6 +50,39 @@ import org.jspecify.annotations.Nullable;
  * @see PipelineDesc.Builder#shaderProgram
  */
 public interface ShaderProgram extends AutoCloseable {
+  /**
+   * Loads a vertex + fragment shader pair from classpath resources and
+   * links them into a program.
+   *
+   * <p>File extension determines the source language: {@code .hlsl} for
+   * HLSL, anything else for GLSL.
+   *
+   * @param device   the graphics device
+   * @param vertPath classpath path to the vertex shader
+   * @param fragPath classpath path to the fragment shader
+   * @return a linked shader program
+   * @throws GraphicsException if loading, compilation, or linking fails
+   */
+  static ShaderProgram load(Device device, String vertPath, String fragPath) {
+    String vertSrc = ShaderProgram.loadResource(vertPath);
+    String fragSrc = ShaderProgram.loadResource(fragPath);
+    ShaderModule vert = device.getShaderModule(new ShaderModuleDesc(ShaderType.VERTEX, vertSrc));
+    ShaderModule frag = device.getShaderModule(new ShaderModuleDesc(ShaderType.FRAGMENT, fragSrc));
+    return device.getShaderProgram(vert, frag);
+  }
+
+  private static String loadResource(String path) {
+    var url = ShaderProgram.class.getResource(path);
+    if (url == null) {
+      throw new GraphicsException("Shader resource not found: " + path);
+    }
+    try (var in = url.openStream()) {
+      return new String(in.readAllBytes(), StandardCharsets.UTF_8);
+    } catch (IOException e) {
+      throw new GraphicsException("Failed to read shader: " + path, e);
+    }
+  }
+
   /**
    * Returns the shader modules that were linked into this program.
    *

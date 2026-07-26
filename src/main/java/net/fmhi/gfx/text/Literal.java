@@ -113,6 +113,11 @@ public final class Literal implements Text {
   }
 
   @Override
+  public String text() {
+    return text;
+  }
+
+  @Override
   public MutableText append(Text component) {
     return new MutableText().append(this).append(component);
   }
@@ -125,11 +130,6 @@ public final class Literal implements Text {
   @Override
   public TextFormat forwadingStyle() {
     return fmt;
-  }
-
-  @Override
-  public String text() {
-    return text;
   }
 
   /**
@@ -151,6 +151,11 @@ public final class Literal implements Text {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hash(text, fmt, Arrays.hashCode(meta));
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (obj == this) {
       return true;
@@ -162,11 +167,6 @@ public final class Literal implements Text {
     return Objects.equals(this.text, that.text) &&
         Objects.equals(this.fmt, that.fmt) &&
         Arrays.equals(this.meta, that.meta);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(text, fmt, Arrays.hashCode(meta));
   }
 
   @Override

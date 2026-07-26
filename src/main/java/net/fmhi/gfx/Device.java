@@ -124,6 +124,14 @@ public interface Device extends AutoCloseable {
   ShaderProgram getShaderProgram(ShaderModule... modules);
 
   /**
+   * Returns the backend-specific shader compiler for translating HLSL
+   * to the native shading language.
+   *
+   * @return the shader compiler; never {@code null}
+   */
+  ShaderCompiler getShaderCompiler();
+
+  /**
    * Creates a new immutable render pipeline.
    *
    * <p>Pipelines are heavy objects that should be created once and reused

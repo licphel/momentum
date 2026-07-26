@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.texture;
 
-import net.fmhi.gfx.mesh.dim2.Drawable2D;
 import net.fmhi.gfx.mesh.dim2.VertexBuilder2D;
+import net.fmhi.gfx.sprite.Drawable2D;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -45,6 +45,37 @@ public interface FragileTexture extends Drawable2D {
    */
   @Nullable Texture pin();
 
+  /**
+   * A sensible default implementation of draw.
+   *
+   * @param g the vertex builder to draw with
+   * @param x the X position in world units
+   * @param y the Y position in world units
+   * @param w the width in world units
+   * @param h the height in world units
+   */
+  @Override
+  default void draw(VertexBuilder2D g, float x, float y, float w, float h) {
+    Texture texture = pin();
+
+    if (texture != null) {
+      g.draw(texture, x, y, w, h, 0, 0, texture.width(), texture.height());
+    }
+  }
+
+  /**
+   * A sensible default implementation of draw.
+   *
+   * @param g  the vertex builder to draw with
+   * @param x  the X position in world units
+   * @param y  the Y position in world units
+   * @param w  the width in world units
+   * @param h  the height in world units
+   * @param u  the U texture coordinate offset in texels
+   * @param v  the V texture coordinate offset in texels
+   * @param uw the U texture coordinate range in texels
+   * @param vh the V texture coordinate range in texels
+   */
   @Override
   default void draw(VertexBuilder2D g, float x, float y, float w, float h, float u, float v, float uw, float vh) {
     g.draw(this, x, y, w, h, u, v, uw, vh);

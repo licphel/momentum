@@ -35,6 +35,8 @@ import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.shader.ResourceSetLayout;
 import net.fmhi.math.Color;
 import net.fmhi.util.InternalApi;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -61,6 +63,8 @@ import static org.lwjgl.opengl.GL43.glDispatchCompute;
  */
 @InternalApi
 public final class OpenGLEncoder implements Encoder {
+  private static final Logger LOGGER = LogManager.getLogger();
+
   private final OpenGLDevice ctx;
   private final List<Runnable> commands = new ArrayList<>();
   private final @Nullable OpenGLResourceSet[] currentRss = new OpenGLResourceSet[64]; // Most support 64 sets
@@ -71,6 +75,9 @@ public final class OpenGLEncoder implements Encoder {
   private @Nullable OpenGLBufferObject currentInstanceVbo;
   private @Nullable RenderTarget currentTarget;
   private int topology = GL_TRIANGLES;
+  private boolean queryReset;
+  private int currentInstanceBase;
+  private boolean loggedResetWarn;
 
   /**
    * Creates a new encoder backed by the given GL context.
@@ -95,6 +102,7 @@ public final class OpenGLEncoder implements Encoder {
     currentEbo = null;
     currentInstanceVbo = null;
     currentTarget = null;
+    queryReset = false;
   }
 
   /**
@@ -106,6 +114,7 @@ public final class OpenGLEncoder implements Encoder {
   @Override
   public void queuedExecute() {
     List<Runnable> snapshot = new ArrayList<>(commands);
+    queryReset = true;
     ctx.submit(() -> {
       for (Runnable cmd : snapshot) {
         cmd.run();
@@ -115,6 +124,7 @@ public final class OpenGLEncoder implements Encoder {
 
   @Override
   public void beginPass(RenderPass desc) {
+    warnIfNotReset();
     commands.add(() -> {
       currentTarget = desc.target() == null ? ctx.getSwapchain() : desc.target();
 
@@ -183,6 +193,11 @@ public final class OpenGLEncoder implements Encoder {
   }
 
   @Override
+  public void setInstanceBase(int baseInstance) {
+    commands.add(() -> currentInstanceBase = baseInstance);
+  }
+
+  @Override
   public void setRenderPipe(Pipeline pipe) {
     OpenGLPipeline glPipe = (OpenGLPipeline) pipe;
     commands.add(() -> {
@@ -247,7 +262,7 @@ public final class OpenGLEncoder implements Encoder {
 
       applyResources();
 
-      int vao = currentPipe.acquireVao(currentVbo.handle, 0, 0);
+      int vao = currentPipe.acquireVao(currentVbo.handle, 0, 0, currentInstanceBase);
       ctx.cache.bindVao(vao);
       glDrawArrays(topology, firstVertex, vertexCount);
       ctx.cache.bindVao(0);
@@ -277,7 +292,7 @@ public final class OpenGLEncoder implements Encoder {
 
       applyResources();
 
-      int vao = currentPipe.acquireVao(currentVbo.handle, 0, currentEbo.handle);
+      int vao = currentPipe.acquireVao(currentVbo.handle, 0, currentEbo.handle, currentInstanceBase);
       ctx.cache.bindVao(vao);
       glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
       ctx.cache.bindVao(0);
@@ -297,7 +312,7 @@ public final class OpenGLEncoder implements Encoder {
       applyResources();
 
       int instHandle = currentInstanceVbo != null ? currentInstanceVbo.handle : 0;
-      int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, 0);
+      int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, 0, currentInstanceBase);
       ctx.cache.bindVao(vao);
       glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
       ctx.cache.bindVao(0);
@@ -320,7 +335,7 @@ public final class OpenGLEncoder implements Encoder {
       applyResources();
 
       int instHandle = currentInstanceVbo != null ? currentInstanceVbo.handle : 0;
-      int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, currentEbo.handle);
+      int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, currentEbo.handle, currentInstanceBase);
       ctx.cache.bindVao(vao);
       glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
       ctx.cache.bindVao(0);
@@ -340,6 +355,13 @@ public final class OpenGLEncoder implements Encoder {
   @Override
   public void close() {
     commands.clear();
+  }
+
+  private void warnIfNotReset() {
+    if (queryReset && !loggedResetWarn) {
+      loggedResetWarn = true;
+      LOGGER.warn("Encoder is not reset after use. Do you forget it?");
+    }
   }
 
   private void applyResources() {

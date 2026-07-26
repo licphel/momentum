@@ -32,10 +32,7 @@ import net.fmhi.gfx.text.harfbuzz.HarfbuzzShaper;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Locale;
+import java.util.*;
 
 /**
  * Rasterizes a list of text literals into a {@link Raster} for rendering.
@@ -574,7 +571,7 @@ public final class Rasterizer {
         lineCursor += adv;
       }
       if (lineGlyphCount < lineGlyphs.length) {
-        lineGlyphs = java.util.Arrays.copyOf(lineGlyphs, lineGlyphCount);
+        lineGlyphs = Arrays.copyOf(lineGlyphs, lineGlyphCount);
       }
 
       runs.add(new LayoutRun(lineText, lineCharStart, lineGlyphs, lineTop, lineHeight, baseline));

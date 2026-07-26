@@ -75,7 +75,7 @@ import java.nio.file.Path;
 /**
  * Textured rotating cube with Phong lighting.
  */
-public class Main {
+public class TestVertexBuilder2D {
 
   // ---------------------------------------------------------------------------
   // Shaders
@@ -218,9 +218,6 @@ public class Main {
     Vector3 ambient = new Vector3(0.25F, 0.25F, 0.28F);
 
     // --- Shaders ---
-    ShaderModule vert = dev.getShaderModule(new ShaderModuleDesc(ShaderType.VERTEX, VERT_SRC));
-    ShaderModule frag = dev.getShaderModule(new ShaderModuleDesc(ShaderType.FRAGMENT, FRAG_SRC));
-    ShaderProgram prog = dev.getShaderProgram(vert, frag);
 
     CompoundTag tag = new CompoundTag();
     tag.put("win.locale", "Window {0}");
@@ -251,9 +248,6 @@ public class Main {
         new Slot(1, "Lighting", ShaderType.FRAGMENT_BIT, ResourceType.UNIFORM_BUFFER));
 
     // --- Pipeline ---
-    PipelineDesc pipeDesc = new PipelineDesc.Builder().vertexLayout(layout).shaderProgram(prog).depth(new Depth(true,
-        true, CompareOp.LESS_OR_EQUAL)).resourceLayouts(rsLayout).build();
-    Pipeline pipe = dev.getRenderPipeline(pipeDesc);
 
     // --- Buffers ---
     BufferObject vbo = dev.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STATIC));
@@ -306,7 +300,7 @@ public class Main {
     btn.setAnchorLayout(AnchorLayout.topStretch(8, 8, 24));
     uiWin.addChild(btn);
 
-    // --- Main loop ---
+    // --- TestVertexBuilder2D loop ---
     float angle = 0.0F;
     double lastTime = System.nanoTime();
     int frame = 0;
@@ -468,10 +462,7 @@ public class Main {
     uboLighting.close();
     ibo.close();
     vbo.close();
-    pipe.close();
-    prog.close();
-    vert.close();
-    frag.close();
+   
     theView.close();
   }
 

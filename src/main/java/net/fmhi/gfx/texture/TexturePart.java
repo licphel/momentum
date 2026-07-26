@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.texture;
 
-import net.fmhi.gfx.mesh.dim2.Drawable2D;
 import net.fmhi.gfx.mesh.dim2.VertexBuilder2D;
+import net.fmhi.gfx.sprite.Drawable2D;
 import net.fmhi.math.Box2D;
 import org.jspecify.annotations.Nullable;
 
@@ -44,7 +44,6 @@ import org.jspecify.annotations.Nullable;
  * @param region  the region within the texture in texel coordinates
  */
 public record TexturePart(FragileTexture fragile, Box2D region) implements Drawable2D {
-
   /**
    * Creates a {@code TexturePart} covering the entire texture.
    *
@@ -112,7 +111,12 @@ public record TexturePart(FragileTexture fragile, Box2D region) implements Drawa
   }
 
   @Override
+  public void draw(VertexBuilder2D g, float x, float y, float w, float h) {
+    g.drawTexture(this, x, y, w, h);
+  }
+
+  @Override
   public void draw(VertexBuilder2D g, float x, float y, float w, float h, float u, float v, float uw, float vh) {
-    g.draw(this, x, y, w, h, u, v, uw, vh);
+    g.drawTexture(this, x, y, w, h, u, v, uw, vh);
   }
 }

@@ -22,32 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh.dim2;
+@NullMarked
+package net.fmhi.fml.registry;
 
-/**
- * A drawable object that renders itself using a {@link VertexBuilder2D}.
- *
- * <p>This is a functional interface whose functional method is
- * {@link #draw(VertexBuilder2D, float, float, float, float, float, float, float, float)}.
- * Implementations define custom drawing logic and can be passed to the various
- * {@code VertexBuilder2D.draw(...)} overloads.
- *
- * @see VertexBuilder2D
- */
-@FunctionalInterface
-public interface Drawable2D {
-  /**
-   * Draws this object at the given position, size, and texture coordinate region.
-   *
-   * @param g  the vertex builder to draw with
-   * @param x  the X position in world units
-   * @param y  the Y position in world units
-   * @param w  the width in world units
-   * @param h  the height in world units
-   * @param u  the U texture coordinate offset in texels
-   * @param v  the V texture coordinate offset in texels
-   * @param uw the U texture coordinate range in texels
-   * @param vh the V texture coordinate range in texels
-   */
-  void draw(VertexBuilder2D g, float x, float y, float w, float h, float u, float v, float uw, float vh);
-}
+import org.jspecify.annotations.NullMarked;

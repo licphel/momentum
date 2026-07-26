@@ -101,7 +101,7 @@ public final class ClipManager implements AutoCloseable {
           /*
            * Do not check Clip.isPlaying here.
            * We do not guarantee that method will be implemented properly
-           * on every backend, but Clip.shouldClose does so.
+           * on every backend, but Clip#shouldClose does so.
            */
           if (clip.shouldClose()) {
             clip.close();

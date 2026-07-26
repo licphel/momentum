@@ -74,6 +74,18 @@ public record Identifier(Domain domain, String path) {
   }
 
   /**
+   * Parses an identifier from the string form {@code domain} and {@code path}.
+   *
+   * @param domain the domain
+   * @param path   the path
+   * @return the parsed identifier, e.g. {@code domain:path}
+   * @throws IllegalArgumentException if the format is invalid
+   */
+  public static Identifier of(String domain, String path) {
+    return new Identifier(Domain.of(domain), path);
+  }
+
+  /**
    * Returns this identifier as a {@link URI} with the domain as the scheme.
    *
    * <p>The resulting URI has the form {@code domain://path}.

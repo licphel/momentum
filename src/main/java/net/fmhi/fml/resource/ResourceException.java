@@ -36,11 +36,22 @@ public class ResourceException extends RuntimeException {
   @Serial
   private static final long serialVersionUID = 2026060100L;
 
-  ResourceException(String message) {
+  /**
+   * Creates an exception with a descriptive message.
+   *
+   * @param message a human-readable description of the error
+   */
+  public ResourceException(String message) {
     super(message);
   }
 
-  ResourceException(String message, Throwable cause) {
+  /**
+   * Creates an exception with a descriptive message and a root cause.
+   *
+   * @param message a human-readable description of the error
+   * @param cause   the underlying throwable that triggered this error, or {@code null}
+   */
+  public ResourceException(String message, Throwable cause) {
     super(message, cause);
   }
 }

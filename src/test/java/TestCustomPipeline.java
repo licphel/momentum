@@ -48,7 +48,7 @@ import java.io.IOException;
 /**
  * Custom pipeline test: Gaussian blur post-processing.
  */
-public class CustomPipeMain {
+public class TestCustomPipeline {
   // shared vertex shader — same layout as BuiltinGfx textured
   private static final String VERT = """
       #version 330 core

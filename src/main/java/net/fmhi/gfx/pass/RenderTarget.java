@@ -26,7 +26,6 @@ package net.fmhi.gfx.pass;
 
 import net.fmhi.gfx.texture.FragileTexture;
 import net.fmhi.gfx.texture.TextureFilter;
-import org.jspecify.annotations.Nullable;
 
 /**
  * A framebuffer target that receives rendered output.

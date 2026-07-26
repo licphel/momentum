@@ -24,10 +24,19 @@
 
 package net.fmhi.gfx.texture;
 
+import net.fmhi.fml.resource.ResourceException;
 import net.fmhi.gfx.Device;
+import net.fmhi.gfx.io.ImageInfo;
+import net.fmhi.gfx.io.ImageInputStream;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.math.Box3D;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 
 /**
  * A GPU texture resource holding 1D, 2D, or 3D image data.
@@ -58,6 +67,97 @@ import net.fmhi.math.Box3D;
  * @see Sampler
  */
 public interface Texture extends FragileTexture, AutoCloseable {
+  /**
+   * Loads an RGBA8 2D texture from a classpath resource (PNG).
+   *
+   * @param device the graphics device
+   * @param path   the classpath resource path, e.g. {@code "/textures/sprite.png"}
+   * @return a new RGBA8 texture
+   * @throws ResourceException if the resource is missing or unreadable
+   */
+  static Texture loadRGBA8(Device device, String path) {
+    URL url = Texture.class.getResource(path);
+    if (url == null) {
+      throw new ResourceException("Texture resource not found: " + path);
+    }
+    try (InputStream in = url.openStream()) {
+      return loadRGBA8(device, in);
+    } catch (IOException e) {
+      throw new ResourceException("Failed to read texture: " + path, e);
+    }
+  }
+
+  /**
+   * Loads an RGBA8 2D texture from a file path (PNG).
+   *
+   * @param device the graphics device
+   * @param path   the file path
+   * @return a new RGBA8 texture
+   * @throws ResourceException if the file is missing or unreadable
+   */
+  static Texture loadRGBA8(Device device, Path path) {
+    try (InputStream in = Files.newInputStream(path)) {
+      return loadRGBA8(device, in);
+    } catch (IOException e) {
+      throw new ResourceException("Failed to read texture: " + path, e);
+    }
+  }
+
+  /**
+   * Loads an RGBA8 2D texture from an input stream (PNG).
+   *
+   * @param device the graphics device
+   * @param in     the input stream
+   * @return a new RGBA8 texture
+   * @throws ResourceException if the stream cannot be decoded
+   */
+  static Texture loadRGBA8(Device device, InputStream in) {
+    ImageInfo info;
+    try {
+      info = ImageInputStream.open(in).info();
+    } catch (IOException e) {
+      throw new ResourceException("Failed to decode image", e);
+    }
+    return loadRGBA8(device, info);
+  }
+
+  /**
+   * Loads an RGBA8 2D texture from decoded image data.
+   *
+   * <p>If the image has 3 channels (RGB), an opaque alpha channel is added.
+   *
+   * @param device the graphics device
+   * @param info   the decoded image metadata and pixels
+   * @return a new RGBA8 texture
+   */
+  static Texture loadRGBA8(Device device, ImageInfo info) {
+    byte[] rgba = fillAlphaChannel(info);
+    TextureDesc desc = new TextureDesc.Builder()
+        .width(info.width())
+        .height(info.height())
+        .format(TextureFormat.RGBA8)
+        .initialBytes(rgba)
+        .build();
+    return device.getTexture(desc);
+  }
+
+  private static byte[] fillAlphaChannel(ImageInfo info) {
+    if (info.channels() == 4) {
+      return info.pixels();
+    }
+    int w = info.width(), h = info.height();
+    byte[] src = info.pixels();
+    byte[] dst = new byte[w * h * 4];
+    int srcChannels = info.channels();
+    for (int i = 0, si = 0, di = 0; i < w * h; i++, si += srcChannels, di += 4) {
+      dst[di] = src[si];
+      dst[di + 1] = src[si + 1];
+      dst[di + 2] = src[si + 2];
+      dst[di + 3] = (byte) 255;
+    }
+    return dst;
+  }
+
   /**
    * Returns this texture.
    *

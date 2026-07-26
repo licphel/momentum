@@ -25,23 +25,22 @@
 package net.fmhi.gfx.shader;
 
 /**
- * Creates a new {@code ShaderModuleDesc} describing a single shader stage to be compiled.
+ * Describes a single shader stage to be compiled.
  *
- * <p>Holds the GLSL source code and the pipeline stage it targets. Passed to
- * the backend to create a {@link ShaderModule}, which is then linked into a {@link ShaderProgram}.
+ * <p>The source {@code code} should be in HLSL.
  *
- * @param type    the pipeline stage this module targets
- * @param code    GLSL source code for this stage
+ * @param type    the pipeline stage
+ * @param code    shader source code
  * @param targets render targets
  * @see ShaderModule
  * @see ShaderProgram
  */
 public record ShaderModuleDesc(ShaderType type, String code, String[] targets) {
   /**
-   * Creates a new {@code ShaderModuleDesc} describing a single shader stage to be compiled.
+   * Creates a descriptor assuming GLSL source.
    *
-   * @param type the pipeline stage this module targets
-   * @param code GLSL source code for this stage
+   * @param type the pipeline stage
+   * @param code GLSL source code
    */
   public ShaderModuleDesc(ShaderType type, String code) {
     this(type, code, new String[0]);

@@ -1,6 +1,7 @@
 package net.fmhi.gfx.mesh.dim2;
 
 import net.fmhi.gfx.mesh.VertexBuilder;
+import net.fmhi.gfx.sprite.Drawable2D;
 import net.fmhi.gfx.text.Text;
 import net.fmhi.gfx.text.raster.Glyph;
 import net.fmhi.gfx.text.raster.Raster;
@@ -415,7 +416,7 @@ public interface VertexBuilder2D extends VertexBuilder {
       float ca2 = sc2[1];
       float sa2 = sc2[0];
       drawLine(cx + rx * ca1, cy + ry * sa1,
-               cx + rx * ca2, cy + ry * sa2);
+          cx + rx * ca2, cy + ry * sa2);
     }
   }
 
@@ -460,7 +461,9 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param vertices the polygon vertices in order
    */
   default void drawPolygon(Vector2... vertices) {
-    if (vertices.length < 3) return;
+    if (vertices.length < 3) {
+      return;
+    }
     Vector2 v0 = vertices[0];
     for (int i = 1; i < vertices.length - 1; i++) {
       drawTriangle(v0, vertices[i], vertices[i + 1]);

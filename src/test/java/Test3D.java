@@ -51,9 +51,10 @@ import net.fmhi.util.NativeLookup;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 /** 3D text test — renders text as texture-mapped quads in 3D space. */
-public class Main3D {
+public class Test3D {
 
   private static final String VERT = """
       #version 330 core
@@ -228,7 +229,7 @@ public class Main3D {
   }
 
   static byte[] floatsToBytes(float[] a) {
-    ByteBuffer bb = java.nio.ByteBuffer.allocate(a.length * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    ByteBuffer bb = ByteBuffer.allocate(a.length * 4).order(ByteOrder.LITTLE_ENDIAN);
     for (float f : a) {
       bb.putFloat(f);
     }
@@ -236,7 +237,7 @@ public class Main3D {
   }
 
   static byte[] intsToBytes(int[] a) {
-    ByteBuffer bb = java.nio.ByteBuffer.allocate(a.length * 4).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    ByteBuffer bb = ByteBuffer.allocate(a.length * 4).order(ByteOrder.LITTLE_ENDIAN);
     for (int i : a) {
       bb.putInt(i);
     }
@@ -244,7 +245,7 @@ public class Main3D {
   }
 
   static byte[] mat4ToBytes(Matrix4x4 m) {
-    ByteBuffer bb = java.nio.ByteBuffer.allocate(64).order(java.nio.ByteOrder.LITTLE_ENDIAN);
+    ByteBuffer bb = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
     for (float f : m.toFloatArray()) {
       bb.putFloat(f);
     }

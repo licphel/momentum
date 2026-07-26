@@ -106,7 +106,8 @@ public final class VertexLayout {
    * @param offset     byte offset of this attribute within its buffer (assigned by {@code bake})
    * @param size       total byte size of this attribute ({@code components × sizeof(type)})
    */
-  public record Attr(int components, VertexAttributeType type, boolean normalized, int divisor, int location, int offset,
+  public record Attr(int components, VertexAttributeType type, boolean normalized, int divisor, int location,
+                     int offset,
                      int size) {
     /**
      * Creates a new {@code Attr} for a per-vertex attribute — location, offset, and size are set to 0 and will be
