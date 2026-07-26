@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  *
  * @param <T> the entry type
  */
-final class SimpleRegistry<T> implements Registry<T> {
+public final class SimpleRegistry<T> implements Registry<T> {
   private final Identifier key;
   private final Map<Identifier, T> byId = new LinkedHashMap<>();
   private final Map<T, Identifier> byValue = new IdentityHashMap<>();
@@ -49,7 +49,7 @@ final class SimpleRegistry<T> implements Registry<T> {
    *
    * @param key the registry identifier
    */
-  SimpleRegistry(Identifier key) {
+  public SimpleRegistry(Identifier key) {
     this.key = Objects.requireNonNull(key);
   }
 

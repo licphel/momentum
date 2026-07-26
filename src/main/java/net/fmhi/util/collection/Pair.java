@@ -42,6 +42,8 @@ public record Pair<L, R>(L left, R right) {
    * @param left  the first value
    * @param right the second value
    * @return a new pair
+   * @param <L>   the type of the left value
+   * @param <R>   the type of the right value
    */
   public static <L, R> Pair<L, R> of(L left, R right) {
     return new Pair<>(left, right);

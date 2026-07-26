@@ -41,7 +41,6 @@ import java.util.stream.Stream;
  * no further entries may be added.
  *
  * @param <T> the type of entries in this registry
- * @see Registries
  * @see DeferredRegister
  */
 public interface Registry<T> extends Iterable<T> {

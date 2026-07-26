@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.input.event;
 
-import net.fmhi.event.Event;
+import net.fmhi.fml.event.Event;
 
 /**
  * The view was iconified (minimized) or restored.

@@ -24,7 +24,6 @@
 
 package net.fmhi.network;
 
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.io.Serial;

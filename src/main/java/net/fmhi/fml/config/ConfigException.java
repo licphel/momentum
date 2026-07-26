@@ -27,8 +27,10 @@ package net.fmhi.fml.config;
 import java.io.Serial;
 
 /**
- * Thrown when a configuration operation fails, such as when a value
- * fails validation or a configuration file cannot be read or parsed.
+ * Thrown when a configuration operation fails.
+ *
+ * <p>This exception covers file I/O errors, malformed JSON, and other
+ * configuration-related failures.
  */
 public class ConfigException extends RuntimeException {
   @Serial

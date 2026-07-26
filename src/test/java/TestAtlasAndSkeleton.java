@@ -26,10 +26,10 @@ import net.fmhi.gfx.BuiltinGfx;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.mesh.dim2.BatchedGraphics2D;
+import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
 import net.fmhi.gfx.pass.RenderPass;
-import net.fmhi.gfx.sprite.Bone;
-import net.fmhi.gfx.sprite.Skeleton;
+import net.fmhi.gfx.dim2.sprite.Bone2D;
+import net.fmhi.gfx.dim2.sprite.Skeleton2D;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.TextureAtlas;
 import net.fmhi.gfx.texture.TexturePart;
@@ -77,7 +77,7 @@ public class TestAtlasAndSkeleton {
     System.out.println("Atlas initial size: " + atlas.size() + "x" + atlas.size());
 
     // --- Build humanoid skeleton ---
-    Skeleton skeleton = buildHumanoid();
+    Skeleton2D skeleton = buildHumanoid();
     float animTime = 0f;
 
     int it = 0;
@@ -150,68 +150,68 @@ public class TestAtlasAndSkeleton {
     theView.close();
   }
 
-  // ─── Skeleton ─────────────────────────────────
+  // ─── Skeleton2D ─────────────────────────────────
 
   /** Builds a simple humanoid skeleton. */
-  private static Skeleton buildHumanoid() {
+  private static Skeleton2D buildHumanoid() {
     // Root → torso
-    Bone torso = new Bone("torso");
+    Bone2D torso = new Bone2D("torso");
     torso.translation(new Vector2(0, 0));
     torso.origin(new Vector2(0, 20));
 
     // Head
-    Bone head = new Bone("head", torso);
+    Bone2D head = new Bone2D("head", torso);
     head.translation(new Vector2(0, -40));
     head.origin(new Vector2(0, 12));
 
     // Upper arms
-    Bone upperArmL = new Bone("upper_arm_l", torso);
+    Bone2D upperArmL = new Bone2D("upper_arm_l", torso);
     upperArmL.translation(new Vector2(-18, -25));
     upperArmL.origin(new Vector2(0, 8));
-    Bone upperArmR = new Bone("upper_arm_r", torso);
+    Bone2D upperArmR = new Bone2D("upper_arm_r", torso);
     upperArmR.translation(new Vector2(18, -25));
     upperArmR.origin(new Vector2(0, 8));
 
     // Lower arms
-    Bone lowerArmL = new Bone("lower_arm_l", upperArmL);
+    Bone2D lowerArmL = new Bone2D("lower_arm_l", upperArmL);
     lowerArmL.translation(new Vector2(0, 24));
     lowerArmL.origin(new Vector2(0, 6));
-    Bone lowerArmR = new Bone("lower_arm_r", upperArmR);
+    Bone2D lowerArmR = new Bone2D("lower_arm_r", upperArmR);
     lowerArmR.translation(new Vector2(0, 24));
     lowerArmR.origin(new Vector2(0, 6));
 
     // Upper legs
-    Bone upperLegL = new Bone("upper_leg_l", torso);
+    Bone2D upperLegL = new Bone2D("upper_leg_l", torso);
     upperLegL.translation(new Vector2(-10, 20));
     upperLegL.origin(new Vector2(0, -8));
-    Bone upperLegR = new Bone("upper_leg_r", torso);
+    Bone2D upperLegR = new Bone2D("upper_leg_r", torso);
     upperLegR.translation(new Vector2(10, 20));
     upperLegR.origin(new Vector2(0, -8));
 
     // Lower legs
-    Bone lowerLegL = new Bone("lower_leg_l", upperLegL);
+    Bone2D lowerLegL = new Bone2D("lower_leg_l", upperLegL);
     lowerLegL.translation(new Vector2(0, 24));
     lowerLegL.origin(new Vector2(0, -6));
-    Bone lowerLegR = new Bone("lower_leg_r", upperLegR);
+    Bone2D lowerLegR = new Bone2D("lower_leg_r", upperLegR);
     lowerLegR.translation(new Vector2(0, 24));
     lowerLegR.origin(new Vector2(0, -6));
 
-    return new Skeleton(torso);
+    return new Skeleton2D(torso);
   }
 
   /** Applies a walking animation to the skeleton. */
-  private static void animateWalk(Skeleton skeleton, float time) {
+  private static void animateWalk(Skeleton2D skeleton, float time) {
     float swing = (float) Math.sin(time * 3f) * 0.6f;
 
     // Arms swing opposite to legs
-    Bone upperArmL = skeleton.findBone("upper_arm_l");
-    Bone upperArmR = skeleton.findBone("upper_arm_r");
-    Bone lowerArmL = skeleton.findBone("lower_arm_l");
-    Bone lowerArmR = skeleton.findBone("lower_arm_r");
-    Bone upperLegL = skeleton.findBone("upper_leg_l");
-    Bone upperLegR = skeleton.findBone("upper_leg_r");
-    Bone lowerLegL = skeleton.findBone("lower_leg_l");
-    Bone lowerLegR = skeleton.findBone("lower_leg_r");
+    Bone2D upperArmL = skeleton.findBone("upper_arm_l");
+    Bone2D upperArmR = skeleton.findBone("upper_arm_r");
+    Bone2D lowerArmL = skeleton.findBone("lower_arm_l");
+    Bone2D lowerArmR = skeleton.findBone("lower_arm_r");
+    Bone2D upperLegL = skeleton.findBone("upper_leg_l");
+    Bone2D upperLegR = skeleton.findBone("upper_leg_r");
+    Bone2D lowerLegL = skeleton.findBone("lower_leg_l");
+    Bone2D lowerLegR = skeleton.findBone("lower_leg_r");
 
     if (upperArmL != null) upperArmL.rotation(swing);
     if (upperArmR != null) upperArmR.rotation(-swing);
@@ -223,7 +223,7 @@ public class TestAtlasAndSkeleton {
     if (lowerLegR != null) lowerLegR.rotation(swing * 2.5f);
 
     // Slight body bob
-    Bone torso = skeleton.findBone("torso");
+    Bone2D torso = skeleton.findBone("torso");
     if (torso != null) {
       float bob = Math.abs((float) Math.sin(time * 6f)) * 3f;
       torso.translation(new Vector2(0, bob - 1.5f));
@@ -231,10 +231,10 @@ public class TestAtlasAndSkeleton {
   }
 
   /** Draws the skeleton as colored lines (bones) and circles (joints). */
-  private static void drawSkeleton(BatchedGraphics2D g, Skeleton skeleton,
+  private static void drawSkeleton(BatchedGraphics2D g, Skeleton2D skeleton,
                                    Map<String, Matrix3x2> transforms,
                                    float originX, float originY) {
-    // Bone length → color pairs
+    // Bone2D length → color pairs
     String[][] bones = {
         {"torso", "head",         "#FFCC80"},
         {"torso", "upper_arm_l",  "#FF9966"},

@@ -24,15 +24,13 @@
 
 package net.fmhi.gfx.mesh;
 
-import net.fmhi.gfx.mesh.dim2.VertexBuilder2D;
-
 /**
  * Bitmask flags for controlling drawing behavior.
  *
  * <p>Combine flags with bitwise OR to enable multiple effects simultaneously.
- * Pass the combined value to {@link VertexBuilder2D#setFlags(int)}.
+ * Pass the combined value to {@link VertexBuilder#setFlags(int)}.
  *
- * @see VertexBuilder2D#setFlags(int)
+ * @see VertexBuilder#setFlags(int)
  */
 public final class DrawingFlags {
   /** No flags set. */

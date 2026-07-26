@@ -26,10 +26,8 @@ import net.fmhi.codec.tag.CompoundTag;
 import net.fmhi.codec.tag.JsonUtil;
 import net.fmhi.fml.Identifier;
 import net.fmhi.fml.config.Config;
-import net.fmhi.fml.config.ConfigException;
 import net.fmhi.fml.config.ConfigSpec;
-import net.fmhi.fml.config.ConfigValidator;
-import net.fmhi.fml.config.ConfigValue;
+import net.fmhi.fml.config.Validator;
 import net.fmhi.fml.registry.Registry;
 import net.fmhi.fml.tag.Tag;
 import net.fmhi.fml.tag.TagManager;
@@ -300,129 +298,112 @@ public class TestTags {
 
   // ── Config tests ────────────────────────────────────
 
-  /** Config roundtrip: define, set via ConfigValue, dump JSON, parse back. */
+  /** Config roundtrip: define via ConfigSpec, set via Config, dump JSON, parse back. */
   private static void testConfigRoundtrip() {
     System.out.println("--- testConfigRoundtrip ---");
-    ConfigSpec.Builder sb = ConfigSpec.builder();
-    ConfigValue<Integer> width = sb.define("$graphics.width", 1920,
-        ConfigValidator.rangedInt(800, 7680), "Display width in pixels");
-    ConfigValue<Integer> height = sb.define("$graphics.height", 1080,
-        ConfigValidator.rangedInt(600, 4320), "Display height in pixels");
-    ConfigValue<Boolean> fullscreen = sb.define("$graphics.fullscreen", false, null,
+    ConfigSpec spec = ConfigSpec.load();
+    Config<Integer> width = spec.define("$graphics.width", 1920,
+        Validator.rangedInt(800, 7680), "Display width in pixels");
+    Config<Integer> height = spec.define("$graphics.height", 1080,
+        Validator.rangedInt(600, 4320), "Display height in pixels");
+    Config<Boolean> fullscreen = spec.define("$graphics.fullscreen", false, null,
         "Whether to use fullscreen mode");
-    ConfigValue<String> title = sb.define("$window.title", "My Game",
-        ConfigValidator.nonBlank(), "Window title");
-    ConfigValue<Double> volume = sb.define("$audio.masterVolume", 1.0,
-        ConfigValidator.rangedDouble(0, 1), "Master volume level");
-    ConfigSpec spec = sb.build();
+    Config<String> title = spec.define("$window.title", "My Game",
+        Validator.nonBlank(), "Window title");
+    Config<Double> volume = spec.define("$audio.masterVolume", 1.0,
+        Validator.rangedDouble(0, 1), "Master volume level");
 
-    Config cfg = Config.of(spec);
-
-    // Read defaults through ConfigValue
+    // Read defaults through Config
     assert width.get() == 1920;
     assert height.get() == 1080;
     assert !fullscreen.get();
     assert title.get().equals("My Game");
     assert volume.get() == 1.0;
 
-    // Modify through ConfigValue — live update
+    // Modify through Config — live update
     width.set(2560);
     title.set("Test Window");
     fullscreen.set(true);
     volume.set(0.5);
 
     // Dump to JSON
-    String json = cfg.dump();
+    String json = spec.dump();
     System.out.println("  JSON output:\n" + json.indent(4));
     assert json.contains("2560");
     assert json.contains("Test Window");
     assert json.contains("0.5");
 
-    // Reload — same ConfigValue handles now see new values
-    cfg.load(json);
+    // Reload — same Config handles now see new values
+    spec.reload(json);
     assert width.get() == 2560;
     assert title.get().equals("Test Window");
     assert fullscreen.get();
     assert volume.get() == 0.5;
   }
 
-  /** Config validation: out-of-range values throw. */
+  /** Config validation: out-of-range values are silently ignored. */
   private static void testConfigValidation() {
     System.out.println("--- testConfigValidation ---");
-    ConfigSpec.Builder sb = ConfigSpec.builder();
-    ConfigValue<Integer> aB = sb.define("$a.b", 0,
-        ConfigValidator.rangedInt(0, 100), null);
-    ConfigValue<String> name = sb.define("$name", "default",
-        ConfigValidator.nonBlank(), null);
-    ConfigSpec spec = sb.build();
-
-    Config cfg = Config.of(spec);
+    ConfigSpec spec = ConfigSpec.load();
+    Config<Integer> aB = spec.define("$a.b", 0,
+        Validator.rangedInt(0, 100), null);
+    Config<String> name = spec.define("$name", "default",
+        Validator.nonBlank(), null);
 
     // Valid
     aB.set(50);
     assert aB.get() == 50;
 
-    // Out of range
-    try {
-      aB.set(200);
-      assert false : "should have thrown";
-    } catch (ConfigException e) {
-      System.out.println("  caught expected: " + e.getMessage());
-    }
+    // Out of range — silently keeps previous value
+    aB.set(200);
     assert aB.get() == 50; // unchanged
 
-    // Blank string rejected
-    try {
-      name.set("");
-      assert false : "should have thrown";
-    } catch (ConfigException e) {
-      System.out.println("  caught expected: " + e.getMessage());
-    }
+    // Blank string — silently keeps previous value
+    name.set("");
+    assert name.get().equals("default"); // unchanged
 
     // OneOf validator
-    ConfigSpec.Builder sb2 = ConfigSpec.builder();
-    ConfigValue<String> mode = sb2.define("$mode", "windowed",
-        ConfigValidator.oneOf("windowed", "fullscreen", "borderless"), null);
-    ConfigSpec spec2 = sb2.build();
-    Config cfg2 = Config.of(spec2);
+    ConfigSpec spec2 = ConfigSpec.load();
+    Config<String> mode = spec2.define("$mode", "windowed",
+        Validator.oneOf("windowed", "fullscreen", "borderless"), null);
     mode.set("fullscreen"); // OK
-    try {
-      mode.set("maximized"); // not allowed
-      assert false : "should have thrown";
-    } catch (ConfigException e) {
-      System.out.println("  caught expected: " + e.getMessage());
-    }
+    assert mode.get().equals("fullscreen");
+    mode.set("maximized"); // not allowed — silently ignored
+    assert mode.get().equals("fullscreen"); // unchanged
+
+    System.out.println("  caught expected: silent ignore on invalid values");
   }
 
   /** Config from/to file. */
   private static void testConfigFile() {
     System.out.println("--- testConfigFile ---");
-    ConfigSpec.Builder sb = ConfigSpec.builder();
-    ConfigValue<Integer> answer = sb.define("$answer", 42, null, null);
-    ConfigValue<String> greeting = sb.define("$greeting", "hello", null, null);
-    ConfigSpec spec = sb.build();
+    ConfigSpec spec = ConfigSpec.load();
+    Config<Integer> answer = spec.define("$answer", 42, null, null);
+    Config<String> greeting = spec.define("$greeting", "hello", null, null);
 
     try {
       Path tmp = Files.createTempFile("fmhi-test-config", ".json");
       tmp.toFile().deleteOnExit();
 
-      Config cfg = Config.of(spec);
       answer.set(99);
-      cfg.save(tmp);
+      spec.save(tmp);
 
       System.out.println("  saved to: " + tmp);
       System.out.println("  content:\n" + Files.readString(tmp).indent(4));
 
-      Config loaded = Config.of(spec, tmp);
-      assert loaded.data().getInt("$answer", 0) == 99;
-      assert loaded.data().getString("$greeting", "").equals("hello"); // default
+      ConfigSpec loaded = ConfigSpec.load(tmp);
+      Config<Integer> answer2 = loaded.define("$answer", 42, null, null);
+      Config<String> greeting2 = loaded.define("$greeting", "hello", null, null);
+      assert answer2.get() == 99; // from file
+      assert greeting2.get().equals("hello"); // from file
 
       // save() without explicit path (has filePath from load)
-      answer.set(123);
+      answer2.set(123);
       loaded.save();
 
-      Config reloaded = Config.of(spec, tmp);
-      assert reloaded.data().getInt("$answer", 0) == 123;
+      ConfigSpec reloaded = ConfigSpec.load(tmp);
+      Config<Integer> answer3 = reloaded.define("$answer", 42, null, null);
+      assert answer3.get() == 123;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }

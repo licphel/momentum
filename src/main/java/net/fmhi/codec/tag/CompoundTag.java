@@ -58,11 +58,33 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
   public static final char PATH_PREFIX = '$';
 
   private final Map<String, @Nullable Object> map = new HashMap<>();
+  private boolean modifiable = true;
 
   /**
    * Creates an empty NBT compound.
    */
   public CompoundTag() {
+  }
+
+  /**
+   * Creates a compound tag with the map content.
+   *
+   * @param map content source
+   */
+  public CompoundTag(Map<String, @Nullable Object> map) {
+    this.map.putAll(map);
+  }
+
+  /**
+   * Creates an unmodifiable compound tag from another tag.
+   *
+   * @param tag content source
+   * @return an unmodifiable view of the given tag
+   */
+  public static CompoundTag ofUnmodifiable(CompoundTag tag) {
+    CompoundTag unmodifiable = new CompoundTag(tag.map);
+    unmodifiable.modifiable = false;
+    return unmodifiable;
   }
 
   /**
@@ -242,6 +264,10 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    * @param key the key (may start with '$' for path)
    */
   public void remove(String key) {
+    if (!modifiable) {
+      return;
+    }
+
     if (isPather(key)) {
       String[] parts = key.substring(1).split("\\.");
       if (parts.length == 0) {
@@ -266,6 +292,10 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    * @throws IllegalArgumentException if the value type is not supported
    */
   public void put(String key, @Nullable Object value) {
+    if (!modifiable) {
+      return;
+    }
+
     TagMark.validate(value);
 
     if (isPather(key)) {

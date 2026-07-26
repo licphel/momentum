@@ -24,8 +24,7 @@
 
 package net.fmhi.gfx.texture;
 
-import net.fmhi.gfx.mesh.dim2.VertexBuilder2D;
-import net.fmhi.gfx.sprite.Drawable2D;
+import net.fmhi.gfx.dim2.mesh.VertexBuilder2D;
 import net.fmhi.math.Box2D;
 import org.jspecify.annotations.Nullable;
 

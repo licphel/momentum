@@ -32,9 +32,7 @@ import net.fmhi.gfx.texture.SamplerDesc;
 import net.fmhi.gfx.texture.TextureFilter;
 import org.jspecify.annotations.Nullable;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 
 /**
  * Lazy-initialized built-in 2D pipelines and resource-set layouts.

@@ -27,7 +27,6 @@ package net.fmhi.fml.tag;
 import net.fmhi.fml.Identifier;
 
 import java.util.Collection;
-import java.util.Set;
 import java.util.stream.Stream;
 
 /**

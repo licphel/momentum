@@ -39,6 +39,8 @@ import java.util.*;
  * <p>Values can be primitives ({@code byte}, {@code short}, {@code int}, {@code long},
  * {@code float}, {@code double}, {@code boolean}, {@link String}, {@code byte[]}), or nested {@link CompoundTag} /
  * {@link ListTag}.
+ * 
+ * <p>This is not designed for high performance circumstances. You may use {@link CompoundTag#putBytes(String, byte[])}
  *
  * @see CompoundTag
  * @see TagMark

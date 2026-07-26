@@ -25,165 +25,110 @@
 package net.fmhi.fml.config;
 
 import net.fmhi.codec.tag.CompoundTag;
-import net.fmhi.codec.tag.JsonUtil;
 import org.jspecify.annotations.Nullable;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-
 /**
- * A configuration backed by a {@link ConfigSpec} and a JSON source.
+ * A live, typed handle to a single configuration property.
  *
- * <p>Binds every {@link ConfigValue} in the spec to a shared backing
- * store. Reads and writes go through the value handles directly;
- * changes are persisted on {@link #save()}.
+ * <p>Created via {@link ConfigSpec#define(String, Object, Validator, String)} and bound
+ * directly to the spec's backing data. Reads and writes are reflected immediately;
+ * changes are persisted on {@link ConfigSpec#save()}.
  *
+ * <p>When the backing store contains no entry for this property, {@link #get()}
+ * returns the default value. Validation is performed on every write; a failed
+ * validation leaves the previous value unchanged.
+ *
+ * @param <T> the value type of this property
  * @see ConfigSpec
- * @see ConfigValue
+ * @see Validator
  */
-public final class Config {
-  private final ConfigSpec spec;
-  private final CompoundTag data = new CompoundTag();
-  private @Nullable Path filePath;
+public final class Config<T> {
+  private final String path;
+  private final T defaultValue;
+  private final @Nullable Validator<T> validator;
+  private final @Nullable String comment;
+  private @Nullable CompoundTag data;
 
-  private Config(ConfigSpec spec) {
-    this.spec = spec;
-    bindAndApplyDefaults();
+  Config(String path, T defaultValue,
+         @Nullable Validator<T> validator,
+         @Nullable String comment) {
+    this.path = path;
+    this.defaultValue = defaultValue;
+    this.validator = validator;
+    this.comment = comment;
+  }
+
+  void bind(CompoundTag data) {
+    this.data = data;
   }
 
   /**
-   * Creates a new config populated with the default values from the
-   * given spec.
+   * Returns the key path of this property.
    *
-   * @param spec the configuration schema
-   * @return a new config
+   * @return the key path
    */
-  public static Config of(ConfigSpec spec) {
-    return new Config(spec);
+  public String path() {
+    return path;
   }
 
   /**
-   * Creates a new config by loading values from a JSON file.
+   * Returns the default value for this property.
    *
-   * @param spec     the configuration schema
-   * @param filePath the path to a JSON file
-   * @return a new config with values loaded from the file
-   * @throws ConfigException if the file cannot be read or parsed
+   * @return the default value
    */
-  public static Config of(ConfigSpec spec, Path filePath) {
-    Config cfg = new Config(spec);
-    cfg.filePath = filePath;
-    cfg.load(filePath);
-    return cfg;
+  public T defaultValue() {
+    return defaultValue;
   }
 
   /**
-   * Creates a new config by loading values from a JSON string.
+   * Returns the current value, or the default if the backing store contains no entry for this property.
    *
-   * @param spec the configuration schema
-   * @param json the JSON text
-   * @return a new config with values parsed from the string
-   * @throws ConfigException if the JSON is malformed
+   * @return the current value; may be {@code null} if the default is {@code null}
    */
-  public static Config of(ConfigSpec spec, String json) {
-    Config cfg = new Config(spec);
-    cfg.load(json);
-    return cfg;
-  }
-
-  /**
-   * Reloads values from a JSON file into the backing store.
-   *
-   * <p>Existing {@link ConfigValue} handles remain valid after the reload.
-   *
-   * @param path the JSON file to read
-   * @throws ConfigException if the file cannot be read or parsed
-   */
-  public void load(Path path) {
-    try {
-      load(Files.readString(path));
-    } catch (IOException e) {
-      throw new ConfigException("Failed to read config file: " + path, e);
+  public @Nullable T get() {
+    if (data == null) {
+      return defaultValue;
     }
+    return data.get(path);
   }
 
   /**
-   * Reloads values from a JSON string into the backing store.
+   * Sets the current value after running validation.
    *
-   * <p>Existing {@link ConfigValue} handles remain valid after the reload.
+   * <p>If validation fails, the previous value is kept silently. The change is
+   * persisted on {@link ConfigSpec#save()}.
    *
-   * @param json the JSON text
-   * @throws ConfigException if the JSON is malformed
+   * @param value the new value
+   * @throws IllegalStateException if this config has not been bound to a spec
    */
-  public void load(String json) {
-    data.clear();
-    bindAndApplyDefaults();
-
-    if (json.isBlank()) {
-      return;
+  public void set(T value) {
+    if (data == null) {
+      throw new IllegalStateException("Config not bound — call ConfigSpec.define first");
     }
-    try {
-      CompoundTag parsed = JsonUtil.parse(json);
-      for (var entry : parsed.entrySet()) {
-        data.put(entry.getKey(), entry.getValue());
+    if (validator != null) {
+      String err = validator.validate(value);
+      if (err != null) {
+        return;
       }
-    } catch (Exception e) {
-      throw new ConfigException("Failed to parse JSON", e);
     }
+    data.put(path, value);
   }
 
   /**
-   * Saves the current configuration to the file it was loaded from.
+   * Returns the validator for this property.
    *
-   * @throws IllegalStateException if no file path was set at creation time
-   * @throws ConfigException       if writing fails
+   * @return the validator, or {@code null} if no validation is configured
    */
-  public void save() {
-    if (filePath == null) {
-      throw new IllegalStateException(
-          "No file path — use save(Path) or construct with Config.of(spec, path)");
-    }
-    save(filePath);
+  public @Nullable Validator<T> validator() {
+    return validator;
   }
 
   /**
-   * Saves the current configuration to the given JSON file.
+   * Returns the comment for this property.
    *
-   * @param path the file to write
-   * @throws ConfigException if writing fails
+   * @return the comment, or {@code null} if none was set
    */
-  public void save(Path path) {
-    try {
-      Files.writeString(path, dump());
-      this.filePath = path;
-    } catch (IOException e) {
-      throw new ConfigException("Failed to write config file: " + path, e);
-    }
-  }
-
-  /**
-   * Serializes the current configuration to a pretty-printed JSON string.
-   *
-   * @return the JSON representation of the current state
-   */
-  public String dump() {
-    return JsonUtil.dumpPrettily(data);
-  }
-
-  /**
-   * Returns the raw backing data store.
-   *
-   * @return the backing data
-   */
-  public CompoundTag data() {
-    return data;
-  }
-
-  private void bindAndApplyDefaults() {
-    for (ConfigValue<?> cv : spec.values().values()) {
-      cv.bind(data);
-      data.put(cv.path(), cv.defaultValue());
-    }
+  public @Nullable String comment() {
+    return comment;
   }
 }

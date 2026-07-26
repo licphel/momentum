@@ -24,7 +24,7 @@
 
 package net.fmhi.fml;
 
-import net.fmhi.event.EventBus;
+import net.fmhi.fml.event.EventBus;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;

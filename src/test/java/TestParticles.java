@@ -28,9 +28,9 @@ import net.fmhi.gfx.View;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.mesh.dim2.BatchedGraphics2D;
-import net.fmhi.gfx.particle.Particle;
-import net.fmhi.gfx.particle.ParticleEmitter;
+import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.dim2.particle.Particle2D;
+import net.fmhi.gfx.dim2.particle.ParticleSystem2D;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.TextureAtlas;
@@ -50,7 +50,7 @@ import java.util.List;
  */
 public class TestParticles {
 
-  static final class MyParticle extends Particle {
+  static final class MyParticle extends Particle2D {
     float x, y, vx, vy;
     float age, maxLife;
     float size, endSize;
@@ -90,7 +90,7 @@ public class TestParticles {
     TexturePart circleTex = atlas.accept(generateCircle(64));
     TexturePart circleTex2 = atlas.accept(generateCircle(32));
 
-    ParticleEmitter emitter = ParticleEmitter.builder(dev)
+    ParticleSystem2D emitter = ParticleSystem2D.builder(dev)
         .maxParticles(4096)
         .build();
 

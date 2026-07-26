@@ -24,8 +24,9 @@
 
 package net.fmhi.gfx;
 
-import net.fmhi.event.Event;
-import net.fmhi.event.EventBus;
+import net.fmhi.fml.event.Event;
+import net.fmhi.fml.event.EventBus;
+import net.fmhi.fml.event.EventListener;
 import net.fmhi.gfx.input.Snapshot;
 import net.fmhi.gfx.input.event.*;
 import net.fmhi.gfx.io.ImageInfo;
@@ -206,7 +207,7 @@ public abstract class View implements AutoCloseable {
   /**
    * Returns the event bus for registering input event listeners.
    *
-   * <p>Listeners are registered via {@link EventBus#register(Class, net.fmhi.event.EventListener)}
+   * <p>Listeners are registered via {@link EventBus#register(Class, EventListener)}
    * and removed via {@link EventBus#deregister(Object)}.
    *
    * @return the event bus

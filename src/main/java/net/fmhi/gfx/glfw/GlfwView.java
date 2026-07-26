@@ -24,6 +24,7 @@
 
 package net.fmhi.gfx.glfw;
 
+import net.fmhi.fml.event.Event;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.ViewInfo;
@@ -45,8 +46,8 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 /**
  * GLFW window implementing the {@link View} abstract class with an OpenGL 3.3 Core Profile context.
  *
- * <p>Input arrives via GLFW callbacks that translate native events into {@link net.fmhi.event.Event}
- * records and dispatch them through {@link #dispatchInputEvent(net.fmhi.event.Event)}.
+ * <p>Input arrives via GLFW callbacks that translate native events into {@link Event}
+ * records and dispatch them through {@link #dispatchInputEvent(Event)}.
  */
 @InternalApi
 public final class GlfwView extends View {

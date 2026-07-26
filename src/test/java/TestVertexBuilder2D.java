@@ -40,14 +40,10 @@ import net.fmhi.gfx.input.KeyCode;
 import net.fmhi.gfx.input.Modifiers;
 import net.fmhi.gfx.io.ImageInfo;
 import net.fmhi.gfx.io.ImageInputStream;
-import net.fmhi.gfx.mesh.dim2.BatchedGraphics2D;
+import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
 import net.fmhi.gfx.mesh.Mesh;
-import net.fmhi.gfx.mesh.dim2.MeshGraphics2D;
+import net.fmhi.gfx.dim2.mesh.MeshGraphics2D;
 import net.fmhi.gfx.pass.RenderPass;
-import net.fmhi.gfx.pipe.CompareOp;
-import net.fmhi.gfx.pipe.Depth;
-import net.fmhi.gfx.pipe.Pipeline;
-import net.fmhi.gfx.pipe.PipelineDesc;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.Literal;
@@ -59,11 +55,11 @@ import net.fmhi.math.*;
 import net.fmhi.math.dim2.Camera2D;
 import net.fmhi.math.dim2.CatenaryCurve;import net.fmhi.math.dim3.CameraPerspective3D;
 import net.fmhi.fml.resource.ResourceFinder;
-import net.fmhi.ui.AnchorLayout;
-import net.fmhi.ui.UiContext;
-import net.fmhi.ui.look.ModernFlat;
-import net.fmhi.ui.widget.Button;
-import net.fmhi.ui.widget.Window;
+import net.fmhi.gfx.dim2.ui.AnchorLayout;
+import net.fmhi.gfx.dim2.ui.UiContext;
+import net.fmhi.gfx.dim2.ui.look.ModernFlat;
+import net.fmhi.gfx.dim2.ui.widget.Button;
+import net.fmhi.gfx.dim2.ui.widget.Window;
 import net.fmhi.util.NativeLookup;import net.fmhi.util.i18n.Language;
 
 import java.io.FileInputStream;
@@ -462,7 +458,7 @@ public class TestVertexBuilder2D {
     uboLighting.close();
     ibo.close();
     vbo.close();
-   
+
     theView.close();
   }
 

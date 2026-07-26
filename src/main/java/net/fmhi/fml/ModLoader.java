@@ -24,8 +24,8 @@
 
 package net.fmhi.fml;
 
-import net.fmhi.event.EventBus;
-import net.fmhi.event.Subscribe;
+import net.fmhi.fml.event.EventBus;
+import net.fmhi.fml.event.Subscribe;
 import net.fmhi.fml.resource.ResourceFinder;
 import org.jspecify.annotations.Nullable;
 
