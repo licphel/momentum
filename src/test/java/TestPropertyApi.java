@@ -1,12 +1,7 @@
-import net.fmhi.util.collection.Palette;
-import net.fmhi.util.property.ImmutablePropertyMap;
-import net.fmhi.util.property.MutablePropertyMap;
-import net.fmhi.util.property.MutablePropertyMapImpl;
-import net.fmhi.util.property.Property;
-import net.fmhi.util.property.PropertyDef;
+import net.fmhi.collection.Palette;
+import net.fmhi.property.*;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -73,7 +68,7 @@ public class TestPropertyApi {
     MutablePropertyMap map = new MutablePropertyMapImpl()
         .put(FACING, 1).put(LIT, true).put(LEVEL, 10);
     List<Property<?>> keys = new ArrayList<>();
-    for (var entry : map) keys.add(entry.getKey());
+    for (Map.Entry<Property<?>, Object> entry : map) keys.add(entry.getKey());
     assert keys.size() == 3;
     System.out.println("  ✓ testMutableIteration");
   }

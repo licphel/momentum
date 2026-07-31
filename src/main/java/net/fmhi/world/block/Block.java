@@ -1,0 +1,107 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package net.fmhi.world.block;
+
+import net.fmhi.property.ImmutablePropertyMap;
+import net.fmhi.property.PropertyDef;
+import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.light.LightEngine;
+import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.util.BlockPos;
+import net.fmhi.world.item.ItemLike;
+import net.fmhi.world.physics.Polygon;
+import org.jspecify.annotations.Nullable;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
+/**
+ * Stub for a block type.
+ */
+public class Block implements ItemLike {
+  final PropertyDef propertyDef = new PropertyDef();
+  final List<BlockState> states = new ArrayList<>();
+  @Nullable BlockState defaultState;
+
+  public PropertyDef propertyDef() { return propertyDef; }
+
+  public void collectProperties(PropertyDef def) {
+  }
+
+  public void fillStates() {
+    for (ImmutablePropertyMap map : propertyDef.maps()) {
+      BlockState state = new BlockState(this, map);
+      BlockStateHolder.BLOCK_STATE_PROPERTY_PALETTE.assign(state);
+      states.add(state);
+    }
+
+    defaultState = BlockStateHolder.BLOCK_STATE_PROPERTY_PALETTE.get(propertyDef.defaultMap().identity());
+  }
+
+  public @Nullable Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
+    return Polygon.CUBE;
+  }
+
+  /** Restitution: 0 = no bounce, 1 = perfect. */
+  public float bounce() { return 0F; }
+
+  /** Friction: 0 = ice, 1 = rough. */
+  public float friction() { return 0.5F; }
+
+  /** Collision kind for SBPhyObj. */
+  public int collisionKind() { return 3; } // BLOCK
+
+  /** Whether this block is solid (blocks light, collides). */
+  public boolean isSolid(BlockState state) { return true; }
+
+  public void filterLight(BlockState state, LightBuffer l) {
+    if (isSolid(state)) {
+      l.r(0);
+      l.g(0);
+      l.b(0);
+    }
+  }
+  /**
+   * Filter incoming light through this block in-place.
+   * Default: solid blocks zero the light, non-solid pass through.
+   */
+  public float filterLight(BlockState state, float in, byte channel) {
+    if (isSolid(state)) {
+      return in * 0.92F - LightEngine.UNIT;
+    } else {
+      return in * 0.99F - LightEngine.UNIT;
+    }
+  }
+
+  /** Write RGB light emission into {@code buf}. Returns false if no light. */
+  public boolean getLight(BlockState state, LightBuffer buf) {
+    return false;
+  }
+
+  public BlockState defaultState() {
+    return Objects.requireNonNull(defaultState);
+  }
+}

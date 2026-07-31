@@ -22,25 +22,26 @@
  * SOFTWARE.
  */
 
-import net.fmhi.gfx.BuiltinGfx;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
+import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
-import net.fmhi.gfx.dim2.particle.Particle2D;
-import net.fmhi.gfx.dim2.particle.ParticleSystem2D;
+import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.opengl.OpenGLDevice;
+import net.fmhi.gfx.particle.Particle2D;
+import net.fmhi.gfx.particle.ParticleSystem2D;
 import net.fmhi.gfx.pass.RenderPass;
+import net.fmhi.gfx.text.FallbackFont;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.TextureAtlas;
 import net.fmhi.gfx.texture.TexturePart;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
 import net.fmhi.math.Vector2;
-import net.fmhi.math.dim2.Camera2D;
+import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.math.random.RandomGenerator;
-import net.fmhi.util.NativeLookup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -51,11 +52,18 @@ import java.util.List;
 public class TestParticles {
 
   static final class MyParticle extends Particle2D {
-    float x, y, vx, vy;
-    float age, maxLife;
-    float size, endSize;
-    Color c0 = Color.WHITE, c1 = Color.EMPTY;
-    float rot, angVel;
+    float x;
+    float y;
+    float vx;
+    float vy;
+    float age;
+    float maxLife;
+    float size;
+    float endSize;
+    Color c0 = Color.WHITE;
+    Color c1 = Color.EMPTY;
+    float rot;
+    float angVel;
 
     @Override public float posX() { return x; }
     @Override public float posY() { return y; }
@@ -76,14 +84,14 @@ public class TestParticles {
   }
 
   public static void main(String[] args) {
-    View theView = NativeLookup.create(View.class);
+    View theView = new GlfwView();
     theView.initialize();
 
-    Device dev = NativeLookup.create(Device.class);
+    Device dev = new OpenGLDevice();
     dev.load(theView);
-    BuiltinGfx.init(dev);
+    FallbackFont.init(dev);
 
-    Camera2D camera = new Camera2D(800, 450);
+    Camera2D camera = new Camera2D(800, 450, dev.getTransformHandler());
     Encoder encoder = dev.getEncoder(EncoderDesc.DEFAULT);
 
     TextureAtlas atlas = new TextureAtlas(dev);
@@ -91,7 +99,7 @@ public class TestParticles {
     TexturePart circleTex2 = atlas.accept(generateCircle(32));
 
     ParticleSystem2D emitter = ParticleSystem2D.builder(dev)
-        .maxParticles(4096)
+        .maxParticles(40960)
         .build();
 
     RandomGenerator rng = RandomGenerator.DEFAULT;
@@ -118,8 +126,8 @@ public class TestParticles {
 
       if (mx >= 0 && my >= 0 && mx <= 800 && my <= 450) {
         spawnTimer += dt;
-        while (spawnTimer >= 1f / 120f) {
-          spawnTimer -= 1f / 120f;
+        while (spawnTimer >= 1f / 1200f) {
+          spawnTimer -= 1f / 1200f;
           float angle = (float) rng.nextDouble(0, Math.PI * 2);
           float speed = (float) rng.nextDouble(40, 150);
 
@@ -128,10 +136,10 @@ public class TestParticles {
           p.x = mx;
           p.y = my;
           p.vx = (float) Math.cos(angle) * speed;
-          p.vy = (float) Math.sin(angle) * speed;
+          p.vy = (float) Math.sin(angle) * speed * 2;
           p.size = 8;
           p.endSize = 32;
-          p.maxLife = (float) rng.nextDouble(1, 3);
+          p.maxLife = (float) rng.nextDouble(3, 5);
           p.angVel = (float) rng.nextDouble(-Math.PI, Math.PI);
           p.rot = (float) rng.nextDouble(0, Math.PI * 2);
           emitter.spawn(p);
@@ -141,12 +149,12 @@ public class TestParticles {
           p2.texture(circleTex2);
           p2.x = mx;
           p2.y = my;
-          p2.vx = (float) Math.cos(angle) * speed;
+          p2.vx = (float) Math.cos(angle) * speed* 2;
           p2.vy = (float) Math.sin(angle) * speed;
           p2.size = 4;
           p2.endSize = 16;
           p2.c0 = Color.RED;
-          p2.maxLife = (float) rng.nextDouble(0.5f, 1.5f);
+          p2.maxLife = (float) rng.nextDouble(2.5f, 5.5f);
           p2.angVel = (float) rng.nextDouble(-Math.PI, Math.PI);
           p2.rot = (float) rng.nextDouble(0, Math.PI * 2);
           emitter.spawn(p2);
@@ -188,11 +196,14 @@ public class TestParticles {
 
   private static ImageInfo generateCircle(int size) {
     byte[] pixels = new byte[size * size * 4];
-    float cx = size / 2f, cy = size / 2f, r = size / 2f - 1;
+    float cx = size / 2f;
+    float cy = size / 2f;
+    float r = size / 2f - 1;
     float soft = r * 0.15f;
     for (int y = 0; y < size; y++) {
       for (int x = 0; x < size; x++) {
-        float dx = x - cx, dy = y - cy;
+        float dx = x - cx;
+        float dy = y - cy;
         float dist = (float) Math.sqrt(dx * dx + dy * dy);
         int alpha;
         if (dist <= r - soft) alpha = 255;

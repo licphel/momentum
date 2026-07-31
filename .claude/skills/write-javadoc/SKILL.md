@@ -42,6 +42,7 @@ Generate or supplement Javadoc for each Java file in `$ARGUMENTS`.
 - Fields and enum constants: descriptive Javadoc required
 - For interface methods, examine the primary implementation if needed to understand behavior
 - Do not mention specific algorithms, field names, or internal logic
+- IMPORTANT: Focus on **WHY** instead of **HOW/WHAT**
 
 ### Format Standards
 

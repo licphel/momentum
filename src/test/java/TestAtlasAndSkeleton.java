@@ -22,14 +22,16 @@
  * SOFTWARE.
  */
 
-import net.fmhi.gfx.BuiltinGfx;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
+import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
-import net.fmhi.gfx.dim2.sprite.Bone2D;
-import net.fmhi.gfx.dim2.sprite.Skeleton2D;
+import net.fmhi.gfx.sprite.Bone2D;
+import net.fmhi.gfx.sprite.Skeleton2D;
+import net.fmhi.gfx.text.FallbackFont;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.TextureAtlas;
 import net.fmhi.gfx.texture.TexturePart;
@@ -37,10 +39,9 @@ import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
 import net.fmhi.math.Matrix3x2;
 import net.fmhi.math.Vector2;
-import net.fmhi.math.dim2.Camera2D;
+import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.math.noise.PerlinNoise;
 import net.fmhi.math.random.RandomGenerator;
-import net.fmhi.util.NativeLookup;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -57,14 +58,14 @@ public class TestAtlasAndSkeleton {
   private static final long SEED = 42;
 
   public static void main(String[] args) {
-    View theView = NativeLookup.create(View.class);
+    View theView = new GlfwView();
     theView.initialize();
 
-    Device dev = NativeLookup.create(Device.class);
+    Device dev = new OpenGLDevice();
     dev.load(theView);
-    BuiltinGfx.init(dev);
+    FallbackFont.init(dev);
 
-    Camera2D camera = new Camera2D(800, 450);
+    Camera2D camera = new Camera2D(800, 450, dev.getTransformHandler());
     BatchedGraphics2D g = new BatchedGraphics2D(dev);
 
     // --- Atlas set up ---

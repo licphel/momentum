@@ -27,7 +27,11 @@ import net.fmhi.audio.Controller;
 import net.fmhi.audio.Mixer;
 import net.fmhi.audio.io.AudioFormatException;
 import net.fmhi.audio.io.AudioInputStream;
-import net.fmhi.codec.tag.CompoundTag;import net.fmhi.gfx.Device;
+import net.fmhi.audio.openal.OpenALMixer;
+import net.fmhi.codec.i18n.Language;
+import net.fmhi.codec.tag.CompoundTag;
+import net.fmhi.fml.resource.ResourceFinder;
+import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
@@ -35,32 +39,33 @@ import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.buffer.BufferType;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
+import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.input.Key;
 import net.fmhi.gfx.input.KeyCode;
 import net.fmhi.gfx.input.Modifiers;
 import net.fmhi.gfx.io.ImageInfo;
 import net.fmhi.gfx.io.ImageInputStream;
-import net.fmhi.gfx.dim2.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.mesh.BatchedGraphics2D;
 import net.fmhi.gfx.mesh.Mesh;
-import net.fmhi.gfx.dim2.mesh.MeshGraphics2D;
+import net.fmhi.gfx.mesh.MeshGraphics2D;
+import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.Literal;
-import net.fmhi.gfx.text.TextFormat;
 import net.fmhi.gfx.text.MutableText;
+import net.fmhi.gfx.text.TextFormat;
 import net.fmhi.gfx.text.raster.Raster;
 import net.fmhi.gfx.texture.*;
+import net.fmhi.gfx.ui.AnchorLayout;
+import net.fmhi.gfx.ui.UiContext;
+import net.fmhi.gfx.ui.look.ModernFlat;
+import net.fmhi.gfx.ui.widget.Button;
+import net.fmhi.gfx.ui.widget.Window;
 import net.fmhi.math.*;
-import net.fmhi.math.dim2.Camera2D;
-import net.fmhi.math.dim2.CatenaryCurve;import net.fmhi.math.dim3.CameraPerspective3D;
-import net.fmhi.fml.resource.ResourceFinder;
-import net.fmhi.gfx.dim2.ui.AnchorLayout;
-import net.fmhi.gfx.dim2.ui.UiContext;
-import net.fmhi.gfx.dim2.ui.look.ModernFlat;
-import net.fmhi.gfx.dim2.ui.widget.Button;
-import net.fmhi.gfx.dim2.ui.widget.Window;
-import net.fmhi.util.NativeLookup;import net.fmhi.util.i18n.Language;
+import net.fmhi.gfx.math.Camera2D;
+import net.fmhi.math.dim2.CatenaryCurve;
+import net.fmhi.gfx.math.CameraPerspective3D;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -173,7 +178,7 @@ public class TestVertexBuilder2D {
 
   static void main(String[] args) throws IOException {
     // --- Audio ---
-    Mixer mixer = NativeLookup.create(Mixer.class);
+    Mixer mixer = new OpenALMixer();
     Clip clip;
     try {
       Path p = ResourceFinder.getAppRoot().resolve(".ref", "dopd.wav");
@@ -189,19 +194,19 @@ public class TestVertexBuilder2D {
     }
 
     // --- Window ---
-    View theView = NativeLookup.create(View.class);
+    View theView = new GlfwView();
     theView.setTitle("Fmhi Test");
     theView.setDecorated(true);
     theView.setMaximized(false);
     theView.initialize();
-    Device dev = NativeLookup.create(Device.class);
+    Device dev = new OpenGLDevice();
     dev.load(theView);
 
     // --- UI ---
     UiContext ui = new UiContext(dev, theView, new ModernFlat(), new Box2D(0, 0, 800, 450));
 
     // Camera ---
-    CameraPerspective3D camera = new CameraPerspective3D();
+    CameraPerspective3D camera = new CameraPerspective3D(dev.getTransformHandler());
     camera.setAspectRatio((float) theView.width() / theView.height());
     camera.setNearPlane(0.1F);
     camera.setFarPlane(100.0F);
@@ -344,7 +349,7 @@ public class TestVertexBuilder2D {
 
       MeshGraphics2D g = new MeshGraphics2D(dev);
       g.begin(RenderPass.DEFAULT);
-      g.setCamera(new Camera2D(800, 450));
+      g.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
       MutableText cns = new MutableText().justify(true).flipY(true).maxWidth(260);
       cns.newline();
       cns.append(Literal.of("多语言测试多语言测试多语言测试多语言测试多语言测试",
@@ -387,7 +392,7 @@ public class TestVertexBuilder2D {
       // hitTest operates in pen space, so subtract (200 - bounds.minX(), 100 - bounds.minY()).
       float hitOriginX = 200 - cns.raster().bounds().minX();
       float hitOriginY = 100 - cns.raster().bounds().minY();
-      cursor = new Camera2D(800, 450).unproject(cursor, g.currentViewport());
+      cursor = new Camera2D(800, 450, dev.getTransformHandler()).unproject(cursor, g.currentViewport());
       int idx = cns.raster().hitTest(cursor.subtract(new Vector2(hitOriginX, hitOriginY)));
       if (idx >= 0) {
         // hitTest returns a char index; find the entry whose charIndex matches.
@@ -424,7 +429,7 @@ public class TestVertexBuilder2D {
       Mesh mesh = g.bake(dev);
 
       bg.begin();
-      bg.setCamera(new Camera2D(800, 450));
+      bg.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
       bg.drawMesh(mesh);
       bg.drawRectangleFrame(0, 0, 200, 200);
       bg.drawPolygonFrame(new Vector2(0, 0), new Vector2(200, 200), new Vector2(200, 400), new Vector2(20, 400));

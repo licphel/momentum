@@ -30,6 +30,8 @@ import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.buffer.BufferType;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
+import net.fmhi.gfx.glfw.GlfwView;
+import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pipe.*;
 import net.fmhi.gfx.shader.*;
@@ -45,8 +47,7 @@ import net.fmhi.gfx.texture.TexturePart;
 import net.fmhi.math.Color;
 import net.fmhi.math.Matrix4x4;
 import net.fmhi.math.Vector3;
-import net.fmhi.math.dim3.CameraPerspective3D;
-import net.fmhi.util.NativeLookup;
+import net.fmhi.gfx.math.CameraPerspective3D;
 
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -72,15 +73,15 @@ public class Test3D {
       """;
 
   static void main(String[] args) {
-    View view = NativeLookup.create(View.class);
+    View view = new GlfwView();
     view.setTitle("3D Text");
     view.setMaximized(true);
     view.initialize();
-    Device dev = NativeLookup.create(Device.class);
+    Device dev = new OpenGLDevice();
     dev.load(view);
 
     // Camera
-    CameraPerspective3D cam = new CameraPerspective3D();
+    CameraPerspective3D cam = new CameraPerspective3D(dev.getTransformHandler());
     cam.setAspectRatio((float) view.width() / view.height());
 
     // Shader

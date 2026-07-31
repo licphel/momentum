@@ -1,8 +1,8 @@
+import net.fmhi.collection.Palette;
 import net.fmhi.math.dim2.Direction2D;
-import net.fmhi.util.collection.Palette;
-import net.fmhi.util.property.ImmutablePropertyMap;
-import net.fmhi.util.property.Property;
-import net.fmhi.util.property.PropertyDef;
+import net.fmhi.property.ImmutablePropertyMap;
+import net.fmhi.property.Property;
+import net.fmhi.property.PropertyDef;
 
 import java.util.List;
 

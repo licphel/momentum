@@ -1,7 +1,7 @@
-import net.fmhi.util.collection.Palette;
-import net.fmhi.util.property.ImmutablePropertyMap;
-import net.fmhi.util.property.Property;
-import net.fmhi.util.property.PropertyDef;
+import net.fmhi.collection.Palette;
+import net.fmhi.property.ImmutablePropertyMap;
+import net.fmhi.property.Property;
+import net.fmhi.property.PropertyDef;
 
 public class TestPropertyMap {
 
@@ -64,7 +64,7 @@ public class TestPropertyMap {
     PropertyDef def = new PropertyDef().put(FACING).put(WATERLOGGED).put(LIT);
     def.collectStates(new  Palette<>());
 
-    var defaults = def.defaultMap();
+    ImmutablePropertyMap defaults = def.defaultMap();
     assert defaults.get(FACING) == 0;
     assert defaults.get(WATERLOGGED).equals(false);
     assert defaults.get(LIT).equals(false);

@@ -32,6 +32,7 @@ import net.fmhi.fml.registry.Registry;
 import net.fmhi.fml.tag.Tag;
 import net.fmhi.fml.tag.TagManager;
 import net.fmhi.fml.tag.TagMap;
+import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
@@ -43,6 +44,7 @@ import java.util.stream.Stream;
  * Manual tests for the tag system: plain tags, tag references, tag maps,
  * and resolution.
  */
+@NullMarked
 public class TestTags {
 
   // ── Simple in-memory registry for testing ──────────

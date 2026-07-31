@@ -25,7 +25,6 @@
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
-import org.lwjgl.util.shaderc.Shaderc;
 
 import java.nio.ByteBuffer;
 
@@ -194,7 +193,7 @@ public class TestHLSLtoGLSL {
   }
 
   static String spirvToGLSL(ByteBuffer spirv) {
-    try (var stack = MemoryStack.stackPush()) {
+    try (MemoryStack stack = MemoryStack.stackPush()) {
       PointerBuffer pointer = stack.mallocPointer(1);
 
       spvc_context_create(pointer);

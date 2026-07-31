@@ -1,0 +1,9 @@
+plugins {
+  id 'java-library'
+}
+
+dependencies {
+  api project(':fmhi-core')
+  compileOnly 'org.jspecify:jspecify:1.0.0'
+  implementation 'com.fasterxml.jackson.core:jackson-databind:2.21.1'
+}
