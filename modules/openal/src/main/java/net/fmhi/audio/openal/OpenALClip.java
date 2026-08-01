@@ -131,7 +131,7 @@ public final class OpenALClip implements Clip {
      * For loops, we tend to handle manually.
      * OpenAL only supports infinite looping natively.
      */
-    remainingLoops = count - 1;
+    remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
 
     mixer.submit(() -> {
       alSourcePlay(source);
