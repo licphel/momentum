@@ -108,11 +108,11 @@ public final class OpenALMixer implements Mixer {
         clip.offset = alGetSourcef(clip.source, AL_SEC_OFFSET);
 
         if (!clip.isPlaying()) {
-          if (clip.remainingLoops < 0) {
+          if (clip.remainingLoops <= 0) {
             gc.add(clip);
             clip.shouldClose = true;
           } else {
-            clip.loop(clip.remainingLoops - 1);
+            clip.loop(clip.remainingLoops);
           }
         }
       }
