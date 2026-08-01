@@ -4,6 +4,7 @@ import net.fmhi.collection.MappingArray;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.BlockStateHolder;
 import net.fmhi.world.entity.Entity;
+import net.fmhi.world.fluid.LiquidMap;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
 
@@ -18,6 +19,7 @@ public class Chunk {
       new MappingArray<>(BlockStateHolder.BLOCK_STATE_PROPERTY_PALETTE, ChunkPos.SIZE, 2);
 
   private final List<Entity> entities = new ArrayList<>();
+  private final LiquidMap liquidMap = new LiquidMap();
 
   public final Level level;
   public final ChunkPos chunkPos;
@@ -31,6 +33,8 @@ public class Chunk {
   public void tick(double delta) {}
 
   public void setLoaded(boolean loaded) { isLoaded = loaded; }
+
+  public LiquidMap liquidMap() { return liquidMap; }
 
   // -- blocks ---------------------------------------------------------------
 

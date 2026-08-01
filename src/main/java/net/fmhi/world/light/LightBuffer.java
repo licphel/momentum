@@ -82,8 +82,7 @@ public interface LightBuffer {
   /**
    * Copies the color from the given buffer into this one.
    *
-   * @param buf the buffer to copy from, must not be {@code null}
-   * @throws NullPointerException if {@code buf} is {@code null}
+   * @param buf the buffer to copy from
    */
   default void copy(LightBuffer buf) {
     r(buf.r());
@@ -94,12 +93,57 @@ public interface LightBuffer {
   /**
    * Replaces each channel with the brighter of this color and the given one.
    *
-   * @param buf the buffer to compare against, must not be {@code null}
-   * @throws NullPointerException if {@code buf} is {@code null}
+   * @param buf the buffer to compare against
    */
   default void max(LightBuffer buf) {
     r(Math.max(buf.r(), r()));
     g(Math.max(buf.g(), g()));
     b(Math.max(buf.b(), b()));
+  }
+
+  /**
+   * Replaces each channel with the darker of this color and the given one.
+   *
+   * @param buf the buffer to compare against
+   */
+  default void min(LightBuffer buf) {
+    r(Math.min(buf.r(), r()));
+    g(Math.min(buf.g(), g()));
+    b(Math.min(buf.b(), b()));
+  }
+
+  /**
+   * Multiplies each channel of this color by the corresponding channel of the
+   * given buffer.
+   *
+   * @param buf the buffer to multiply by
+   */
+  default void mul(LightBuffer buf) {
+    r(buf.r() * r());
+    g(buf.g() * g());
+    b(buf.b() * b());
+  }
+
+  /**
+   * Multiplies each channel of this color by the given scalar.
+   *
+   * @param f the scalar to multiply by
+   */
+  default void mul(float f) {
+    r(f * r());
+    g(f * g());
+    b(f * b());
+  }
+
+  /**
+   * Blends using a formula from the given buf to this.
+   *
+   * @param buf     blending source
+   * @param formula blending formula
+   */
+  default void blend(LightBuffer buf, CompositionFormula formula) {
+    r(formula.blend(buf.r(), r()));
+    g(formula.blend(buf.g(), g()));
+    b(formula.blend(buf.b(), b()));
   }
 }

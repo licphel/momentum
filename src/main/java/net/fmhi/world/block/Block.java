@@ -26,6 +26,7 @@ package net.fmhi.world.block;
 
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.property.PropertyDef;
+import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.light.LightEngine;
 import net.fmhi.world.physics.SBPhyObj;
@@ -99,6 +100,10 @@ public class Block implements ItemLike {
   /** Write RGB light emission into {@code buf}. Returns false if no light. */
   public boolean getLight(BlockState state, LightBuffer buf) {
     return false;
+  }
+
+  public Beam @Nullable [] getBeam(BlockState state, LightBuffer buf) {
+    return null;
   }
 
   public BlockState defaultState() {

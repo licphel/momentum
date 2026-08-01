@@ -53,4 +53,14 @@ public final class ChunkCache {
     Chunk c = chunk(wx, wy);
     return c != null && c.isLoaded;
   }
+
+  public int liquidLevel(int wx, int wy) {
+    Chunk c = chunk(wx, wy);
+    return c != null ? c.liquidMap().level(wx, wy) : 0;
+  }
+
+  public byte liquidType(int wx, int wy) {
+    Chunk c = chunk(wx, wy);
+    return c != null ? c.liquidMap().liquidType(wx, wy) : 0;
+  }
 }

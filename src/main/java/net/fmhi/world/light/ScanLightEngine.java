@@ -4,9 +4,12 @@ import net.fmhi.math.Box2D;
 import net.fmhi.util.Profiler;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.entity.Entity;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
+
+import java.util.Arrays;
 
 /**
  * Light engine that recomputes its whole window on a background virtual
@@ -49,6 +52,10 @@ public class ScanLightEngine extends LightEngine {
       return; // window too small for this camera — next tick will resize
     }
 
+    // clear the window — additive composition formulas would accumulate
+    // leftover values from the previous frame otherwise
+    Arrays.fill(back, 0F);
+
     cc = new ChunkCache(level, x0 - 1, y0 - 1, x1 + 1, y1 + 1);
 
     // Phase 1: seed
@@ -56,11 +63,7 @@ public class ScanLightEngine extends LightEngine {
       LightBuffer lb = new SimpleLightBuffer();
       for (int x = x0 - 1; x <= x1 + 1; x++) {
         for (int y = y0 - 1; y <= y1 + 1; y++) {
-          int o = backBufferIndex(x, y);
-          if (o < 0) {
-            continue;
-          }
-          seed(back, o, cc.getBlock(x, y), cc.getWall(x, y), sunlight, x, y, lb, AMPLIFIER);
+          seed(cc.getBlock(x, y), cc.getWall(x, y), sunlight, x, y, lb);
         }
       }
     }
@@ -70,9 +73,7 @@ public class ScanLightEngine extends LightEngine {
       LightBuffer lb = new SimpleLightBuffer();
       for (Chunk c : level.loadedChunks()) {
         for (Entity e : c.entities()) {
-          if (e.getLight(lb)) {
-            drawInterpolated(e.center().xf(), e.center().yf(), lb.r(), lb.g(), lb.b());
-          }
+          seed(e, lb);
         }
       }
     }
@@ -101,6 +102,10 @@ public class ScanLightEngine extends LightEngine {
       }
     }
 
+    // Beam light: max-blend into raw channels after spread (spread is
+    // isotropic and would wash out the cone if the beam went through it)
+    mergeBeam();
+
     // Phase 4: populate vertex lights
     try (Profiler.Scope _ = Profiler.scope("lighting:populate")) {
       for (int y = y0; y <= y1; y++) {
@@ -109,7 +114,7 @@ public class ScanLightEngine extends LightEngine {
           if (o < 0) {
             continue;
           }
-          populate(cc, back, o, x, y);
+          populate(cc, x, y);
         }
       }
     }
@@ -117,6 +122,9 @@ public class ScanLightEngine extends LightEngine {
 
   /**
    * Relaxes the light of a tile toward the brightest of its four neighbors.
+   *
+   * @param x the tile X coordinate
+   * @param y the tile Y coordinate
    */
   private void spread(int x, int y) {
     if (!cc.isLoaded(x, y)) {
@@ -148,8 +156,13 @@ public class ScanLightEngine extends LightEngine {
     float w = getChannelValue(x, y - 1, channel);
     float e = getChannelValue(x, y + 1, channel);
     float max = Math.max(n, Math.max(s, Math.max(w, e)));
-    float f = Math.max(back[o + channel], max);
+    float f = formula.blend(back[o + channel], max);
     f = state.block().filterLight(state, f, channel);
+    // liquid absorbs light like a block (thicker liquid absorbs more)
+    int lv = cc.liquidLevel(x, y);
+    if (lv > 0) {
+      f = Liquids.byId(cc.liquidType(x, y)).filterLight(f, channel, lv);
+    }
     back[o + channel] = f <= DARK_LUMINANCE ? 0F : f;
   }
 }

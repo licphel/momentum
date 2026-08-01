@@ -26,6 +26,11 @@ package net.fmhi.world.level;
 
 import net.fmhi.Registries;
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.fluid.FluidEngine;
+import net.fmhi.world.fluid.Liquid;
+import net.fmhi.world.fluid.LiquidMap;
+import net.fmhi.world.fluid.LiquidStack;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.light.LightEngine;
 import net.fmhi.world.light.ScanLightEngine;
 import net.fmhi.world.physics.Polygon;
@@ -53,6 +58,7 @@ public class Level {
   private final long seed;
   private final Map<Long, Chunk> chunks = new HashMap<>();
   private final LightEngine lightEngine = new ScanLightEngine(this);
+  private final FluidEngine fluidEngine = new FluidEngine(this);
 
   /**
    * Creates a level with the given chunk generator.
@@ -67,12 +73,15 @@ public class Level {
 
   public LightEngine lightEngine() { return lightEngine; }
 
+  public FluidEngine fluidEngine() { return fluidEngine; }
+
   public Collection<Chunk> loadedChunks() { return chunks.values(); }
 
   // -- tick ----------------------------------------------------------------
 
   public void tick(double delta) {
     ticks++;
+    fluidEngine.tick(delta);
     for (Chunk chunk : Set.copyOf(chunks.values())) {
       chunk.tick(delta);
     }
@@ -107,6 +116,15 @@ public class Level {
 
   public int loadedChunkCount() { return chunks.size(); }
 
+  /**
+   * Removes the chunk from the world and its liquid cells from the fluid
+   * engine (the chunk is regenerated on next access).
+   */
+  public void unloadChunk(ChunkPos pos) {
+    chunks.remove(pos.asLong());
+    fluidEngine.delChunk(pos);
+  }
+
   // -- tiles ---------------------------------------------------------------
 
   /**
@@ -134,6 +152,10 @@ public class Level {
     ChunkPos cp = pos.toChunkPos();
     Chunk chunk = getOrLoadChunk(cp);
     chunk.setBlock(pos, state);
+    // a solid block replaces any liquid in its tile
+    if (state.block().isSolid(state)) {
+      chunk.liquidMap().set(pos.x(), pos.y(), Liquids.EMPTY, 0);
+    }
   }
 
   public void setWall(BlockPos pos, BlockState state) {
@@ -155,4 +177,38 @@ public class Level {
   }
 
   public long seed() { return seed; }
+
+  // -- liquids -------------------------------------------------------------
+
+  /**
+   * Sets the liquid of a tile, generating the containing chunk if needed
+   * and joining the tile to the fluid engine. Levels are discrete tile
+   * units: {@code 255} is a full tile, the minimum amount is 1.
+   */
+  public void setLiquid(int x, int y, Liquid liquid, int level) {
+    ChunkPos cp = new BlockPos(x, y).toChunkPos();
+    getOrLoadChunk(cp).liquidMap().set(x, y, liquid, level);
+    if (level > 0) fluidEngine.join(x, y);
+  }
+
+  /**
+   * Returns the liquid level of a tile, or {@code 0} if none or the chunk
+   * is not loaded.
+   */
+  public int getLiquidLevel(int x, int y) {
+    Chunk chunk = getChunk(new BlockPos(x, y).toChunkPos());
+    return chunk != null ? chunk.liquidMap().level(x, y) : 0;
+  }
+
+  /**
+   * Returns the liquid stack of a tile, or {@link LiquidStack#EMPTY} if
+   * none or the chunk is not loaded.
+   */
+  public LiquidStack getLiquidStack(int x, int y) {
+    Chunk chunk = getChunk(new BlockPos(x, y).toChunkPos());
+    if (chunk == null) return LiquidStack.EMPTY;
+    LiquidMap lm = chunk.liquidMap();
+    int lv = lm.level(x, y);
+    return lv <= 0 ? LiquidStack.EMPTY : new LiquidStack(Liquids.byId(lm.liquidType(x, y)), lv);
+  }
 }

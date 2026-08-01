@@ -32,9 +32,14 @@ import net.fmhi.util.ResourceProvider;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.BlockStateHolder;
 import net.fmhi.world.entity.Entity;
+import net.fmhi.world.fluid.FluidEngine;
+import net.fmhi.world.fluid.Liquid;
+import net.fmhi.world.fluid.LiquidMap;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.FlatTerrainGenerator;
 import net.fmhi.world.level.Level;
+import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
@@ -80,6 +85,11 @@ public class Main {
     for (int cx = -WORLD_RADIUS; cx <= WORLD_RADIUS; cx++)
       for (int cy = -WORLD_RADIUS; cy <= WORLD_RADIUS; cy++)
         level.getOrLoadChunk(new ChunkPos(cx, cy));
+    // demo fluids: a water pool at the spawn, a lava pool on the plateau,
+    // and a splash of water next to the lava so the reaction is visible
+    for (int x = -4; x <= 4; x++) level.setLiquid(x, GROUND_Y - 1, Liquids.WATER, FluidEngine.FULL);
+    for (int x = 13; x <= 16; x++) level.setLiquid(x, GROUND_Y - 8, Liquids.LAVA, FluidEngine.FULL);
+    level.setLiquid(12, GROUND_Y - 8, Liquids.WATER, FluidEngine.FULL);
     try {
       texture = Texture.loadRGBA8(dev, new PngInputStream(ResourceProvider.classpath(Main.class).openStream("/img.png")).info());
     } catch (IOException e) {
@@ -179,10 +189,14 @@ public class Main {
       else
         player.setVelocity(vx, player.velocity().y());
 
+      var vp = Box2D.create(0, 0, view.width(), view.height());
+      var w = camera.unproject(new Vector2((float) snap.cursorX(), (float) snap.cursorY()), vp);
+      var bp = new BlockPos((int) Math.floor(w.x()), (int) Math.floor(w.y()));
+
+      // flashlight: beam toward the mouse, relative to the player
+
+
       if (ML.isDown() || MR.isDown()) {
-        var vp = Box2D.create(0, 0, view.width(), view.height());
-        var w = camera.unproject(new Vector2((float) snap.cursorX(), (float) snap.cursorY()), vp);
-        var bp = new BlockPos((int) Math.floor(w.x()), (int) Math.floor(w.y()));
         if (ML.isDown(Modifiers.CONTROL))
           level.setWall(bp, airState);
         else if (level.getBlock(bp).block() == Registries.AIR && MR.isDown(Modifiers.CONTROL))
@@ -193,9 +207,18 @@ public class Main {
           level.setBlock(bp, colorfulstate);
       }
 
+      // F1/F2: spawn water / lava at the cursor, breaking the block there
+      if (snap.isDown(KeyCode.F1)) {
+        level.setBlock(bp, airState);
+        level.setLiquid(bp.x(), bp.y(), Liquids.WATER, FluidEngine.FULL);
+      }
+      if (snap.isDown(KeyCode.F2)) {
+        level.setBlock(bp, airState);
+        level.setLiquid(bp.x(), bp.y(), Liquids.LAVA, FluidEngine.FULL);
+      }
+
       boolean qDown = snap.isDown(KeyCode.Q);
       if (qDown) {
-        var vp = Box2D.create(0, 0, view.width(), view.height());
         var m = camera.unproject(new Vector2((float) snap.cursorX(), (float) snap.cursorY()), vp);
         float dx = m.x() - player.position().xf();
         float dy = m.y() - player.position().yf();
@@ -206,6 +229,7 @@ public class Main {
         thrownItems.add(item);
       }
 
+      level.tick(dt);
       player.tick(dt, level);
       for (var item : thrownItems) item.tick(dt, level);
       thrownItems.removeIf(i -> {
@@ -274,11 +298,15 @@ public class Main {
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:block")) {
         renderBlocks(g, level, camera);
+        renderLiquids(g, level, camera);
         renderPlayer(g, player);
         for (var item : thrownItems) {
           g.setColor(new Color(1F, 0.8F, 0F));
           g.drawRectangle(item.bounds().minX(), item.bounds().minY(), item.bounds().width(), item.bounds().height());
         }
+      }
+      for (Chunk chunk : level.loadedChunks()) {
+        g.drawRectangleFrame(chunk.chunkPos.x() * 16, chunk.chunkPos.y() * 16, 16, 16);
       }
       g.end();
 
@@ -357,6 +385,74 @@ public class Main {
             g.drawRectangle(cx*cs+lx, cy*cs+ly, 1F, 1F);
           }
       }
+  }
+
+  private static void renderLiquids(BatchedGraphics2D g, Level level, Camera2D cam) {
+    var cp = cam.position();
+    float vw = cam.width() / cam.zoom();
+    float vh = cam.height() / cam.zoom();
+    int cs = ChunkPos.SIZE;
+    for (int cx = (int)Math.floor((cp.x()-vw/2F)/cs); cx <= (int)Math.floor((cp.x()+vw/2F)/cs); cx++)
+      for (int cy = (int)Math.floor((cp.y()-vh/2F)/cs); cy <= (int)Math.floor((cp.y()+vh/2F)/cs); cy++) {
+        Chunk ck = level.getChunk(new ChunkPos(cx, cy));
+        if (ck == null) continue;
+        LiquidMap lm = ck.liquidMap();
+        for (int ly = 0; ly < cs; ly++)
+          for (int lx = 0; lx < cs; lx++) {
+            int wx = cx * cs + lx, wy = cy * cs + ly;
+            int lv = lm.level(wx, wy);
+            if (lv <= 0) continue;
+            Liquid liq = Liquids.byId(lm.liquidType(wx, wy));
+            long packed = liq.color().pack();
+            // falling liquid (nothing below) renders as a small centered
+            // block, like Starbound
+            if (isFalling(level, wx, wy)) {
+              // centered rectangle, width scaled by the level (0..1)
+              float half = (float) lv / FluidEngine.FULL / 2F;
+              int base = g.vertexCount();
+              g.putPosColor(wx + 0.5F - half, wy + 0.5F - half, 0, packed);
+              g.putPosColor(wx + 0.5F + half, wy + 0.5F - half, 0, packed);
+              g.putPosColor(wx + 0.5F + half, wy + 0.5F + half, 0, packed);
+              g.putPosColor(wx + 0.5F - half, wy + 0.5F + half, 0, packed);
+              g.putQuadIndices(base);
+              g.addVertex(4);
+              g.addIndex(6);
+              continue;
+            }
+            float h = Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
+            float s = 1F - h;
+            // top edge: average with the neighbouring surfaces so the
+            // waterline stays continuous across tiles
+            float topYL = wy + (s + surfaceOf(level, wx - 1, wy, liq, s)) / 2F;
+            float topYR = wy + (s + surfaceOf(level, wx + 1, wy, liq, s)) / 2F;
+            int base = g.vertexCount();
+            g.putPosColor(wx, topYL, 0, packed);
+            g.putPosColor(wx + 1, topYR, 0, packed);
+            g.putPosColor(wx + 1, wy + 1, 0, packed);
+            g.putPosColor(wx, wy + 1, 0, packed);
+            g.putQuadIndices(base);
+            g.addVertex(4);
+            g.addIndex(6);
+          }
+      }
+  }
+
+  private static float surfaceOf(Level level, int wx, int wy, Liquid type, float fallback) {
+    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(wx, ChunkPos.SIZE), Math.floorDiv(wy, ChunkPos.SIZE)));
+    if (c == null) return fallback;
+    LiquidMap lm = c.liquidMap();
+    int lv = lm.level(wx, wy);
+    if (lv <= 0 || Liquids.byId(lm.liquidType(wx, wy)) != type) return fallback;
+    return 1F - Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
+  }
+
+  /** Whether the liquid tile has nothing supporting it below (falling). */
+  private static boolean isFalling(Level level, int wx, int wy) {
+    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(wx, ChunkPos.SIZE), Math.floorDiv(wy + 1, ChunkPos.SIZE)));
+    if (c == null) return false;
+    if (c.liquidMap().level(wx, wy + 1) == FluidEngine.FULL) return false;
+    BlockState bs = c.getBlock(wx, wy + 1);
+    return !bs.block().isSolid(bs);
   }
 
   // -- VP upload -----------------------------------------------------------

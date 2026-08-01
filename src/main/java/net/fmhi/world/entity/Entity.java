@@ -27,12 +27,14 @@ package net.fmhi.world.entity;
 import net.fmhi.math.Box2D;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
+import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 @NullMarked
 public class Entity extends SBPhyObj {
@@ -44,6 +46,8 @@ public class Entity extends SBPhyObj {
   protected Entity(float width, float height) {
     this.w = width;
     this.h = height;
+    // lighter than water, so entities float in liquids
+    density = 0.85F;
   }
 
   public Box2D bounds() {
@@ -82,10 +86,19 @@ public class Entity extends SBPhyObj {
 
   public boolean getLight(LightBuffer buf) { return false; }
 
+  public @Nullable Beam getBeam(LightBuffer buf) { return null; }
+
   public static Entity player(PrecisePos pos) {
     var e = new Entity(1.4F, 2.65F) {
-      @Override public boolean getLight(LightBuffer buf) {
-        return false;
+      @Override public Beam getBeam(LightBuffer buf) {
+        buf.r(1.0F); buf.g(0.85F); buf.b(0.86F);
+        return null;
+      }
+
+      @Override
+      public boolean getLight(LightBuffer buf) {
+        getBeam(buf);
+        return true;
       }
     };
     e.setPosition(pos);

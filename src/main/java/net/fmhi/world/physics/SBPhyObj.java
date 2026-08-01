@@ -6,6 +6,8 @@ package net.fmhi.world.physics;
 
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;
+import net.fmhi.world.fluid.Liquid;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.PrecisePos;
@@ -49,6 +51,8 @@ public abstract class SBPhyObj {
   protected float groundFriction = 0F;
   protected float airFriction = 0F;
   protected float liquidFriction = 0F;
+  /** Density of the entity, used for liquid buoyancy. */
+  protected float density = 1F;
   protected float mass = 1F;
   protected float slopeSlidingFactor = 5F;
 
@@ -202,8 +206,23 @@ public abstract class SBPhyObj {
       envVy += sy * slide * d;
     }
 
+    // Liquid contact (Starbound-style): buoyancy and thermal updraft scale
+    // with the fraction of the body inside liquid; viscosity damps the
+    // resulting velocity.
+    float liquidContact = liquidContactFraction(level);
+    if (liquidContact > 0F) {
+      float g = gravity();
+      envVy -= (dominantLiquid.density() - density) * liquidContact * g * d;
+      envVy -= dominantLiquid.temperature() / 1000F * liquidContact * g * 0.1F * d;
+    }
+
     velocity = new Vector2(relativeVelocity.x() + envVx,
                            relativeVelocity.y() + envVy);
+
+    if (liquidContact > 0F) {
+      float keep = Math.max(0F, 1F - dominantLiquid.viscosity() * liquidContact * d);
+      velocity = velocity.multiply(keep);
+    }
 
     // ground friction
     float effFric = Math.max(groundFriction, maxBlockFriction);
@@ -442,6 +461,41 @@ public abstract class SBPhyObj {
     }
 
     return separation;
+  }
+
+  // -- liquid contact ------------------------------------------------------
+
+  private Liquid dominantLiquid = Liquids.EMPTY;
+
+  /** The fraction of the body inside liquid ({@code 0..1}); the liquid
+   * with the largest overlap becomes {@link #dominantLiquid}. */
+  private float liquidContactFraction(Level level) {
+    if (collisionPolygon() == null) return 0F;
+    Box2D bb = collisionPolygon().boundBox().translate(position.toVector2());
+    dominantLiquid = Liquids.EMPTY;
+    float total = 0F;
+    float best = 0F;
+    int minBX = (int) Math.floor(bb.minX());
+    int maxBX = (int) Math.floor(bb.maxX());
+    int minBY = (int) Math.floor(bb.minY());
+    int maxBY = (int) Math.floor(bb.maxY());
+    for (int bx = minBX; bx <= maxBX; bx++) {
+      for (int by = minBY; by <= maxBY; by++) {
+        int lv = level.getLiquidLevel(bx, by);
+        if (lv <= 0) continue;
+        float ox = Math.min(bb.maxX(), bx + 1F) - Math.max(bb.minX(), bx);
+        float oy = Math.min(bb.maxY(), by + 1F) - Math.max(bb.minY(), by);
+        if (ox <= 0F || oy <= 0F) continue;
+        float ov = ox * oy;
+        total += ov;
+        if (ov > best) {
+          best = ov;
+          dominantLiquid = level.getLiquidStack(bx, by).liquid();
+        }
+      }
+    }
+    float area = bb.width() * bb.height();
+    return area > 0F ? Math.min(1F, total / area) : 0F;
   }
 
   // -- queryCollisions ----------------------------------------------------

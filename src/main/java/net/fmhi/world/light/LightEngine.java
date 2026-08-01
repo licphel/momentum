@@ -12,13 +12,19 @@ import net.fmhi.gfx.texture.TextureFilter;
 import net.fmhi.gfx.texture.TextureWrap;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
+import net.fmhi.math.FastTrigonometric;
 import net.fmhi.math.Vector2;
 import net.fmhi.util.Profiler;
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.entity.Entity;
+import net.fmhi.world.fluid.Liquid;
+import net.fmhi.world.fluid.LiquidMap;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.util.ChunkPos;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Base class for engines that maintain a sliding window of per-tile light
@@ -56,7 +62,8 @@ public abstract class LightEngine implements AutoCloseable {
   protected static final int MIN_SIZE = 64;
   /** Largest allowed window side, in tiles. */
   protected static final int MAX_SIZE = 2048;
-
+  /** Maximum reach of a beam, in tiles. */
+  private static final float BEAM_RANGE = 20F;
   /** Sunlight color used to seed sky illumination. */
   public final LightBuffer sunlight = new SimpleLightBuffer();
   protected final Level level;
@@ -67,23 +74,28 @@ public abstract class LightEngine implements AutoCloseable {
   /** Current window size in tiles. */
   protected volatile int sizeX = MIN_SIZE;
   protected volatile int sizeY = MIN_SIZE;
-  protected int oriX;
-  protected int oriY;
+  protected volatile int oriX;
+  protected volatile int oriY;
   /** Window origin of the current front buffer. */
-  protected int frontOriX;
-  protected int frontOriY;
+  protected volatile int frontOriX;
+  protected volatile int frontOriY;
   protected volatile boolean done;
   protected Thread worker;
   protected ChunkCache cc;
+  /** How light values combine everywhere (seed, draw, beam merge, spread). */
+  protected CompositionFormula formula = CompositionFormula.MAX;
   /** Pending window resize, applied when the worker is idle. */
-  private int pendingW = -1, pendingH = -1;
+  private int pendingW = -1;
+  private int pendingH = -1;
   private RenderTarget wallLightRT;
   private RenderTarget frontLightRT;
   private Sampler lmSampler;
+  /** Beam layer: raw RGB per tile, merged into {@code back} after spread. */
+  private float[] beamLayer;
 
   /**
-   * Creates a light engine for the given level, allocating its initial front
-   * and back buffers.
+   * Creates a light engine for the given level, allocating its initial front,
+   * back and beam buffers.
    *
    * @param level the level to light
    */
@@ -92,49 +104,11 @@ public abstract class LightEngine implements AutoCloseable {
     int len = sizeX * sizeY * STRIDE;
     this.front = new float[len];
     this.back = new float[len];
+    this.beamLayer = new float[len];
   }
 
   private static int clamp(int v, int lo, int hi) {
     return Math.max(lo, Math.min(hi, v));
-  }
-
-  /**
-   * Returns the red component of a per-vertex light value in a raw tile
-   * buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the red value of the vertex
-   */
-  public static float r(float[] data, int off, int c) {
-    return data[off + 7 + c * 3];
-  }
-
-  /**
-   * Returns the green component of a per-vertex light value in a raw tile
-   * buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the green value of the vertex
-   */
-  public static float g(float[] data, int off, int c) {
-    return data[off + 8 + c * 3];
-  }
-
-  /**
-   * Returns the blue component of a per-vertex light value in a raw tile
-   * buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the blue value of the vertex
-   */
-  public static float b(float[] data, int off, int c) {
-    return data[off + 9 + c * 3];
   }
 
   /**
@@ -157,57 +131,158 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Seeds the raw RGB channels of a tile from its block light and sky light,
-   * keeping the brighter of the two per channel.
+   * Sets the composition formula used by every light mix in the engine.
    *
-   * @param buf       the tile buffer
-   * @param off       the tile offset
-   * @param block     the block at the tile
-   * @param wall      the wall at the tile
-   * @param skyLight  the sky light falling on the tile
-   * @param x         the tile X coordinate
-   * @param y         the tile Y coordinate
-   * @param lb        a reusable buffer for intermediate light values
-   * @param amplifier the multiplier applied to seeded light
+   * @param formula the composition formula to use
    */
-  public static void seed(float[] buf, int off,
-                          BlockState block, BlockState wall, LightBuffer skyLight,
-                          int x, int y, LightBuffer lb, float amplifier) {
-    float br = 0, bg = 0, bb = 0;
+  public void setCompositionFormula(CompositionFormula formula) {
+    this.formula = formula;
+  }
+
+  /**
+   * Returns the current composition formula.
+   *
+   * @return the composition formula
+   */
+  public CompositionFormula compositionFormula() {
+    return formula;
+  }
+
+  /**
+   * Blends RGB light into the raw channels of the tile at the given offset,
+   * using the current composition formula.
+   *
+   * @param o the tile offset in the working buffer
+   * @param r the red light to blend
+   * @param g the green light to blend
+   * @param b the blue light to blend
+   */
+  protected void blendWrite(int o, float r, float g, float b) {
+    back[o] = formula.blend(back[o], r);
+    back[o + 1] = formula.blend(back[o + 1], g);
+    back[o + 2] = formula.blend(back[o + 2], b);
+  }
+
+  /**
+   * Returns the red component of a per-vertex light value in a raw tile
+   * buffer.
+   *
+   * @param data the tile buffer
+   * @param off  the tile offset
+   * @param c    the vertex index in {@code 0..3}
+   * @return the red value of the vertex
+   */
+  public float r(float[] data, int off, int c) {
+    return data[off + 7 + c * 3];
+  }
+
+  /**
+   * Returns the green component of a per-vertex light value in a raw tile
+   * buffer.
+   *
+   * @param data the tile buffer
+   * @param off  the tile offset
+   * @param c    the vertex index in {@code 0..3}
+   * @return the green value of the vertex
+   */
+  public float g(float[] data, int off, int c) {
+    return data[off + 8 + c * 3];
+  }
+
+  /**
+   * Returns the blue component of a per-vertex light value in a raw tile
+   * buffer.
+   *
+   * @param data the tile buffer
+   * @param off  the tile offset
+   * @param c    the vertex index in {@code 0..3}
+   * @return the blue value of the vertex
+   */
+  public float b(float[] data, int off, int c) {
+    return data[off + 9 + c * 3];
+  }
+
+  /**
+   * Seeds the raw RGB channels of a tile from its block light and sky light,
+   * combining the two per channel, and emits any beam carried by the block.
+   *
+   * @param block    the block at the tile
+   * @param wall     the wall at the tile
+   * @param skyLight the sky light falling on the tile
+   * @param x        the tile X coordinate
+   * @param y        the tile Y coordinate
+   * @param lb       a reusable buffer for intermediate light values
+   */
+  public void seed(BlockState block, BlockState wall, LightBuffer skyLight, int x, int y, LightBuffer lb) {
+    int o = backBufferIndex(x, y);
+    if (o < 0) {
+      return;
+    }
+    float br = 0;
+    float bg = 0;
+    float bb = 0;
     if (block.block().getLight(block, lb)) {
-      br = lb.r() * amplifier;
-      bg = lb.g() * amplifier;
-      bb = lb.b() * amplifier;
+      br = lb.r() * AMPLIFIER;
+      bg = lb.g() * AMPLIFIER;
+      bb = lb.b() * AMPLIFIER;
+    }
+    // liquid light: lava glows like a block, but liquids never emit beams
+    Liquid liq = liquidAt(x, y);
+    if (liq != null && liq.getLight(lb)) {
+      br = Math.max(br, lb.r() * AMPLIFIER);
+      bg = Math.max(bg, lb.g() * AMPLIFIER);
+      bb = Math.max(bb, lb.b() * AMPLIFIER);
+    }
+    Beam[] beams;
+    if ((beams = block.block().getBeam(wall, lb)) != null) {
+      for (Beam b : beams) {
+        drawBeam(x + 0.5F, y + 0.5F, lb.r(), lb.g(), lb.b(), b);
+      }
     }
     LightBuffer gb = new SimpleLightBuffer();
     LightBuffer wb = new SimpleLightBuffer();
     skyEmit(skyLight, x, y, gb);
     wall.block().getLight(wall, wb);
     wall.block().filterLight(wall, gb);
-    gb.max(wb);
+    gb.blend(wb, formula);
 
-    buf[off] = Math.max(br, gb.r() * amplifier);
-    buf[off + 1] = Math.max(bg, gb.g() * amplifier);
-    buf[off + 2] = Math.max(bb, gb.b() * amplifier);
+    blendWrite(o, formula.blend(br, gb.r() * AMPLIFIER),
+        formula.blend(bg, gb.g() * AMPLIFIER),
+        formula.blend(bb, gb.b() * AMPLIFIER));
+  }
+
+  /**
+   * Seeds the raw RGB channels of an entity.
+   *
+   * @param e  the entity to seed
+   * @param lb a reusable buffer for intermediate light values
+   */
+  public void seed(Entity e, LightBuffer lb) {
+    if (e.getLight(lb)) {
+      drawInterpolated(e.center().xf(), e.center().yf(), lb.r(), lb.g(), lb.b());
+    }
+    Beam beam;
+    if ((beam = e.getBeam(lb)) != null) {
+      drawBeam(e.center().xf(), e.center().yf(), lb.r(), lb.g(), lb.b(), beam);
+    }
   }
 
   /**
    * Computes the ambient-occlusion factors of a tile from the solidity of its
    * neighbors and stores them in the tile's AO slots.
    *
-   * @param cc   the chunk cache for neighbor lookups
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param x    the tile X coordinate
-   * @param y    the tile Y coordinate
+   * @param o  the tile offset in the working buffer
+   * @param cc the chunk cache for neighbor lookups
+   * @param x  the tile X coordinate
+   * @param y  the tile Y coordinate
    */
-  private static void populateAO(ChunkCache cc, float[] data, int off, int x, int y) {
+  private void populateAO(int o, ChunkCache cc, int x, int y) {
     if (cc.isFrontSolid(x, y)) {
       float v = 1F - AO_STRENGTH * 1.5F;
-      data[off + 3] = v;
-      data[off + 4] = v;
-      data[off + 5] = v;
-      data[off + 6] = v;
+      back[o + 3] = v;
+      back[o + 4] = v;
+      back[o + 5] = v;
+      back[o + 6] = v;
     } else {
       boolean s0 = cc.isFrontSolid(x - 1, y - 1);
       boolean s1 = cc.isFrontSolid(x - 1, y);
@@ -217,10 +292,10 @@ public abstract class LightEngine implements AutoCloseable {
       boolean s5 = cc.isFrontSolid(x + 1, y - 1);
       boolean s6 = cc.isFrontSolid(x + 1, y);
       boolean s7 = cc.isFrontSolid(x + 1, y + 1);
-      data[off + 3] = 1F - ((s0 ? 1 : 0) + (s1 ? 1 : 0) + (s3 ? 1 : 0)) * AO_STRENGTH;
-      data[off + 4] = 1F - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s4 ? 1 : 0)) * AO_STRENGTH;
-      data[off + 5] = 1F - ((s4 ? 1 : 0) + (s6 ? 1 : 0) + (s7 ? 1 : 0)) * AO_STRENGTH;
-      data[off + 6] = 1F - ((s3 ? 1 : 0) + (s5 ? 1 : 0) + (s6 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 3] = 1F - ((s0 ? 1 : 0) + (s1 ? 1 : 0) + (s3 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 4] = 1F - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s4 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 5] = 1F - ((s4 ? 1 : 0) + (s6 ? 1 : 0) + (s7 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 6] = 1F - ((s3 ? 1 : 0) + (s5 ? 1 : 0) + (s6 ? 1 : 0)) * AO_STRENGTH;
     }
   }
 
@@ -269,9 +344,12 @@ public abstract class LightEngine implements AutoCloseable {
     if (pendingW <= 0) {
       return false;
     }
-    int oldW = sizeX, oldH = sizeY;
-    float[] oldFront = front, oldBack = back;
-    int oldFOX = frontOriX, oldFOY = frontOriY;
+    int oldW = sizeX;
+    int oldH = sizeY;
+    float[] oldFront = front;
+    float[] oldBack = back;
+    int oldFOX = frontOriX;
+    int oldFOY = frontOriY;
     sizeX = pendingW;
     sizeY = pendingH;
     pendingW = pendingH = -1;
@@ -371,7 +449,7 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Adds light to a tile, keeping the brightest value per channel.
+   * Combines light into a tile's current value, using the composition formula.
    *
    * @param x the tile X coordinate
    * @param y the tile Y coordinate
@@ -382,9 +460,7 @@ public abstract class LightEngine implements AutoCloseable {
   public void draw(int x, int y, float r, float g, float b) {
     int o = backBufferIndex(x, y);
     if (o >= 0) {
-      back[o] = Math.max(back[o], r * AMPLIFIER);
-      back[o + 1] = Math.max(back[o + 1], g * AMPLIFIER);
-      back[o + 2] = Math.max(back[o + 2], b * AMPLIFIER);
+      blendWrite(o, r * AMPLIFIER, g * AMPLIFIER, b * AMPLIFIER);
     }
   }
 
@@ -414,6 +490,97 @@ public abstract class LightEngine implements AutoCloseable {
         }
         draw(tx, ty, r / d2, g / d2, b / d2);
       }
+    }
+  }
+
+  /**
+   * Draws a directional beam into the beam layer. Beam light is kept separate
+   * from the spread buffer: the cellular spread is isotropic and would wash
+   * out the cone. The beam layer is blended into the raw channels after
+   * spreading (see {@link #mergeBeam()}), so the cone shape survives.
+   *
+   * @param x    the light source X coordinate
+   * @param y    the light source Y coordinate
+   * @param r    the red light of the source
+   * @param g    the green light of the source
+   * @param b    the blue light of the source
+   * @param beam the beam to draw
+   */
+  public void drawBeam(float x, float y, float r, float g, float b, Beam beam) {
+    float maxIntensity = Math.max(r, Math.max(g, b));
+    if (maxIntensity <= DARK_LUMINANCE) {
+      return;
+    }
+    float range = maxIntensity * BEAM_RANGE * beam.power();
+    float perBlockAir = 1F / (BEAM_RANGE * beam.power());
+    float[] bdsc = FastTrigonometric.sincos(beam.direction());
+    float bdx = bdsc[1];
+    float bdy = -bdsc[0];
+    // Normalize so that the angular falloff equals `strength` exactly at
+    // `halfAngle` — the half-angle marks where the beam reaches the
+    // strength-weighted attenuation; the edge stays smooth (cosine curve)
+    // rather than a hard cutoff.
+    float beamK = beam.strength() / (1F - FastTrigonometric.cos(beam.halfAngle()));
+    float ambi = beam.ambience();
+
+    int lx = (int) Math.floor(x);
+    int ly = (int) Math.floor(y);
+    int radius = (int) Math.ceil(range);
+    for (int tx = lx - radius; tx <= lx + radius; tx++) {
+      for (int ty = ly - radius; ty <= ly + radius; ty++) {
+        float dx = tx + 0.5F - x;
+        float dy = ty + 0.5F - y;
+        float dist = (float) Math.sqrt(dx * dx + dy * dy);
+        if (dist == 0F) {
+          int o0 = backBufferIndex(tx, ty);
+          if (o0 >= 0) {
+            beamLayer[o0] = Math.max(beamLayer[o0], r * AMPLIFIER);
+            beamLayer[o0 + 1] = Math.max(beamLayer[o0 + 1], g * AMPLIFIER);
+            beamLayer[o0 + 2] = Math.max(beamLayer[o0 + 2], b * AMPLIFIER);
+          }
+          continue;
+        }
+
+        float attenuation = dist * perBlockAir;
+        if (beamK > 0F) {
+          float dot = (dx * bdx + dy * bdy) / dist;
+          attenuation += (1F - ambi) * Math.min(1F, Math.max(0F, beamK * (1F - dot)));
+        }
+        if (attenuation >= 1F) {
+          continue;
+        }
+        float remaining = maxIntensity - attenuation;
+        if (remaining <= 0F) {
+          continue;
+        }
+        float factor = remaining / maxIntensity;
+
+        int o = backBufferIndex(tx, ty);
+        if (o < 0) {
+          continue;
+        }
+        beamLayer[o] = Math.max(beamLayer[o], r * factor * AMPLIFIER);
+        beamLayer[o + 1] = Math.max(beamLayer[o + 1], g * factor * AMPLIFIER);
+        beamLayer[o + 2] = Math.max(beamLayer[o + 2], b * factor * AMPLIFIER);
+      }
+    }
+  }
+
+  /**
+   * Blends the beam layer into the raw channels of {@code back} using the
+   * composition formula, then clears it for the next frame. Call after
+   * spreading, before populating vertices.
+   */
+  protected void mergeBeam() {
+    if (beamLayer == null) {
+      return;
+    }
+    int len = sizeX * sizeY * STRIDE;
+    for (int i = 0; i < len; i += STRIDE) {
+      if (beamLayer[i] > 0F || beamLayer[i + 1] > 0F || beamLayer[i + 2] > 0F) {
+        blendWrite(i, beamLayer[i], beamLayer[i + 1], beamLayer[i + 2]);
+      }
+      beamLayer[i] = beamLayer[i + 1] = beamLayer[i + 2] = 0F;
     }
   }
 
@@ -472,7 +639,8 @@ public abstract class LightEngine implements AutoCloseable {
         Chunk chunk = level.getOrLoadChunk(new ChunkPos(cx, cy));
         for (int lx = 0; lx < cs; lx++) {
           for (int ly = 0; ly < cs; ly++) {
-            int wx = cx * cs + lx, wy = cy * cs + ly;
+            int wx = cx * cs + lx;
+            int wy = cy * cs + ly;
             BlockState block = chunk.getBlock(lx, ly);
             BlockState wallS = chunk.getWall(lx, ly);
             boolean hasWall = wallS != BlockState.EMPTY;
@@ -525,31 +693,31 @@ public abstract class LightEngine implements AutoCloseable {
    * Computes the per-tile auxiliary values of a tile: its ambient-occlusion
    * factors and the smoothed per-vertex light colors.
    *
-   * @param cc   the chunk cache for neighbor lookups
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param x    the tile X coordinate
-   * @param y    the tile Y coordinate
+   * @param cc the chunk cache for neighbor lookups
+   * @param x  the tile X coordinate
+   * @param y  the tile Y coordinate
    */
-  public void populate(ChunkCache cc, float[] data, int off, int x, int y) {
-    populateAO(cc, data, off, x, y);
-    populateSmoothedLightVerticesByChannel(data, off, Channel.RED, x, y);
-    populateSmoothedLightVerticesByChannel(data, off, Channel.GREEN, x, y);
-    populateSmoothedLightVerticesByChannel(data, off, Channel.BLUE, x, y);
+  public void populate(ChunkCache cc, int x, int y) {
+    int o = backBufferIndex(x, y);
+    if (o < 0) {
+      return;
+    }
+    populateAO(o, cc, x, y);
+    populateSmoothedLightVerticesByChannel(o, Channel.RED, x, y);
+    populateSmoothedLightVerticesByChannel(o, Channel.GREEN, x, y);
+    populateSmoothedLightVerticesByChannel(o, Channel.BLUE, x, y);
   }
 
   /**
    * Smoothes one channel of a tile's light against its neighbors and writes
    * the four per-vertex values, darkened by the tile's ambient occlusion.
    *
-   * @param data    the tile buffer
-   * @param off     the tile offset
+   * @param o       the tile offset in the working buffer
    * @param channel the color channel to populate
    * @param x       the tile X coordinate
    * @param y       the tile Y coordinate
    */
-  private void populateSmoothedLightVerticesByChannel(
-      float[] data, int off, byte channel, int x, int y) {
+  private void populateSmoothedLightVerticesByChannel(int o, byte channel, int x, int y) {
     float l1 = getChannelValue(x - 1, y, channel);
     float l2 = getChannelValue(x + 1, y, channel);
     float l3 = getChannelValue(x, y - 1, channel);
@@ -558,19 +726,19 @@ public abstract class LightEngine implements AutoCloseable {
     float l6 = getChannelValue(x + 1, y + 1, channel);
     float l7 = getChannelValue(x - 1, y + 1, channel);
     float l8 = getChannelValue(x + 1, y - 1, channel);
-    float l0 = data[off + channel];
+    float l0 = back[o + channel];
     float v0 = (l0 + l1 + l3 + l5) / 4F;
     float v1 = (l0 + l1 + l4 + l7) / 4F;
     float v2 = (l0 + l2 + l4 + l6) / 4F;
     float v3 = (l0 + l2 + l3 + l8) / 4F;
-    float aoTL = data[off + 3];
-    float aoBL = data[off + 4];
-    float aoBR = data[off + 5];
-    float aoTR = data[off + 6];
-    data[off + channel + 7] = v0 * aoTL;
-    data[off + channel + 10] = v3 * aoTR;
-    data[off + channel + 13] = v2 * aoBR;
-    data[off + channel + 16] = v1 * aoBL;
+    float aoTL = back[o + 3];
+    float aoBL = back[o + 4];
+    float aoBR = back[o + 5];
+    float aoTR = back[o + 6];
+    back[o + channel + 7] = v0 * aoTL;
+    back[o + channel + 10] = v3 * aoTR;
+    back[o + channel + 13] = v2 * aoBR;
+    back[o + channel + 16] = v1 * aoBL;
   }
 
   /**
@@ -606,8 +774,12 @@ public abstract class LightEngine implements AutoCloseable {
     sunlight.b(1F);
   }
 
-  /* Called on #applyPendingResize returns true. */
+  /**
+   * Rebuilds engine state that depends on the window size after a resize
+   * takes effect.
+   */
   protected void onResized() {
+    beamLayer = new float[sizeX * sizeY * STRIDE];
   }
 
   /**
@@ -656,9 +828,22 @@ public abstract class LightEngine implements AutoCloseable {
     return (x + y * sizeX) * STRIDE;
   }
 
+  /** The liquid at the given tile, or {@code null} if none. */
+  private @Nullable Liquid liquidAt(int x, int y) {
+    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(x, ChunkPos.SIZE), Math.floorDiv(y, ChunkPos.SIZE)));
+    if (c == null) {
+      return null;
+    }
+    LiquidMap lm = c.liquidMap();
+    return lm.level(x, y) > 0 ? Liquids.byId(lm.liquidType(x, y)) : null;
+  }
+
   /**
-   * Returns the buffer offset of a tile in the working window, or -1 if the
-   * tile is outside it.
+   * Returns the buffer offset of a tile in the working window.
+   *
+   * @param x the tile X coordinate
+   * @param y the tile Y coordinate
+   * @return the tile offset, or -1 if the tile is outside the window
    */
   protected int backBufferIndex(int x, int y) {
     x -= oriX;

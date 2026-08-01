@@ -32,6 +32,7 @@ import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.world.block.Block;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.item.Item;
+import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
@@ -94,6 +95,14 @@ public final class Registries {
       buf.g((float) Math.sin(fm / 1000.0 + 1) * 0.25F + 0.5F);
       buf.b((float) Math.sin(fm / 1000.0 + 2) * 0.25F + 0.5F);
       return true;
+    }
+
+    @Override
+    public Beam[] getBeam(BlockState state, LightBuffer buf) {
+      buf.r(1);
+      buf.g(1);
+      buf.b(1);
+      return new Beam[]{new Beam((float) -Math.PI / 2, 0.95F, 0.1F, 1.0F, 1.0F)};
     }
   });
 
