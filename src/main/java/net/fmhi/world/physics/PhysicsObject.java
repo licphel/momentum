@@ -222,7 +222,7 @@ public abstract class PhysicsObject {
         float dx = poly.boundBox().centralX() - centerX;
         float dy = poly.boundBox().centralY() - centerY;
         list.add(new ColPoly(poly, dx * dx + dy * dy,
-            state.block().bounce(), state.block().friction(),
+            state.bounce(), state.friction(),
             new BlockPos(bx, by)));
       }
     }

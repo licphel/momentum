@@ -31,15 +31,14 @@ import net.fmhi.util.Profiler;
 import net.fmhi.util.ResourceProvider;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.BlockStateHolder;
+import net.fmhi.world.block.Shape;
 import net.fmhi.world.entity.Entity;
 import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
-import net.fmhi.world.fluid.LiquidMap;
 import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.FlatTerrainGenerator;
 import net.fmhi.world.level.Level;
-import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
@@ -87,16 +86,19 @@ public class Main {
         level.getOrLoadChunk(new ChunkPos(cx, cy));
     // demo fluids: a water pool at the spawn, a lava pool on the plateau,
     // and a splash of water next to the lava so the reaction is visible
-    for (int x = -4; x <= 4; x++) level.setLiquid(x, GROUND_Y - 1, Liquids.WATER, FluidEngine.FULL);
-    for (int x = 13; x <= 16; x++) level.setLiquid(x, GROUND_Y - 8, Liquids.LAVA, FluidEngine.FULL);
-    level.setLiquid(12, GROUND_Y - 8, Liquids.WATER, FluidEngine.FULL);
+    // (Y-up: the ground is at GROUND_Y, above it is higher Y)
+    for (int x = -4; x <= 4; x++) level.setLiquid(x, GROUND_Y + 1, Liquids.WATER, FluidEngine.FULL);
+    for (int x = 13; x <= 16; x++) level.setLiquid(x, GROUND_Y + 8, Liquids.LAVA, FluidEngine.FULL);
+    level.setLiquid(12, GROUND_Y + 8, Liquids.WATER, FluidEngine.FULL);
     try {
       texture = Texture.loadRGBA8(dev, new PngInputStream(ResourceProvider.classpath(Main.class).openStream("/img.png")).info());
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
 
-    Entity player = Entity.player(new PrecisePos(0, GROUND_Y - 2.65F));
+    // Y-up: the player position is the feet; the ground block at GROUND_Y
+    // spans [GROUND_Y, GROUND_Y+1], so the feet rest on its top
+    Entity player = Entity.player(new PrecisePos(0, GROUND_Y + 1F));
     player.enterChunk(level);
 
     List<ThrownItem> thrownItems = new ArrayList<>();
@@ -134,7 +136,7 @@ public class Main {
 
     Pipeline pipeCompose = dev.getRenderPipeline(new PipelineDesc.Builder()
         .blend(Blend.DISABLED).depth(Depth.DISABLED)
-        .rasterization(RasterizationDesc.DEFAULT)
+        .rasterization(RasterizationDesc.NOT_CULL)
         .shaderProgram(spCompose)
         .vertexLayout(vlCompose)
         .resourceLayouts(rslCompose)
@@ -185,8 +187,13 @@ public class Main {
       if (snap.isDown(KeyCode.D)) vx = WALK_SPEED;
       boolean jump = snap.isDown(KeyCode.W) || snap.isDown(KeyCode.SPACE);
       if (jump && player.onGround())
-        player.setVelocity(vx, -JUMP_SPEED);
-      else
+        player.setVelocity(vx, JUMP_SPEED); // Y-up: jumping is +Y
+      else if (jump) {
+        // Starbound-style swimming: burst on press, smooth approach while
+        // held, never launches out of the water
+        player.setVelocity(vx, player.velocity().y());
+        player.liquidJump(true, dt);
+      } else
         player.setVelocity(vx, player.velocity().y());
 
       var vp = Box2D.create(0, 0, view.width(), view.height());
@@ -256,6 +263,7 @@ public class Main {
       // ===================================================================
       // PASS 1a: wall layer → wallRT (full bright; tint from lightmap)
       // ===================================================================
+      camera.flipY(false); // world is Y-up: render without flipping
       g.begin(RenderPass.of(colorRT, new Color(0.05F, 0.05F, 0.08F)));
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:wall")) {
@@ -268,13 +276,14 @@ public class Main {
       // always have light — Enchant style)
       // ===================================================================
       level.lightEngine().generateLightmaps(g, camera);
+      camera.flipY(true);
 
       // ===================================================================
       // PASS 2a: wall albedo × wallLightmap → screen (OPAQUE)
       // ===================================================================
       Camera2D orthoCam = new Camera2D(WIN_W, WIN_H, dev.getTransformHandler());
       orthoCam.setOrthographic(WIN_W, WIN_H);
-      orthoCam.setPosition(new Vector2(WIN_W / 2F, WIN_H / 2F));
+      orthoCam.setCenter(new Vector2(WIN_W / 2F, WIN_H / 2F));
       try (Profiler.Scope _ = Profiler.scope("rendering:wall_compose")) {
         g.begin(RenderPass.DEFAULT);
         g.setCamera(orthoCam);
@@ -294,6 +303,7 @@ public class Main {
       // ===================================================================
       // PASS 1b: front layer (blocks + entities) → frontRT (transparent bg)
       // ===================================================================
+      camera.flipY(false); // world is Y-up: render without flipping
       g.begin(RenderPass.of(frontRT, new Color(0, 0, 0, 0)));
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:block")) {
@@ -309,6 +319,7 @@ public class Main {
         g.drawRectangleFrame(chunk.chunkPos.x() * 16, chunk.chunkPos.y() * 16, 16, 16);
       }
       g.end();
+      camera.flipY(true);
 
       // ===================================================================
       // PASS 2b: front albedo × frontLightmap → screen (alpha mix —
@@ -352,7 +363,7 @@ public class Main {
   // -- PASS 1 --------------------------------------------------------------
 
   private static void renderWalls(BatchedGraphics2D g, Level level, Camera2D cam) {
-    var cp = cam.position();
+    var cp = cam.center();
     float vw = cam.width() / cam.zoom();
     float vh = cam.height() / cam.zoom();
     int cs = ChunkPos.SIZE;
@@ -370,7 +381,7 @@ public class Main {
   }
 
   private static void renderBlocks(BatchedGraphics2D g, Level level, Camera2D cam) {
-    var cp = cam.position();
+    var cp = cam.center();
     float vw = cam.width() / cam.zoom();
     float vh = cam.height() / cam.zoom();
     int cs = ChunkPos.SIZE;
@@ -388,7 +399,7 @@ public class Main {
   }
 
   private static void renderLiquids(BatchedGraphics2D g, Level level, Camera2D cam) {
-    var cp = cam.position();
+    var cp = cam.center();
     float vw = cam.width() / cam.zoom();
     float vh = cam.height() / cam.zoom();
     int cs = ChunkPos.SIZE;
@@ -396,13 +407,12 @@ public class Main {
       for (int cy = (int)Math.floor((cp.y()-vh/2F)/cs); cy <= (int)Math.floor((cp.y()+vh/2F)/cs); cy++) {
         Chunk ck = level.getChunk(new ChunkPos(cx, cy));
         if (ck == null) continue;
-        LiquidMap lm = ck.liquidMap();
         for (int ly = 0; ly < cs; ly++)
           for (int lx = 0; lx < cs; lx++) {
             int wx = cx * cs + lx, wy = cy * cs + ly;
-            int lv = lm.level(wx, wy);
+            int lv = ck.getLiquidLevel(wx, wy);
             if (lv <= 0) continue;
-            Liquid liq = Liquids.byId(lm.liquidType(wx, wy));
+            Liquid liq = Liquids.byId(ck.getLiquidType(wx, wy));
             long packed = liq.color().pack();
             // falling liquid (nothing below) renders as a small centered
             // block, like Starbound
@@ -419,17 +429,16 @@ public class Main {
               g.addIndex(6);
               continue;
             }
-            float h = Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
-            float s = 1F - h;
-            // top edge: average with the neighbouring surfaces so the
-            // waterline stays continuous across tiles
-            float topYL = wy + (s + surfaceOf(level, wx - 1, wy, liq, s)) / 2F;
-            float topYR = wy + (s + surfaceOf(level, wx + 1, wy, liq, s)) / 2F;
+            // Y-up: liquid fills the tile from the bottom up; the surface
+            // edge is smoothed against the neighbouring surfaces
+            float surf = wy + Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
+            float topL = (surf + surfaceOf(level, wx - 1, wy, liq, surf)) / 2F;
+            float topR = (surf + surfaceOf(level, wx + 1, wy, liq, surf)) / 2F;
             int base = g.vertexCount();
-            g.putPosColor(wx, topYL, 0, packed);
-            g.putPosColor(wx + 1, topYR, 0, packed);
-            g.putPosColor(wx + 1, wy + 1, 0, packed);
-            g.putPosColor(wx, wy + 1, 0, packed);
+            g.putPosColor(wx, topL, 0, packed);
+            g.putPosColor(wx + 1, topR, 0, packed);
+            g.putPosColor(wx + 1, wy, 0, packed);
+            g.putPosColor(wx, wy, 0, packed);
             g.putQuadIndices(base);
             g.addVertex(4);
             g.addIndex(6);
@@ -438,21 +447,20 @@ public class Main {
   }
 
   private static float surfaceOf(Level level, int wx, int wy, Liquid type, float fallback) {
-    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(wx, ChunkPos.SIZE), Math.floorDiv(wy, ChunkPos.SIZE)));
+    Chunk c = level.getChunkByKey(ChunkPos.packBlockPosAsLong(wx, wy));
     if (c == null) return fallback;
-    LiquidMap lm = c.liquidMap();
-    int lv = lm.level(wx, wy);
-    if (lv <= 0 || Liquids.byId(lm.liquidType(wx, wy)) != type) return fallback;
-    return 1F - Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
+    int lv = c.getLiquidLevel(wx, wy);
+    if (lv <= 0 || Liquids.byId(c.getLiquidType(wx, wy)) != type) return fallback;
+    return wy + Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
   }
 
-  /** Whether the liquid tile has nothing supporting it below (falling). */
+  /** Whether the liquid tile has nothing supporting it below (falling).
+   * Y-up: below is {@code wy - 1}. */
   private static boolean isFalling(Level level, int wx, int wy) {
-    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(wx, ChunkPos.SIZE), Math.floorDiv(wy + 1, ChunkPos.SIZE)));
+    Chunk c = level.getChunkByKey(ChunkPos.packBlockPosAsLong(wx, wy - 1));
     if (c == null) return false;
-    if (c.liquidMap().level(wx, wy + 1) == FluidEngine.FULL) return false;
-    BlockState bs = c.getBlock(wx, wy + 1);
-    return !bs.block().isSolid(bs);
+    if (c.getLiquidLevel(wx, wy - 1) == FluidEngine.FULL) return false;
+    return c.getBlock(wx, wy - 1).shape() != Shape.SOLID;
   }
 
   // -- VP upload -----------------------------------------------------------
@@ -491,7 +499,7 @@ public class Main {
   }
 
   private static Box2D cameraBounds(Camera2D c) {
-    var p = c.position();
+    var p = c.center();
     float vw = c.width() / c.zoom();
     float vh = c.height() / c.zoom();
     return Box2D.createCentral(p.x(), p.y(), vw, vh);
@@ -511,7 +519,6 @@ public class Main {
       setVelocity(vel);
       bounceFactor = 0.5F;
       groundFriction = 0.2F;
-      shouldSlideOnSlope = true;
       rgb[0] = (float)RandomGenerator.DEFAULT.nextDouble();
       rgb[1] = (float)RandomGenerator.DEFAULT.nextDouble();
       rgb[2] = (float)RandomGenerator.DEFAULT.nextDouble();

@@ -378,6 +378,8 @@ public class TestVertexBuilder2D {
       cns.append(Literal.of("多语言测试多语言测试多语言测试多语言测试多语言测试").with(new TextFormat(font2, Color.WHITE,
           Font.ITALIC | Font.STRIKETHROUGH | Font.UNDERLINE, 8)));
       cns.newline();
+      g.drawRectangleFrame(0, 0, 256, 256);
+      g.drawTexture(cns.raster().entries()[0].glyph().texPart().src(), 0, 0, 256, 256);
       g.drawText(cns, 200, 100);
       g.drawRectangle(200, 100, 3, 3);
       g.setColor(Color.RED);

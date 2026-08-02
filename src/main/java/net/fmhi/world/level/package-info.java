@@ -22,27 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fmhi.world.light;
+@NullMarked
+package net.fmhi.world.level;
 
-/**
- * Index constants for the color channels of a light value, used to select
- * individual channels when operating on raw light buffers.
- */
-public final class Channel {
-  /** Index of the red channel. */
-  public static final byte RED = 0;
-  /** Index of the green channel. */
-  public static final byte GREEN = 1;
-  /** Index of the blue channel. */
-  public static final byte BLUE = 2;
-
-  /** All channels array. */
-  public static final byte[] CHANNELS = {
-      RED,
-      GREEN,
-      BLUE
-  };
-
-  private Channel() {
-  }
-}
+import org.jspecify.annotations.NullMarked;

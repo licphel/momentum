@@ -1,7 +1,7 @@
 package net.fmhi.world.fluid;
 
 import net.fmhi.util.Profiler;
-import net.fmhi.world.block.BlockState;
+import net.fmhi.world.block.Shape;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.util.ChunkPos;
@@ -34,6 +34,10 @@ import java.util.Random;
  * impassable. Different liquids touching each other react (lava + water →
  * stone) or the thinner one converts into the thicker one, so they never
  * just sit layered next to each other.
+ *
+ * <p>All tile access goes through the {@link Level} chunk map (allocation-
+ * free via {@link ChunkPos#packBlockPosAsLong(int, int)}) and the
+ * {@link Chunk} proxy methods.
  */
 @NullMarked
 public final class FluidEngine {
@@ -126,15 +130,17 @@ public final class FluidEngine {
    * squeeze overfill upward. */
   private void updateCells() {
     boolean leftFirst = random.nextBoolean();
-    // bottom-up, like Starbound (Y-down world: highest y first)
-    for (int i = activeCount - 1; i >= 0; i--) {
+    // bottom-up, like Starbound (Y-up world: lowest y first); the count is
+    // fixed so cells joined mid-tick are processed on the next tick
+    int count = activeCount;
+    for (int i = 0; i < count; i++) {
       Cell self = cellAt(i);
       if (self == null || self.type == 0 || self.level <= 0) continue;
 
-      // 1) fall: drop into the tile below, filling it up to full
-      Cell below = cellOf(self.x, self.y + 1, cellB);
+      // 1) fall: drop into the tile below (Y-up: y - 1), filling it up
+      Cell below = cellOf(self.x, self.y - 1, cellB);
       if (below != null) {
-        transferLevel(self, self.x, self.y + 1, Math.min(self.level, FULL - below.level));
+        transferLevel(self, self.x, self.y - 1, Math.min(self.level, FULL - below.level));
       }
 
       // 2) equalize: move half the level difference into a lower neighbour
@@ -146,11 +152,11 @@ public final class FluidEngine {
         equalizeSide(self, self.x - 1, self.y);
       }
 
-      // 3) pressure: overfill is squeezed upward
+      // 3) pressure: overfill is squeezed upward (Y-up: y + 1)
       if (self.level > FULL) {
-        Cell top = cellOf(self.x, self.y - 1, cellB);
+        Cell top = cellOf(self.x, self.y + 1, cellB);
         if (top != null) {
-          transferLevel(self, self.x, self.y - 1, Math.min(self.level - FULL, FULL - top.level));
+          transferLevel(self, self.x, self.y + 1, Math.min(self.level - FULL, FULL - top.level));
         }
       }
     }
@@ -162,7 +168,7 @@ public final class FluidEngine {
     int flow = (self.level - dst.level) / 2;
     if (flow <= 0) {
       // a single unit cannot split further: it evaporates instead
-      if (self.level == MINIMUM_LIQUID_LEVEL) self.map.setLevel(self.x, self.y, 0);
+      if (self.level == MINIMUM_LIQUID_LEVEL) self.chunk.setLiquidLevel(self.x, self.y, 0);
       return;
     }
     transferLevel(self, nx, ny, flow);
@@ -172,7 +178,8 @@ public final class FluidEngine {
    * stone); otherwise the thinner liquid converts into the thicker one, so
    * different liquids never just sit layered next to each other. */
   private void findInteractions() {
-    for (int i = activeCount - 1; i >= 0; i--) {
+    int count = activeCount; // the snapshot, as in updateCells
+    for (int i = count - 1; i >= 0; i--) {
       Cell self = cellAt(i);
       if (self == null || self.type == 0 || self.level <= 0) continue;
       interactSide(self, self.x - 1, self.y);
@@ -201,10 +208,10 @@ public final class FluidEngine {
 
     // conversion: the thinner liquid becomes the thicker one
     if (self.level > dst.level) {
-      dst.map.setType(nx, ny, self.type);
+      dst.chunk.setLiquidType(nx, ny, self.type);
       join(nx, ny);
     } else {
-      self.map.setType(self.x, self.y, dst.type);
+      self.chunk.setLiquidType(self.x, self.y, dst.type);
       join(self.x, self.y);
     }
   }
@@ -221,9 +228,9 @@ public final class FluidEngine {
     amount = Math.min(amount, src.level);
     src.level -= amount;
     dst.level += amount;
-    src.map.setLevel(src.x, src.y, src.level);
-    dst.map.setLevel(dx, dy, dst.level);
-    dst.map.setType(dx, dy, src.type);
+    src.chunk.setLiquidLevel(src.x, src.y, src.level);
+    dst.chunk.setLiquidLevel(dx, dy, dst.level);
+    dst.chunk.setLiquidType(dx, dy, src.type);
     join(src.x, src.y);
     join(dx, dy);
   }
@@ -231,7 +238,7 @@ public final class FluidEngine {
   // -- cells ----------------------------------------------------------------
 
   private static final class Cell {
-    LiquidMap map;
+    Chunk chunk;
     int x;
     int y;
     int level;
@@ -245,23 +252,13 @@ public final class FluidEngine {
   /** Fills {@code out} with the tile's data, or {@code null} when the tile
    * is impassable (solid block or unloaded chunk). */
   private @Nullable Cell cellOf(int wx, int wy, Cell out) {
-    Chunk chunk = chunkAt(wx, wy);
-    if (chunk == null || isSolid(chunk, wx, wy)) return null;
-    LiquidMap lm = chunk.liquidMap();
-    out.map = lm;
+    Chunk chunk = level.getChunkByKey(ChunkPos.packBlockPosAsLong(wx, wy));
+    if (chunk == null || chunk.getBlock(wx, wy).shape() == Shape.SOLID) return null;
+    out.chunk = chunk;
     out.x = wx;
     out.y = wy;
-    out.level = lm.level(wx, wy);
-    out.type = lm.liquidType(wx, wy);
+    out.level = chunk.getLiquidLevel(wx, wy);
+    out.type = chunk.getLiquidType(wx, wy);
     return out;
-  }
-
-  private @Nullable Chunk chunkAt(int wx, int wy) {
-    return level.getChunk(new ChunkPos(Math.floorDiv(wx, ChunkPos.SIZE), Math.floorDiv(wy, ChunkPos.SIZE)));
-  }
-
-  private boolean isSolid(Chunk chunk, int wx, int wy) {
-    BlockState state = chunk.getBlock(wx, wy);
-    return state.block().isSolid(state);
   }
 }

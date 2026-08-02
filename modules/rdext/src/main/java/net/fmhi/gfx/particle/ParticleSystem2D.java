@@ -102,7 +102,7 @@ public final class ParticleSystem2D {
         new Slot(1, "u_tex", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE));
 
     pipeline = device.getRenderPipeline(new PipelineDesc.Builder()
-        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.DEFAULT)
+        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.NOT_CULL)
         .shaderProgram(program).vertexLayout(vl).resourceLayouts(rsl).build());
 
     sampler = device.getSampler(new SamplerDesc.Builder()

@@ -20,12 +20,8 @@ public interface CompositionFormula {
   CompositionFormula MAX = Math::max;
   /** Unbounded per-channel sum of the two values. */
   CompositionFormula ADDITIVE = Float::sum;
-  /**
-   * Additive blend with a luminance-aware cap: dark areas add fully, bright
-   * areas asymptotically accept no more light.
-   */
-  CompositionFormula ADDITIVE_CAP =
-      (src, dst) -> src + dst * (1F - src / 2.0F);
+  /** Additive blend with a luminance-aware cap. */
+  CompositionFormula ADDITIVE_CAP = (src, dst) -> src + dst * (1F - src / 2.0F);
 
   /**
    * Combines the existing light value with the incoming one.

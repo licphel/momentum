@@ -140,10 +140,14 @@ public final class OpenGLTexture implements Texture, Handle {
       ByteBuffer bb = memAlloc(flipped.length);
       try {
         bb.put(flipped).flip();
+        // The data block is flipped to GL row order (first row = bottom), so
+        // its destination Y must flip too: the API Y is top-origin, GL Y is
+        // bottom-origin. A full-texture upload (y=0, h=height) is unaffected.
+        int glY = desc.height() - y - h;
         switch (desc.type()) {
           case TextureType.TEXTURE_1D -> glTexSubImage1D(target, 0, x, w, pixFmt, pixType, bb);
-          case TextureType.TEXTURE_2D -> glTexSubImage2D(target, 0, x, y, w, h, pixFmt, pixType, bb);
-          case TextureType.TEXTURE_3D -> glTexSubImage3D(target, 0, x, y, z, w, h, d, pixFmt, pixType, bb);
+          case TextureType.TEXTURE_2D -> glTexSubImage2D(target, 0, x, glY, w, h, pixFmt, pixType, bb);
+          case TextureType.TEXTURE_3D -> glTexSubImage3D(target, 0, x, glY, z, w, h, d, pixFmt, pixType, bb);
         }
       } finally {
         memFree(bb);

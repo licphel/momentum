@@ -76,7 +76,7 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
    * @param primitive the expected primitive type
    */
   @Override
-  protected void assertPrimitive(Primitive2D primitive) {
+  public void setPrimitive(Primitive2D primitive) {
     if (primitive != currentPrimitive) {
       flush();
       currentPrimitive = primitive;
@@ -89,7 +89,7 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
    * @param tex the expected texture
    */
   @Override
-  protected void assertTexture(Texture tex) {
+  public void setTexture(@Nullable Texture tex) {
     if (tex != currentTexture) {
       flush();
       currentTexture = tex;

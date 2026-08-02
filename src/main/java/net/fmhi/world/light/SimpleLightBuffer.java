@@ -24,6 +24,9 @@
 
 package net.fmhi.world.light;
 
+import java.util.ArrayDeque;
+import java.util.Queue;
+
 /**
  * A mutable {@link LightBuffer} backed by three plain float fields.
  *
@@ -33,9 +36,47 @@ package net.fmhi.world.light;
  * @see LightBuffer
  */
 public final class SimpleLightBuffer implements LightBuffer {
+  private static final ThreadLocal<Queue<SimpleLightBuffer>> POOL = ThreadLocal.withInitial(ArrayDeque::new);
+
   private float rv;
   private float gv;
   private float bv;
+  private boolean pooled;
+
+  /**
+   * Creates a non-pooled light buffer.
+   */
+  public SimpleLightBuffer() {
+  }
+
+  /**
+   * Returns a pooled SimpleLightBuffer instance for the current thread.
+   * The buffer may contain stale values from previous usage.
+   *
+   * @return a thread-local light buffer
+   */
+  public static SimpleLightBuffer pooled() {
+    Queue<SimpleLightBuffer> pool = POOL.get();
+    SimpleLightBuffer buf = pool.poll();
+    if (buf == null) {
+      buf = new SimpleLightBuffer();
+      buf.pooled = true;
+    }
+    buf.rv = 0F;
+    buf.gv = 0F;
+    buf.bv = 0F;
+    return buf;
+  }
+
+  /**
+   * Returns this buffer to the pool for reuse.
+   * Call this when done with the buffer.
+   */
+  public void recycle() {
+    if (pooled) {
+      POOL.get().offer(this);
+    }
+  }
 
   @Override
   public float r() {

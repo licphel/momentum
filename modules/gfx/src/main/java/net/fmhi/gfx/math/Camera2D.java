@@ -40,13 +40,14 @@ import net.fmhi.math.Vector3;
  * {@code height/zoom} vertically, centered on the position.
  */
 public class Camera2D {
-  private Vector2 position = Vector2.ZERO;
+  private Vector2 center = Vector2.ZERO;
   private float width;
   private float height;
   private float zoom = 1.0F;
   private Matrix4x4 vpMatrix = Matrix4x4.IDENTITY;
   private boolean dirty = true;
   private final TransformHandler handler;
+  private boolean flipY = true;
 
   /**
    * Creates a camera with the specified viewport dimensions.
@@ -59,6 +60,16 @@ public class Camera2D {
     this.width = width;
     this.height = height;
     this.handler = handler;
+    this.center = new Vector2(width / 2, height / 2);
+  }
+
+  /**
+   * Sets the y-axis points upward or downward.
+   *
+   * @param flipY whether to flip y down
+   */
+  public void flipY(boolean flipY) {
+    this.flipY = flipY;
   }
 
   /**
@@ -66,8 +77,8 @@ public class Camera2D {
    *
    * @return center position
    */
-  public Vector2 position() {
-    return position;
+  public Vector2 center() {
+    return center;
   }
 
   /**
@@ -76,7 +87,8 @@ public class Camera2D {
    * @param center the new center in world coordinates
    */
   public void setCenter(Vector2 center) {
-    setPosition(center);
+    this.center = center;
+    dirty = true;
   }
 
   /**
@@ -116,22 +128,12 @@ public class Camera2D {
   }
 
   /**
-   * Sets the camera position in world coordinates.
-   *
-   * @param pos new position
-   */
-  public void setPosition(Vector2 pos) {
-    position = pos;
-    dirty = true;
-  }
-
-  /**
    * Translates the camera by the given delta.
    *
    * @param delta translation vector
    */
   public void translate(Vector2 delta) {
-    position = position.add(delta);
+    center = center.add(delta);
     dirty = true;
   }
 
@@ -191,14 +193,19 @@ public class Camera2D {
     float effectiveH = height / zoom;
     float halfW = effectiveW * 0.5F;
     float halfH = effectiveH * 0.5F;
-    float left = position.x() - halfW;
-    float right = position.x() + halfW;
-    float top = position.y() - halfH;
-    float bottom = position.y() + halfH;
+    float left = center.x() - halfW;
+    float right = center.x() + halfW;
+    float top = center.y() + halfH;
+    float bottom = center.y() - halfH;
     /*
      * Y-down orthographic: flip Y by swapping top/bottom.
      * (Conform to 2D conventions)
      */
+    if (flipY) {
+      float tmp = top;
+      top = bottom;
+      bottom = tmp;
+    }
     vpMatrix = handler.createOrthographic(left, right, bottom, top, 0.0F, -1.0F);
   }
 

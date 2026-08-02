@@ -26,9 +26,9 @@ package net.fmhi.world.level;
 
 import net.fmhi.Registries;
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.block.Shape;
 import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
-import net.fmhi.world.fluid.LiquidMap;
 import net.fmhi.world.fluid.LiquidStack;
 import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.light.LightEngine;
@@ -114,6 +114,28 @@ public class Level {
     return chunks.get(pos.asLong());
   }
 
+  /**
+   * Returns the chunk containing the given block position by its packed
+   * map key, or {@code null} if not loaded. Allocation-free lookup.
+   */
+  public @Nullable Chunk getChunkByKey(long key) {
+    return chunks.get(key);
+  }
+
+  /**
+   * Returns the chunk containing the given block position, generating it
+   * if needed. Allocation-free lookup.
+   */
+  public Chunk getOrLoadChunkByKey(long key) {
+    var existing = chunks.get(key);
+    if (existing != null && existing.isLoaded) return existing;
+    var chunk = chunks.computeIfAbsent(key, k -> new Chunk(this, ChunkPos.fromLong(key)));
+    if (!chunk.isLoaded) {
+      generator.generate(chunk, seed);
+    }
+    return chunk;
+  }
+
   public int loadedChunkCount() { return chunks.size(); }
 
   /**
@@ -132,36 +154,33 @@ public class Level {
    * containing chunk if needed.
    */
   public BlockState getBlock(BlockPos pos) {
-    ChunkPos cp = pos.toChunkPos();
-    Chunk chunk = getOrLoadChunk(cp);
-    return chunk.getBlock(pos);
+    return getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(pos.x(), pos.y())).getBlock(pos.x(), pos.y());
   }
 
-  public BlockState getBlock(int x, int y) { return getBlock(new BlockPos(x, y)); }
+  public BlockState getBlock(int x, int y) {
+    return getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(x, y)).getBlock(x, y);
+  }
 
   public BlockState getWall(int x, int y) {
-    ChunkPos cp = new ChunkPos(Math.floorDiv(x, ChunkPos.SIZE), Math.floorDiv(y, ChunkPos.SIZE));
-    Chunk chunk = getChunk(cp);
-    return chunk != null ? chunk.getWall(x - cp.x() * ChunkPos.SIZE, y - cp.y() * ChunkPos.SIZE) : BlockState.EMPTY;
+    Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
+    return chunk != null ? chunk.getWall(x, y) : BlockState.EMPTY;
   }
 
   /**
    * Sets the block at the given position.
    */
   public void setBlock(BlockPos pos, BlockState state) {
-    ChunkPos cp = pos.toChunkPos();
-    Chunk chunk = getOrLoadChunk(cp);
-    chunk.setBlock(pos, state);
+    Chunk chunk = getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(pos.x(), pos.y()));
+    chunk.setBlock(pos.x(), pos.y(), state);
     // a solid block replaces any liquid in its tile
-    if (state.block().isSolid(state)) {
-      chunk.liquidMap().set(pos.x(), pos.y(), Liquids.EMPTY, 0);
+    if (state.shape() == Shape.SOLID) {
+      chunk.setLiquid(pos.x(), pos.y(), Liquids.EMPTY, 0);
     }
   }
 
   public void setWall(BlockPos pos, BlockState state) {
-    ChunkPos cp = pos.toChunkPos();
-    Chunk chunk = getOrLoadChunk(cp);
-    chunk.setWall(pos, state);
+    Chunk chunk = getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(pos.x(), pos.y()));
+    chunk.setWall(pos.x(), pos.y(), state);
   }
 
   /**
@@ -186,8 +205,7 @@ public class Level {
    * units: {@code 255} is a full tile, the minimum amount is 1.
    */
   public void setLiquid(int x, int y, Liquid liquid, int level) {
-    ChunkPos cp = new BlockPos(x, y).toChunkPos();
-    getOrLoadChunk(cp).liquidMap().set(x, y, liquid, level);
+    getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(x, y)).setLiquid(x, y, liquid, level);
     if (level > 0) fluidEngine.join(x, y);
   }
 
@@ -196,8 +214,26 @@ public class Level {
    * is not loaded.
    */
   public int getLiquidLevel(int x, int y) {
-    Chunk chunk = getChunk(new BlockPos(x, y).toChunkPos());
-    return chunk != null ? chunk.liquidMap().level(x, y) : 0;
+    Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
+    return chunk != null ? chunk.getLiquidLevel(x, y) : 0;
+  }
+
+  /** Returns the liquid id of a tile, or {@code 0} if none or unloaded. */
+  public byte getLiquidType(int x, int y) {
+    Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
+    return chunk != null ? chunk.getLiquidType(x, y) : 0;
+  }
+
+  /** Sets the liquid level of a tile (engine-internal writes). */
+  public void setLiquidLevel(int x, int y, int level) {
+    Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
+    if (chunk != null) chunk.setLiquidLevel(x, y, level);
+  }
+
+  /** Sets the liquid type of a tile (engine-internal writes). */
+  public void setLiquidType(int x, int y, byte id) {
+    Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
+    if (chunk != null) chunk.setLiquidType(x, y, id);
   }
 
   /**
@@ -205,10 +241,7 @@ public class Level {
    * none or the chunk is not loaded.
    */
   public LiquidStack getLiquidStack(int x, int y) {
-    Chunk chunk = getChunk(new BlockPos(x, y).toChunkPos());
-    if (chunk == null) return LiquidStack.EMPTY;
-    LiquidMap lm = chunk.liquidMap();
-    int lv = lm.level(x, y);
-    return lv <= 0 ? LiquidStack.EMPTY : new LiquidStack(Liquids.byId(lm.liquidType(x, y)), lv);
+    int lv = getLiquidLevel(x, y);
+    return lv <= 0 ? LiquidStack.EMPTY : new LiquidStack(Liquids.byId(getLiquidType(x, y)), lv);
   }
 }

@@ -99,10 +99,10 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
         new VertexLayout.Attr(2, VertexAttributeType.FLOAT32, false));
 
     pipeColor = device.getRenderPipeline(new PipelineDesc.Builder()
-        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.DEFAULT)
+        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.NOT_CULL)
         .shaderProgram(spCol).vertexLayout(vlColor).resourceLayouts(rslColor).build());
     pipeTexture = device.getRenderPipeline(new PipelineDesc.Builder()
-        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.DEFAULT)
+        .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.NOT_CULL)
         .shaderProgram(spTex).vertexLayout(vlTexture).resourceLayouts(rslTexture).build());
 
     defSampler = device.getSampler(new SamplerDesc.Builder()

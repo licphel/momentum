@@ -29,15 +29,14 @@ import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
-import net.fmhi.world.physics.Polygon;
-import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.TRPhyObj;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public class Entity extends SBPhyObj {
+public class Entity extends TRPhyObj {
 
   private final float w;
   private final float h;
@@ -46,6 +45,7 @@ public class Entity extends SBPhyObj {
   protected Entity(float width, float height) {
     this.w = width;
     this.h = height;
+    gravity = 65F;
     // lighter than water, so entities float in liquids
     density = 0.85F;
   }
@@ -54,14 +54,8 @@ public class Entity extends SBPhyObj {
     return Box2D.create(position.xf(), position.yf(), w, h);
   }
 
-  public float width() { return w; }
-  public float height() { return h; }
-
-  @Override public Polygon collisionPolygon() {
-    return Polygon.fromBox(Box2D.create(0F, 0F, w, h));
-  }
-
-  @Override protected float gravity() { return 65; }
+  @Override public float width() { return w; }
+  @Override public float height() { return h; }
 
   public void tick(double dt, Level level) {
     super.tick(dt, level);
@@ -86,18 +80,17 @@ public class Entity extends SBPhyObj {
 
   public boolean getLight(LightBuffer buf) { return false; }
 
-  public @Nullable Beam getBeam(LightBuffer buf) { return null; }
+  public Beam @Nullable [] getBeam() { return null; }
 
   public static Entity player(PrecisePos pos) {
     var e = new Entity(1.4F, 2.65F) {
-      @Override public Beam getBeam(LightBuffer buf) {
-        buf.r(1.0F); buf.g(0.85F); buf.b(0.86F);
+      @Override public Beam[] getBeam() {
         return null;
       }
 
       @Override
       public boolean getLight(LightBuffer buf) {
-        getBeam(buf);
+        getBeam();
         return true;
       }
     };

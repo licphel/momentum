@@ -29,7 +29,9 @@ import net.fmhi.property.PropertyDef;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.light.LightEngine;
+import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.item.ItemLike;
 import net.fmhi.world.physics.Polygon;
@@ -66,20 +68,32 @@ public class Block implements ItemLike {
     return Polygon.CUBE;
   }
 
+  /** The collision shape used by the physics engine (Enchant-style clip
+   * shapes: boxes, outlines for slopes, one-way platforms). */
+  public VoxelClip getVoxelShape(BlockState state) {
+    return VoxelClip.CUBE;
+  }
+
+  /** Terraria slope type: 0 = none, 1 = ↖ high left, 2 = ↗ high right,
+   * 3/4 = ceiling slopes. Used by the Terraria physics port. */
+  public int slope(BlockState state) {
+    return 0;
+  }
+
   /** Restitution: 0 = no bounce, 1 = perfect. */
   public float bounce() { return 0F; }
 
   /** Friction: 0 = ice, 1 = rough. */
   public float friction() { return 0.5F; }
 
-  /** Collision kind for SBPhyObj. */
-  public int collisionKind() { return 3; } // BLOCK
+  /** Collision kind for the physics engine. */
+  public CollisionKind collisionKind() { return CollisionKind.BLOCK; }
 
-  /** Whether this block is solid (blocks light, collides). */
-  public boolean isSolid(BlockState state) { return true; }
+  /** How this block fills its tile (collision, light and liquid rules). */
+  public Shape shape(BlockState state) { return Shape.SOLID; }
 
-  public void filterLight(BlockState state, LightBuffer l) {
-    if (isSolid(state)) {
+  public void filterSkylight(BlockState state, LightBuffer l) {
+    if (shape(state) == Shape.SOLID) {
       l.r(0);
       l.g(0);
       l.b(0);
@@ -90,7 +104,7 @@ public class Block implements ItemLike {
    * Default: solid blocks zero the light, non-solid pass through.
    */
   public float filterLight(BlockState state, float in, byte channel) {
-    if (isSolid(state)) {
+    if (shape(state) == Shape.SOLID) {
       return in * 0.92F - LightEngine.UNIT;
     } else {
       return in * 0.99F - LightEngine.UNIT;
@@ -102,7 +116,7 @@ public class Block implements ItemLike {
     return false;
   }
 
-  public Beam @Nullable [] getBeam(BlockState state, LightBuffer buf) {
+  public Beam @Nullable [] getBeam(BlockState state) {
     return null;
   }
 

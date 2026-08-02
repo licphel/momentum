@@ -27,15 +27,19 @@ package net.fmhi;
 import net.fmhi.collection.Palette;
 import net.fmhi.fml.registry.DeferredRegister;
 import net.fmhi.fml.registry.Holder;
-import net.fmhi.math.FastTrigonometric;
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.world.block.Block;
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.block.Shape;
 import net.fmhi.world.item.Item;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.VoxelClip;
+import net.fmhi.world.physics.VoxelPlatform;
+import net.fmhi.world.physics.VoxelSlope;
 import net.fmhi.world.util.BlockPos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -68,7 +72,15 @@ public final class Registries {
       return null;
     }
 
-    @Override public boolean isSolid(BlockState state) { return false; }
+    @Override
+    public Shape shape(BlockState state) {
+      return Shape.VACUUM;
+    }
+
+    @Override
+    public VoxelClip getVoxelShape(BlockState state) {
+      return VoxelClip.EMPTY;
+    }
   });
 
   public static final Block DIRT = registerBlock("dirt", new Block() {
@@ -98,26 +110,47 @@ public final class Registries {
     }
 
     @Override
-    public Beam[] getBeam(BlockState state, LightBuffer buf) {
-      buf.r(1);
-      buf.g(1);
-      buf.b(1);
-      return new Beam[]{new Beam((float) -Math.PI / 2, 0.95F, 0.1F, 1.0F, 1.0F)};
+    public Beam[] getBeam(BlockState state) {
+      float f = (float) (System.currentTimeMillis() % 1000000) / 1000.0F;
+      return new Beam[]{
+          new Beam(1, 0.2F, 0.2F, (float) -Math.PI / 2 + f, 0.5F, 0.0F, 15.0F, 1.0F),
+          new Beam(0.2f, 1F, 0.2F, (float) -Math.PI / 2 + 2 + f * 2, 0.5F, 0.0F, 15.0F, 1.0F),
+          new Beam(0.2f, 0.2F, 1F, (float) -Math.PI / 2 + 0.3F + f * 3, 0.5F, 0.0F, 15.0F, 1.0F),
+      };
     }
   });
 
   // Y-down local coords: (0,0) top-left, (1,1) bottom-right.
-  // ↗ ramp: walks right → goes up. Solid bottom-right triangle.
+  // ↗ ramp: walks right → goes up. Approximated by three boxes of
+  // increasing height (Enchant VoxelOutline); step-up walks them.
   private static final Polygon SHAPE_SLOPE_RIGHT = new Polygon(
       new net.fmhi.math.Vector2(0, 1), new net.fmhi.math.Vector2(1, 0), new net.fmhi.math.Vector2(1, 1));
   // ↖ ramp: walks left → goes up. Solid bottom-left triangle.
   private static final Polygon SHAPE_SLOPE_LEFT = new Polygon(
       new net.fmhi.math.Vector2(0, 0), new net.fmhi.math.Vector2(1, 1), new net.fmhi.math.Vector2(0, 1));
 
+  // Triangular slope collision (Terraria-style): the surface rises linearly
+  // across the tile and pulls the body's feet onto it.
+  // Y-up: top0/top1 are surface offsets from the tile bottom.
+  // ↗ ramp: walks right → goes up (left edge low, right edge high).
+  private static final VoxelClip VOXEL_SLOPE_RIGHT = new VoxelSlope(0F, 1F);
+  // ↖ ramp: walks left → goes up (left edge high, right edge low).
+  private static final VoxelClip VOXEL_SLOPE_LEFT = new VoxelSlope(1F, 0F);
+
   public static final Block SLOPE_RIGHT = registerBlock("slope_right", new Block() {
     @Override
     public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
       return SHAPE_SLOPE_RIGHT;
+    }
+
+    @Override
+    public VoxelClip getVoxelShape(BlockState state) {
+      return VOXEL_SLOPE_RIGHT;
+    }
+
+    @Override
+    public int slope(BlockState state) {
+      return 2; // ↗ high right (Terraria slope 2)
     }
   });
 
@@ -126,11 +159,22 @@ public final class Registries {
     public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
       return SHAPE_SLOPE_LEFT;
     }
+
+    @Override
+    public VoxelClip getVoxelShape(BlockState state) {
+      return VOXEL_SLOPE_LEFT;
+    }
+
+    @Override
+    public int slope(BlockState state) {
+      return 1; // ↖ high left (Terraria slope 1)
+    }
   });
 
   public static final Block PLATFORM = registerBlock("platform", new Block() {
-    @Override public int collisionKind() { return 2; } // PLATFORM
-    @Override public boolean isSolid(BlockState state) { return false; }
+    @Override public CollisionKind collisionKind() { return CollisionKind.PLATFORM; }
+    @Override public Shape shape(BlockState state) { return Shape.PARTIAL; }
+    @Override public VoxelClip getVoxelShape(BlockState state) { return new VoxelPlatform(); }
   });
 
   // -- items --------------------------------------------------------------

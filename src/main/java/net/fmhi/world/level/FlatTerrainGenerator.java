@@ -66,52 +66,52 @@ public final class FlatTerrainGenerator implements ChunkGenerator {
 
         BlockState s = null;
 
-        // light sources: WALL at (2, groundY-2), POLE at plateau
-        if (wx == 2 && wy == groundY - 2) s = wall;
-        if (wx == 15 && wy == groundY - 8) s = pole;
+        // light sources: WALL at (2, groundY+2), POLE at plateau
+        if (wx == 2 && wy == groundY + 2) s = wall;
+        if (wx == 15 && wy == groundY + 8) s = pole;
 
         if (wx <= 0) {
-          if (wy == groundY - 5) {
+          if (wy == groundY + 5) {
             s = plat;
           }
         }
 
-        // ↗ uphill: surface rises from (5,groundY) to (12,groundY-7)
+        // ↗ uphill: surface rises from (5,groundY) to (12,groundY+7)
         if (wx >= 5 && wx <= 12) {
-          int surfaceY = groundY - (wx - 5);
+          int surfaceY = groundY + (wx - 5);
           if (wy == surfaceY) s = slopeR;
-          else if (wy > surfaceY && wy <= groundY + 4) s = dirt;
-          else if (wy > groundY + 4) s = stone;
+          else if (wy < surfaceY && wy >= groundY - 4) s = dirt;
+          else if (wy < groundY - 4) s = stone;
           else s = air;
         }
         // plateau between ramps
         else if (wx >= 13 && wx <= 17) {
-          int surfaceY = groundY - 7;
+          int surfaceY = groundY + 7;
           if (wy == surfaceY) s = grass;
-          else if (wy > surfaceY && wy <= groundY + 4) s = dirt;
-          else if (wy > groundY + 4) s = stone;
+          else if (wy < surfaceY && wy >= groundY - 4) s = dirt;
+          else if (wy < groundY - 4) s = stone;
           else s = air;
         }
-        // ↘ downhill: surface descends from (18,groundY-7) to (25,groundY)
+        // ↘ downhill: surface descends from (18,groundY+7) to (25,groundY)
         else if (wx >= 18 && wx <= 24) {
-          int surfaceY = groundY - 7 + (wx - 18);
+          int surfaceY = groundY + 7 - (wx - 18);
           if (wy == surfaceY) s = slopeL;
-          else if (wy > surfaceY && wy <= groundY + 4) s = dirt;
-          else if (wy > groundY + 4) s = stone;
+          else if (wy < surfaceY && wy >= groundY - 4) s = dirt;
+          else if (wy < groundY - 4) s = stone;
           else s = air;
         }
         // default flat terrain
         if (s == null) {
-          if (wy < groundY) s = air;
+          if (wy > groundY) s = air;
           else if (wy == groundY) s = grass;
-          else if (wy < groundY + 5) s = dirt;
+          else if (wy > groundY - 5) s = dirt;
           else s = stone;
         }
 
         chunk.setBlock(pos, s);
 
         // background walls behind all underground tiles
-        if (wy > groundY && s != air) {
+        if (wy < groundY && s != air) {
           chunk.setWall(pos, stone);
         }
       }

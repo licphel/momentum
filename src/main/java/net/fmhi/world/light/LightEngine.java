@@ -3,6 +3,7 @@ package net.fmhi.world.light;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.mesh.Primitive2D;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.pass.RenderTargetDesc;
@@ -18,13 +19,10 @@ import net.fmhi.util.Profiler;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.entity.Entity;
 import net.fmhi.world.fluid.Liquid;
-import net.fmhi.world.fluid.LiquidMap;
-import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.util.ChunkPos;
-import org.jspecify.annotations.Nullable;
 
 /**
  * Base class for engines that maintain a sliding window of per-tile light
@@ -61,11 +59,9 @@ public abstract class LightEngine implements AutoCloseable {
   /** Smallest allowed window side, in tiles. */
   protected static final int MIN_SIZE = 64;
   /** Largest allowed window side, in tiles. */
-  protected static final int MAX_SIZE = 2048;
-  /** Maximum reach of a beam, in tiles. */
-  private static final float BEAM_RANGE = 20F;
+  protected static final int MAX_SIZE = 512;
   /** Sunlight color used to seed sky illumination. */
-  public final LightBuffer sunlight = new SimpleLightBuffer();
+  public final LightBuffer sunlight = SimpleLightBuffer.pooled();
   protected final Level level;
   /** Completed buffer, read by the renderer. */
   protected volatile float[] front;
@@ -92,6 +88,8 @@ public abstract class LightEngine implements AutoCloseable {
   private Sampler lmSampler;
   /** Beam layer: raw RGB per tile, merged into {@code back} after spread. */
   private float[] beamLayer;
+  /** Whether to enable lighting; false will make lightmap full bright. */
+  public boolean enabled = true;
 
   /**
    * Creates a light engine for the given level, allocating its initial front,
@@ -206,97 +204,102 @@ public abstract class LightEngine implements AutoCloseable {
    * Seeds the raw RGB channels of a tile from its block light and sky light,
    * combining the two per channel, and emits any beam carried by the block.
    *
-   * @param block    the block at the tile
-   * @param wall     the wall at the tile
+   * @param cc       the chunk cache
    * @param skyLight the sky light falling on the tile
    * @param x        the tile X coordinate
    * @param y        the tile Y coordinate
-   * @param lb       a reusable buffer for intermediate light values
    */
-  public void seed(BlockState block, BlockState wall, LightBuffer skyLight, int x, int y, LightBuffer lb) {
+  public void seed(ChunkCache cc, LightBuffer skyLight, int x, int y) {
     int o = backBufferIndex(x, y);
     if (o < 0) {
       return;
     }
+
+    LightBuffer A = SimpleLightBuffer.pooled();
+    LightBuffer B = SimpleLightBuffer.pooled();
+    LightBuffer C = SimpleLightBuffer.pooled();
+
+    BlockState block = cc.getBlock(x, y);
+    BlockState wall = cc.getWall(x, y);
+    Liquid liq = cc.getLiquid(x, y);
+    int liqAmt = cc.getLiquidAmount(x, y);
+
     float br = 0;
     float bg = 0;
     float bb = 0;
-    if (block.block().getLight(block, lb)) {
-      br = lb.r() * AMPLIFIER;
-      bg = lb.g() * AMPLIFIER;
-      bb = lb.b() * AMPLIFIER;
-    }
-    // liquid light: lava glows like a block, but liquids never emit beams
-    Liquid liq = liquidAt(x, y);
-    if (liq != null && liq.getLight(lb)) {
-      br = Math.max(br, lb.r() * AMPLIFIER);
-      bg = Math.max(bg, lb.g() * AMPLIFIER);
-      bb = Math.max(bb, lb.b() * AMPLIFIER);
+
+    if (block.getLight(A)) {
+      br = A.r() * AMPLIFIER;
+      bg = A.g() * AMPLIFIER;
+      bb = A.b() * AMPLIFIER;
     }
     Beam[] beams;
-    if ((beams = block.block().getBeam(wall, lb)) != null) {
+    if ((beams = block.getBeam()) != null) {
       for (Beam b : beams) {
-        drawBeam(x + 0.5F, y + 0.5F, lb.r(), lb.g(), lb.b(), b);
+        drawBeam(x + 0.5F, y + 0.5F, b);
       }
     }
-    LightBuffer gb = new SimpleLightBuffer();
-    LightBuffer wb = new SimpleLightBuffer();
-    skyEmit(skyLight, x, y, gb);
-    wall.block().getLight(wall, wb);
-    wall.block().filterLight(wall, gb);
-    gb.blend(wb, formula);
 
-    blendWrite(o, formula.blend(br, gb.r() * AMPLIFIER),
-        formula.blend(bg, gb.g() * AMPLIFIER),
-        formula.blend(bb, gb.b() * AMPLIFIER));
+    if (liq != null && liq.getLight(A)) {
+      br = Math.max(br, A.r() * AMPLIFIER);
+      bg = Math.max(bg, A.g() * AMPLIFIER);
+      bb = Math.max(bb, A.b() * AMPLIFIER);
+    }
+
+    skyEmit(skyLight, x, y, B);
+    wall.getLight(C);
+    wall.filterSkylight(B);
+    B.blend(C, formula);
+
+    blendWrite(o, formula.blend(br, B.r() * AMPLIFIER),
+        formula.blend(bg, B.g() * AMPLIFIER),
+        formula.blend(bb, B.b() * AMPLIFIER));
+
+    A.recycle();
+    B.recycle();
+    C.recycle();
   }
 
   /**
    * Seeds the raw RGB channels of an entity.
    *
-   * @param e  the entity to seed
-   * @param lb a reusable buffer for intermediate light values
+   * @param e the entity to seed
    */
-  public void seed(Entity e, LightBuffer lb) {
-    if (e.getLight(lb)) {
-      drawInterpolated(e.center().xf(), e.center().yf(), lb.r(), lb.g(), lb.b());
+  public void seed(Entity e) {
+    LightBuffer A = SimpleLightBuffer.pooled();
+
+    if (e.getLight(A)) {
+      drawInterpolated(e.center().xf(), e.center().yf(), A.r(), A.g(), A.b());
     }
-    Beam beam;
-    if ((beam = e.getBeam(lb)) != null) {
-      drawBeam(e.center().xf(), e.center().yf(), lb.r(), lb.g(), lb.b(), beam);
+    Beam[] beams;
+    if ((beams = e.getBeam()) != null) {
+      for (Beam b : beams) {
+        drawBeam(e.center().xf(), e.center().yf(), b);
+      }
     }
   }
 
   /**
-   * Computes the ambient-occlusion factors of a tile from the solidity of its
-   * neighbors and stores them in the tile's AO slots.
+   * Gets the filtered channel light from a position.
    *
-   * @param o  the tile offset in the working buffer
-   * @param cc the chunk cache for neighbor lookups
-   * @param x  the tile X coordinate
-   * @param y  the tile Y coordinate
+   * @param cc      the chunk cache
+   * @param channel the channel (R/G/B)
+   * @param x       the tile X coordinate
+   * @param y       the tile Y coordinate
+   * @param v       value to filter
+   * @return        the filtered value
    */
-  private void populateAO(int o, ChunkCache cc, int x, int y) {
-    if (cc.isFrontSolid(x, y)) {
-      float v = 1F - AO_STRENGTH * 1.5F;
-      back[o + 3] = v;
-      back[o + 4] = v;
-      back[o + 5] = v;
-      back[o + 6] = v;
-    } else {
-      boolean s0 = cc.isFrontSolid(x - 1, y - 1);
-      boolean s1 = cc.isFrontSolid(x - 1, y);
-      boolean s2 = cc.isFrontSolid(x - 1, y + 1);
-      boolean s3 = cc.isFrontSolid(x, y - 1);
-      boolean s4 = cc.isFrontSolid(x, y + 1);
-      boolean s5 = cc.isFrontSolid(x + 1, y - 1);
-      boolean s6 = cc.isFrontSolid(x + 1, y);
-      boolean s7 = cc.isFrontSolid(x + 1, y + 1);
-      back[o + 3] = 1F - ((s0 ? 1 : 0) + (s1 ? 1 : 0) + (s3 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 4] = 1F - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s4 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 5] = 1F - ((s4 ? 1 : 0) + (s6 ? 1 : 0) + (s7 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 6] = 1F - ((s3 ? 1 : 0) + (s5 ? 1 : 0) + (s6 ? 1 : 0)) * AO_STRENGTH;
+  public float filter(ChunkCache cc, byte channel, int x, int y, float v) {
+    BlockState block = cc.getBlock(x, y);
+    Liquid liq = cc.getLiquid(x, y);
+    int liqAmt = cc.getLiquidAmount(x, y);
+
+    v = block.filterLight(v, channel);
+    if (liq != null) {
+      v = liq.filterLight(v, channel, liqAmt);
     }
+
+    return v;
   }
 
   /**
@@ -378,14 +381,11 @@ public abstract class LightEngine implements AutoCloseable {
     int x1 = Math.min(sox + sw, dox + sizeX);
     int y0 = Math.max(soy, doy);
     int y1 = Math.min(soy + sh, doy + sizeY);
+    int length = (x1 - x0) * STRIDE;
     for (int y = y0; y < y1; y++) {
       int sRow = ((y - soy) * sw + (x0 - sox)) * STRIDE;
       int dRow = ((y - doy) * sizeX + (x0 - dox)) * STRIDE;
-      for (int x = x0; x < x1; x++) {
-        System.arraycopy(src, sRow, dst, dRow, STRIDE);
-        sRow += STRIDE;
-        dRow += STRIDE;
-      }
+      System.arraycopy(src, sRow, dst, dRow, length);
     }
   }
 
@@ -458,6 +458,10 @@ public abstract class LightEngine implements AutoCloseable {
    * @param b the blue light to add
    */
   public void draw(int x, int y, float r, float g, float b) {
+    float maxIntensity = Math.max(r, Math.max(g, b));
+    if (maxIntensity <= DARK_LUMINANCE) {
+      return;
+    }
     int o = backBufferIndex(x, y);
     if (o >= 0) {
       blendWrite(o, r * AMPLIFIER, g * AMPLIFIER, b * AMPLIFIER);
@@ -477,7 +481,8 @@ public abstract class LightEngine implements AutoCloseable {
    * @param b the blue light of the source
    */
   public void drawInterpolated(float x, float y, float r, float g, float b) {
-    if (r <= DARK_LUMINANCE && g <= DARK_LUMINANCE && b <= DARK_LUMINANCE) {
+    float maxIntensity = Math.max(r, Math.max(g, b));
+    if (maxIntensity <= DARK_LUMINANCE) {
       return;
     }
     int lx = (int) Math.floor(x);
@@ -501,25 +506,22 @@ public abstract class LightEngine implements AutoCloseable {
    *
    * @param x    the light source X coordinate
    * @param y    the light source Y coordinate
-   * @param r    the red light of the source
-   * @param g    the green light of the source
-   * @param b    the blue light of the source
    * @param beam the beam to draw
    */
-  public void drawBeam(float x, float y, float r, float g, float b, Beam beam) {
+  public void drawBeam(float x, float y, Beam beam) {
+    float r = beam.r();
+    float g = beam.g();
+    float b = beam.b();
     float maxIntensity = Math.max(r, Math.max(g, b));
     if (maxIntensity <= DARK_LUMINANCE) {
       return;
     }
-    float range = maxIntensity * BEAM_RANGE * beam.power();
-    float perBlockAir = 1F / (BEAM_RANGE * beam.power());
+
+    float range = maxIntensity * beam.range();
+    float perBlockAir = 1F / beam.range();
     float[] bdsc = FastTrigonometric.sincos(beam.direction());
     float bdx = bdsc[1];
-    float bdy = -bdsc[0];
-    // Normalize so that the angular falloff equals `strength` exactly at
-    // `halfAngle` — the half-angle marks where the beam reaches the
-    // strength-weighted attenuation; the edge stays smooth (cosine curve)
-    // rather than a hard cutoff.
+    float bdy = bdsc[0];
     float beamK = beam.strength() / (1F - FastTrigonometric.cos(beam.halfAngle()));
     float ambi = beam.ambience();
 
@@ -596,7 +598,7 @@ public abstract class LightEngine implements AutoCloseable {
    */
   public void generateLightmaps(BatchedGraphics2D g, Camera2D cam) {
     try (Profiler.Scope _ = Profiler.scope("rendering:lightmap")) {
-      Vector2 cp = cam.position();
+      Vector2 cp = cam.center();
       float vw = cam.width() / cam.zoom();
       float vh = cam.height() / cam.zoom();
       int cs = ChunkPos.SIZE;
@@ -631,16 +633,16 @@ public abstract class LightEngine implements AutoCloseable {
    */
   private void drawTiles(BatchedGraphics2D g,
                          int minCX, int maxCX, int minCY, int maxCY, boolean wall) {
-    int cs = ChunkPos.SIZE;
-    g.drawRectangle(0, 0, 0, 0); // prime primitive
+    g.setPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
+    g.setTexture(null);
 
     for (int cx = minCX; cx <= maxCX; cx++) {
       for (int cy = minCY; cy <= maxCY; cy++) {
         Chunk chunk = level.getOrLoadChunk(new ChunkPos(cx, cy));
-        for (int lx = 0; lx < cs; lx++) {
-          for (int ly = 0; ly < cs; ly++) {
-            int wx = cx * cs + lx;
-            int wy = cy * cs + ly;
+        for (int lx = 0; lx < ChunkPos.SIZE; lx++) {
+          for (int ly = 0; ly < ChunkPos.SIZE; ly++) {
+            int wx = cx * ChunkPos.SIZE + lx;
+            int wy = cy * ChunkPos.SIZE + ly;
             BlockState block = chunk.getBlock(lx, ly);
             BlockState wallS = chunk.getWall(lx, ly);
             boolean hasWall = wallS != BlockState.EMPTY;
@@ -690,22 +692,35 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Computes the per-tile auxiliary values of a tile: its ambient-occlusion
-   * factors and the smoothed per-vertex light colors.
+   * Computes the ambient-occlusion factors of a tile from the solidity of its
+   * neighbors and stores them in the tile's AO slots.
    *
+   * @param o  the tile offset in the working buffer
    * @param cc the chunk cache for neighbor lookups
    * @param x  the tile X coordinate
    * @param y  the tile Y coordinate
    */
-  public void populate(ChunkCache cc, int x, int y) {
-    int o = backBufferIndex(x, y);
-    if (o < 0) {
-      return;
+  protected void populateAO(int o, ChunkCache cc, int x, int y) {
+    if (cc.isFrontSolid(x, y)) {
+      float v = 1F - AO_STRENGTH * 1.5F;
+      back[o + 3] = v;
+      back[o + 4] = v;
+      back[o + 5] = v;
+      back[o + 6] = v;
+    } else {
+      boolean s0 = cc.isFrontSolid(x - 1, y - 1);
+      boolean s1 = cc.isFrontSolid(x - 1, y);
+      boolean s2 = cc.isFrontSolid(x - 1, y + 1);
+      boolean s3 = cc.isFrontSolid(x, y - 1);
+      boolean s4 = cc.isFrontSolid(x, y + 1);
+      boolean s5 = cc.isFrontSolid(x + 1, y - 1);
+      boolean s6 = cc.isFrontSolid(x + 1, y);
+      boolean s7 = cc.isFrontSolid(x + 1, y + 1);
+      back[o + 3] = 1F - ((s0 ? 1 : 0) + (s1 ? 1 : 0) + (s3 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 4] = 1F - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s4 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 5] = 1F - ((s4 ? 1 : 0) + (s6 ? 1 : 0) + (s7 ? 1 : 0)) * AO_STRENGTH;
+      back[o + 6] = 1F - ((s3 ? 1 : 0) + (s5 ? 1 : 0) + (s6 ? 1 : 0)) * AO_STRENGTH;
     }
-    populateAO(o, cc, x, y);
-    populateSmoothedLightVerticesByChannel(o, Channel.RED, x, y);
-    populateSmoothedLightVerticesByChannel(o, Channel.GREEN, x, y);
-    populateSmoothedLightVerticesByChannel(o, Channel.BLUE, x, y);
   }
 
   /**
@@ -717,7 +732,15 @@ public abstract class LightEngine implements AutoCloseable {
    * @param x       the tile X coordinate
    * @param y       the tile Y coordinate
    */
-  private void populateSmoothedLightVerticesByChannel(int o, byte channel, int x, int y) {
+  protected void populateSmoothedLightVerticesByChannel(int o, byte channel, int x, int y) {
+    if (!enabled) {
+      back[o + channel + 7] = 1;
+      back[o + channel + 10] = 1;
+      back[o + channel + 13] = 1;
+      back[o + channel + 16] = 1;
+      return;
+    }
+
     float l1 = getChannelValue(x - 1, y, channel);
     float l2 = getChannelValue(x + 1, y, channel);
     float l3 = getChannelValue(x, y - 1, channel);
@@ -826,16 +849,6 @@ public abstract class LightEngine implements AutoCloseable {
       return -1;
     }
     return (x + y * sizeX) * STRIDE;
-  }
-
-  /** The liquid at the given tile, or {@code null} if none. */
-  private @Nullable Liquid liquidAt(int x, int y) {
-    Chunk c = level.getChunk(new ChunkPos(Math.floorDiv(x, ChunkPos.SIZE), Math.floorDiv(y, ChunkPos.SIZE)));
-    if (c == null) {
-      return null;
-    }
-    LiquidMap lm = c.liquidMap();
-    return lm.level(x, y) > 0 ? Liquids.byId(lm.liquidType(x, y)) : null;
   }
 
   /**

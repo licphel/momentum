@@ -10,6 +10,7 @@ import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 
 import java.util.Arrays;
+import java.util.function.Consumer;
 
 /**
  * Light engine that recomputes its whole window on a background virtual
@@ -60,46 +61,46 @@ public class ScanLightEngine extends LightEngine {
 
     // Phase 1: seed
     try (Profiler.Scope _ = Profiler.scope("lighting:seed_block")) {
-      LightBuffer lb = new SimpleLightBuffer();
       for (int x = x0 - 1; x <= x1 + 1; x++) {
         for (int y = y0 - 1; y <= y1 + 1; y++) {
-          seed(cc.getBlock(x, y), cc.getWall(x, y), sunlight, x, y, lb);
+          seed(cc, sunlight, x, y);
         }
       }
     }
 
     // Phase 2: entity lights
     try (Profiler.Scope _ = Profiler.scope("lighting:seed_entity")) {
-      LightBuffer lb = new SimpleLightBuffer();
       for (Chunk c : level.loadedChunks()) {
         for (Entity e : c.entities()) {
-          seed(e, lb);
+          seed(e);
         }
       }
     }
 
     // Phase 3: 4-pass spread
     try (Profiler.Scope _ = Profiler.scope("lighting:spread")) {
-      for (int x = x1; x >= x0; x--) {
-        for (int y = y1; y >= y0; y--) {
-          spread(x, y);
+      channelDispatch(channel -> {
+        for (int x = x1; x >= x0; x--) {
+          for (int y = y1; y >= y0; y--) {
+            spread(x, y, channel);
+          }
         }
-      }
-      for (int x = x0; x <= x1; x++) {
-        for (int y = y0; y <= y1; y++) {
-          spread(x, y);
+        for (int x = x0; x <= x1; x++) {
+          for (int y = y0; y <= y1; y++) {
+            spread(x, y, channel);
+          }
         }
-      }
-      for (int x = x0; x <= x1; x++) {
-        for (int y = y1; y >= y0; y--) {
-          spread(x, y);
+        for (int x = x0; x <= x1; x++) {
+          for (int y = y1; y >= y0; y--) {
+            spread(x, y, channel);
+          }
         }
-      }
-      for (int x = x1; x >= x0; x--) {
-        for (int y = y0; y <= y1; y++) {
-          spread(x, y);
+        for (int x = x1; x >= x0; x--) {
+          for (int y = y0; y <= y1; y++) {
+            spread(x, y, channel);
+          }
         }
-      }
+      });
     }
 
     // Beam light: max-blend into raw channels after spread (spread is
@@ -114,19 +115,28 @@ public class ScanLightEngine extends LightEngine {
           if (o < 0) {
             continue;
           }
-          populate(cc, x, y);
+          populateAO(o, cc, x, y);
         }
       }
+
+      channelDispatch(channel -> {
+        for (int y = y0; y <= y1; y++) {
+          for (int x = x0; x <= x1; x++) {
+            int o = backBufferIndex(x, y);
+            if (o < 0) {
+              continue;
+            }
+            populateSmoothedLightVerticesByChannel(o, channel, x, y);
+          }
+        }
+      });
     }
   }
 
   /**
    * Relaxes the light of a tile toward the brightest of its four neighbors.
-   *
-   * @param x the tile X coordinate
-   * @param y the tile Y coordinate
    */
-  private void spread(int x, int y) {
+  private void spread(int x, int y, byte channel) {
     if (!cc.isLoaded(x, y)) {
       return;
     }
@@ -134,9 +144,7 @@ public class ScanLightEngine extends LightEngine {
     if (o < 0) {
       return;
     }
-    spreadOnChannel(o, Channel.RED, x, y);
-    spreadOnChannel(o, Channel.GREEN, x, y);
-    spreadOnChannel(o, Channel.BLUE, x, y);
+    spreadOnChannel(o, channel, x, y);
   }
 
   /**
@@ -151,18 +159,30 @@ public class ScanLightEngine extends LightEngine {
    */
   private void spreadOnChannel(int o, byte channel, int x, int y) {
     BlockState state = cc.getBlock(x, y);
-    float n = getChannelValue(x - 1, y, channel);
-    float s = getChannelValue(x + 1, y, channel);
-    float w = getChannelValue(x, y - 1, channel);
-    float e = getChannelValue(x, y + 1, channel);
-    float max = Math.max(n, Math.max(s, Math.max(w, e)));
+    float l1 = getChannelValue(x - 1, y, channel);
+    float l2 = getChannelValue(x + 1, y, channel);
+    float l3 = getChannelValue(x, y - 1, channel);
+    float l4 = getChannelValue(x, y + 1, channel);
+    float max = Math.max(l1, Math.max(l2, Math.max(l3, l4)));
     float f = formula.blend(back[o + channel], max);
-    f = state.block().filterLight(state, f, channel);
-    // liquid absorbs light like a block (thicker liquid absorbs more)
-    int lv = cc.liquidLevel(x, y);
-    if (lv > 0) {
-      f = Liquids.byId(cc.liquidType(x, y)).filterLight(f, channel, lv);
-    }
+    f = filter(cc, channel, x, y, f);
     back[o + channel] = f <= DARK_LUMINANCE ? 0F : f;
+  }
+
+  private void channelDispatch(Consumer<Byte> fn) {
+    Thread[] threads = new Thread[Channel.CHANNELS.length];
+    for (int i = 0; i < threads.length; i++) {
+      byte channel = Channel.CHANNELS[i];
+      threads[i] = Thread.startVirtualThread(() -> fn.accept(channel));
+    }
+
+    for (Thread t : threads) {
+      try {
+        t.join();
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
   }
 }

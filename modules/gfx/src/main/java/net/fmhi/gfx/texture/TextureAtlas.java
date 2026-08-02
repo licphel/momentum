@@ -46,9 +46,10 @@ import java.util.List;
  */
 public final class TextureAtlas implements AutoCloseable {
   private static final int INITIAL_SIZE = 64;
-  private static final int PADDING = 1;
 
   private final Device device;
+  /** Empty border kept around every inserted region (anti-bleed for linear filtering). */
+  private final int padding;
   private final AtlasRef ref = new AtlasRef();
   private final List<Rect> freeRects = new ArrayList<>();
   private Texture texture;
@@ -56,12 +57,23 @@ public final class TextureAtlas implements AutoCloseable {
   private boolean disposed;
 
   /**
-   * Creates an empty atlas with an initial backing texture.
+   * Creates an empty atlas with an initial backing texture and no padding.
    *
    * @param device the graphics device used to allocate the backing texture
    */
   public TextureAtlas(Device device) {
+    this(device, 0);
+  }
+
+  /**
+   * Creates an empty atlas with the given padding.
+   *
+   * @param device  the graphics device used to allocate the backing texture
+   * @param padding empty border kept around every inserted region, in pixels
+   */
+  public TextureAtlas(Device device, int padding) {
     this.device = device;
+    this.padding = Math.max(0, padding);
     size = INITIAL_SIZE;
     freeRects.add(new Rect(0, 0, size, size));
     texture = createTexture(size);
@@ -78,16 +90,31 @@ public final class TextureAtlas implements AutoCloseable {
    * @throws IllegalStateException if the atlas has been closed
    */
   public TexturePart accept(ImageInfo image) {
+    return accept(image.pixels(), image.width(), image.height());
+  }
+
+  /**
+   * Inserts raw RGBA pixels into the atlas and returns its texture region.
+   *
+   * <p>The atlas expands automatically if no free rectangle fits the image.
+   *
+   * @param pixels RGBA8 pixels, first row = top
+   * @param width  the image width in pixels
+   * @param height the image height in pixels
+   * @return a texture part spanning the inserted region
+   * @throws IllegalStateException if the atlas has been closed
+   */
+  public TexturePart accept(byte[] pixels, int width, int height) {
     if (disposed) {
       throw new IllegalStateException("Atlas is disposed");
     }
 
     Rect dst = new Rect();
-    while (!find(image.width(), image.height(), dst)) {
+    while (!find(width, height, dst)) {
       expand();
     }
 
-    texture.submit(image.pixels(), Box3D.create(dst.x, dst.y, 0, dst.w, dst.h, 1));
+    texture.submit(pixels, Box3D.create(dst.x, dst.y, 0, dst.w, dst.h, 1));
     return new TexturePart(ref, Box2D.create(dst.x, dst.y, dst.w, dst.h));
   }
 
@@ -132,11 +159,11 @@ public final class TextureAtlas implements AutoCloseable {
 
     for (int i = 0; i < freeRects.size(); i++) {
       Rect fr = freeRects.get(i);
-      if (fr.w < width + PADDING || fr.h < height + PADDING) {
+      if (fr.w < width + padding || fr.h < height + padding) {
         continue;
       }
 
-      int score = Math.min(fr.w - (width + PADDING), fr.h - (height + PADDING));
+      int score = Math.min(fr.w - (width + padding), fr.h - (height + padding));
       if (score < bestScore) {
         bestScore = score;
         best = i;
@@ -150,13 +177,13 @@ public final class TextureAtlas implements AutoCloseable {
     Rect used = freeRects.remove(best);
     int dx = used.x;
     int dy = used.y;
-    int remainW = used.w - (width + PADDING);
-    int remainH = used.h - (height + PADDING);
+    int remainW = used.w - (width + padding);
+    int remainH = used.h - (height + padding);
 
-    Rect right1 = new Rect(used.x + width + PADDING, used.y, remainW, height + PADDING);
-    Rect top1 = new Rect(used.x, used.y + height + PADDING, used.w, remainH);
-    Rect top2 = new Rect(used.x, used.y + height + PADDING, width + PADDING, remainH);
-    Rect right2 = new Rect(used.x + width + PADDING, used.y, remainW, used.h);
+    Rect right1 = new Rect(used.x + width + padding, used.y, remainW, height + padding);
+    Rect top1 = new Rect(used.x, used.y + height + padding, used.w, remainH);
+    Rect top2 = new Rect(used.x, used.y + height + padding, width + padding, remainH);
+    Rect right2 = new Rect(used.x + width + padding, used.y, remainW, used.h);
 
     if (remainW > 0 && remainH > 0) {
       int waste1 = Math.abs(right1.w * right1.h - top1.w * top1.h);
@@ -169,9 +196,9 @@ public final class TextureAtlas implements AutoCloseable {
         append(top2);
       }
     } else if (remainW > 0) {
-      append(new Rect(used.x + width + PADDING, used.y, remainW, height + PADDING));
+      append(new Rect(used.x + width + padding, used.y, remainW, height + padding));
     } else if (remainH > 0) {
-      append(new Rect(used.x, used.y + height + PADDING, width + PADDING, remainH));
+      append(new Rect(used.x, used.y + height + padding, width + padding, remainH));
     }
 
     merge();

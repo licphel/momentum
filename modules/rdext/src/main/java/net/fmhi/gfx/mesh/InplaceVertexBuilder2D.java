@@ -13,7 +13,7 @@ import org.jspecify.annotations.Nullable;
  * <p>This class provides the core drawing primitives: textured sprites, colored rectangles,
  * lines, and points. Each draw call transforms world-space coordinates, applies flip flags,
  * packs the current color, and appends vertex and index data. Subclasses can override
- * {@link #assertPrimitive} and {@link #assertTexture} to detect state changes and trigger flushes.
+ * {@link #setPrimitive} and {@link #setTexture} to detect state changes and trigger flushes.
  *
  * @see VertexBuilder2D
  * @see AbstractStatefulGraphics2D
@@ -40,8 +40,8 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
     if (pinned == null) {
       return;
     }
-    assertPrimitive(Primitive2D.TEXTURE_TRIANGLE_INDEXED);
-    assertTexture(pinned);
+    setPrimitive(Primitive2D.TEXTURE_TRIANGLE_INDEXED);
+    setTexture(pinned);
 
     float u1 = transformHandler.u(pinned, u);
     float v1 = transformHandler.v(pinned, v);
@@ -78,7 +78,7 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
 
   @Override
   public void drawRectangle(float x, float y, float w, float h) {
-    assertPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
+    setPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
 
     Vector3 p0 = transform().top().transform(new Vector3(x, y, 0));
     Vector3 p1 = transform().top().transform(new Vector3(x + w, y, 0));
@@ -99,7 +99,7 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
 
   @Override
   public void drawLine(float x1, float y1, float x2, float y2) {
-    assertPrimitive(Primitive2D.COLOR_LINE);
+    setPrimitive(Primitive2D.COLOR_LINE);
 
     Vector3 t1 = transform().top().transform(new Vector3(x1, y1, 0));
     Vector3 t2 = transform().top().transform(new Vector3(x2, y2, 0));
@@ -113,7 +113,7 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
 
   @Override
   public void drawPoint(float x, float y) {
-    assertPrimitive(Primitive2D.COLOR_POINT);
+    setPrimitive(Primitive2D.COLOR_POINT);
 
     Vector3 t = transform().top().transform(new Vector3(x, y, 0));
     putPosColor(t.x(), t.y(), t.z(), color.pack());
@@ -123,20 +123,11 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
 
   @Override
   public void drawTriangle(float x1, float y1, float x2, float y2, float x3, float y3) {
-    assertPrimitive(Primitive2D.COLOR_TRIANGLE);
+    setPrimitive(Primitive2D.COLOR_TRIANGLE);
 
     Vector3 t1 = transform().top().transform(new Vector3(x1, y1, 0));
     Vector3 t2 = transform().top().transform(new Vector3(x2, y2, 0));
     Vector3 t3 = transform().top().transform(new Vector3(x3, y3, 0));
-
-    // ensure CCW winding after transform
-    // since we use y-flip in 2D rendering, cross > 0, instead, means CW.
-    float cross = (t2.x() - t1.x()) * (t3.y() - t1.y()) - (t2.y() - t1.y()) * (t3.x() - t1.x());
-    if (cross > 0) {
-      Vector3 tmp = t2;
-      t2 = t3;
-      t3 = tmp;
-    }
 
     long col = color.pack();
     putPosColor(t1.x(), t1.y(), t1.z(), col);
@@ -146,9 +137,19 @@ public class InplaceVertexBuilder2D extends InplaceVertexBuilder implements Vert
     addVertex(3);
   }
 
-  protected void assertPrimitive(Primitive2D primitive) {
+  /**
+   * Makes the vertex builder use the given primitive.
+   *
+   * @param primitive primitive to draw
+   */
+  public void setPrimitive(Primitive2D primitive) {
   }
 
-  protected void assertTexture(Texture tex) {
+  /**
+   * Makes the vertex builder use the given texture.
+   *
+   * @param tex texture to draw
+   */
+  public void setTexture(@Nullable Texture tex) {
   }
 }

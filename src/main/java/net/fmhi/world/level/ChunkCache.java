@@ -1,7 +1,12 @@
 package net.fmhi.world.level;
 
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.block.Shape;
+import net.fmhi.world.fluid.Liquid;
+import net.fmhi.world.fluid.LiquidStack;
+import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.util.ChunkPos;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Pre-loaded chunk window for zero-allocation tile access.
@@ -44,9 +49,20 @@ public final class ChunkCache {
     return c != null ? c.getWall(wx - Math.floorDiv(wx, cs) * cs, wy - Math.floorDiv(wy, cs) * cs) : BlockState.EMPTY;
   }
 
+  public @Nullable Liquid getLiquid(int wx, int wy) {
+    Chunk c = chunk(wx, wy);
+    if (c == null) return null;
+    return Liquids.byId(c.getLiquidType(wx, wy));
+  }
+
+  public int getLiquidAmount(int wx, int wy) {
+    Chunk c = chunk(wx, wy);
+    if (c == null) return 0;
+    return c.getLiquidLevel(wx, wy);
+  }
+
   public boolean isFrontSolid(int wx, int wy) {
-    BlockState b = getBlock(wx, wy);
-    return b.block().isSolid(b);
+    return getBlock(wx, wy).shape() == Shape.SOLID;
   }
 
   public boolean isLoaded(int wx, int wy) {
@@ -56,11 +72,11 @@ public final class ChunkCache {
 
   public int liquidLevel(int wx, int wy) {
     Chunk c = chunk(wx, wy);
-    return c != null ? c.liquidMap().level(wx, wy) : 0;
+    return c != null ? c.getLiquidLevel(wx, wy) : 0;
   }
 
   public byte liquidType(int wx, int wy) {
     Chunk c = chunk(wx, wy);
-    return c != null ? c.liquidMap().liquidType(wx, wy) : 0;
+    return c != null ? c.getLiquidType(wx, wy) : 0;
   }
 }

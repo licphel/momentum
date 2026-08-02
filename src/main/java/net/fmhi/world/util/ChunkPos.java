@@ -127,4 +127,16 @@ public record ChunkPos(int x, int y) {
   public long asLong() {
     return ((long) x << 32) | (y & 0xFFFFFFFFL);
   }
+
+  /**
+   * Packs a block position into the chunk map key of its containing chunk,
+   * without allocating a {@link ChunkPos} or {@link BlockPos}.
+   *
+   * @param x the block X coordinate
+   * @param y the block Y coordinate
+   * @return the same key as {@code new ChunkPos(floorDiv(x, SIZE), floorDiv(y, SIZE)).asLong()}
+   */
+  public static long packBlockPosAsLong(int x, int y) {
+    return ((long) Math.floorDiv(x, SIZE) << 32) | (Math.floorDiv(y, SIZE) & 0xFFFFFFFFL);
+  }
 }

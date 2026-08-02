@@ -27,12 +27,8 @@ package net.fmhi.gfx.text.freetype;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.raster.Glyph;
-import net.fmhi.gfx.texture.FragileTexture;
-import net.fmhi.gfx.texture.Texture;
-import net.fmhi.gfx.texture.TextureDesc;
+import net.fmhi.gfx.texture.TextureAtlas;
 import net.fmhi.gfx.texture.TexturePart;
-import net.fmhi.math.Box2D;
-import net.fmhi.math.Box3D;
 import net.fmhi.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.util.freetype.FT_Bitmap;
@@ -51,8 +47,9 @@ import static org.lwjgl.util.freetype.FreeType.*;
  * <p>Each glyph is rasterized on demand via FreeType and packed into the atlas.
  * Re-requesting the same glyph returns the cached entry without re-rasterization.
  *
- * <p>The atlas is backed by a {@link FragileTexture} so that all cached {@link TexturePart}s
- * remain valid when the atlas grows — no cache invalidation or rebinding required.
+ * <p>The atlas is backed by a {@link net.fmhi.gfx.texture.FragileTexture} so that all
+ * cached {@link TexturePart}s remain valid when the atlas grows — no cache invalidation
+ * or rebinding required.
  *
  * <p>Must be {@linkplain #close() closed} to release the underlying texture atlas.
  */
@@ -60,11 +57,7 @@ import static org.lwjgl.util.freetype.FreeType.*;
 public final class FreetypeGlyphCache implements AutoCloseable {
   private final Device device;
   private final Map<GlyphKey, @Nullable Glyph> cache = new HashMap<>();
-  private @Nullable GrowableAtlas atlas;
-  private int cursorX;
-  private int cursorY;
-  private int rowHeight;
-  private int size;
+  private @Nullable TextureAtlas atlas;
   private int resolution = 0;
   private boolean disposed;
 
@@ -174,47 +167,15 @@ public final class FreetypeGlyphCache implements AutoCloseable {
         }
       }
 
-      ensureAtlas(w, h);
-
-      assert atlas != null;
-      atlas.pin().submit(rgba, Box3D.create(cursorX, cursorY, 0, w, h, 1));
-      tp = new TexturePart(atlas, Box2D.create(cursorX, cursorY, w, h));
-      cursorX += w;
-      rowHeight = Math.max(rowHeight, h);
+      if (atlas == null) {
+        atlas = new TextureAtlas(device, Math.max(1, resolution / 64));
+      }
+      tp = atlas.accept(rgba, w, h);
 
       return new Glyph(tp, slot.bitmap_left(), slot.bitmap_top(), advance);
     }
 
     return null;
-  }
-
-  /**
-   * Ensures the atlas has space for a glyph of the given size, growing if needed.
-   */
-  private void ensureAtlas(int w, int h) {
-    if (atlas == null) {
-      size = 512;
-      atlas = new GrowableAtlas(device.getTexture(new TextureDesc.Builder().width(size).height(size).build()));
-    }
-    if (cursorX + w > size) {
-      cursorX = 0;
-      cursorY += rowHeight;
-      rowHeight = 0;
-    }
-    while (cursorY + h > size) {
-      grow();
-    }
-  }
-
-  /** Doubles the atlas — GrowableAtlas.current is updated in place, all TextureParts see new texture automatically. */
-  private void grow() {
-    int newSize = size * 2;
-    Texture newTex = device.getTexture(new TextureDesc.Builder().width(newSize).height(newSize).build());
-    assert atlas != null;
-    atlas.current.blit(newTex, 0, 0, size, size, 0, 0, size, size);
-    atlas.current.close();
-    atlas.current = newTex;
-    size = newSize;
   }
 
   @Override
@@ -224,25 +185,11 @@ public final class FreetypeGlyphCache implements AutoCloseable {
     }
     disposed = true;
     if (atlas != null) {
-      atlas.current.close();
+      atlas.close();
     }
   }
 
   // Stable cache key: font + resolution + glyphIndex + fontStyle avoids identityHashCode collisions.
   private record GlyphKey(Font font, int resolution, int glyphIndex, int fontStyle) {
-  }
-
-  // FragileTexture impl: holds a mutable Texture pointer. TextureParts pin() this to get current atlas.
-  private static final class GrowableAtlas implements FragileTexture {
-    Texture current;
-
-    GrowableAtlas(Texture initial) {
-      this.current = initial;
-    }
-
-    @Override
-    public Texture pin() {
-      return current;
-    }
   }
 }

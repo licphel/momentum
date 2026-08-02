@@ -174,11 +174,28 @@ public final class OpenGLRenderTarget implements RenderTarget {
       OpenGLRenderTarget.this.ctx.submit(() -> {
         OpenGLCache c = OpenGLRenderTarget.this.ctx.cache;
         c.setTexture(0, GL_TEXTURE_2D, colorTex);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, (int) region.minX(), (int) region.minY(),
-            (int) region.width(), (int) region.height(), GL_RGBA, GL_UNSIGNED_BYTE,
-            ByteBuffer.wrap(data));
+        int x = (int) region.minX();
+        int y = (int) region.minY();
+        int w = (int) region.width();
+        int h = (int) region.height();
+        // Same convention as OpenGLTexture.submit: API data is top-origin,
+        // flip to GL row order and flip the destination Y. A full-target
+        // upload (y=0, h=height) is unaffected.
+        byte[] flipped = flipVertically(data, w, h);
+        glTexSubImage2D(GL_TEXTURE_2D, 0, x, fboHeight - y - h, w, h, GL_RGBA,
+            GL_UNSIGNED_BYTE, ByteBuffer.wrap(flipped));
         c.setTexture(0, GL_TEXTURE_2D, 0);
       });
+    }
+
+    private static byte[] flipVertically(byte[] data, int width, int height) {
+      int bpp = data.length / (width * height);
+      int rowSize = width * bpp;
+      byte[] out = new byte[data.length];
+      for (int row = 0; row < height; row++) {
+        System.arraycopy(data, row * rowSize, out, (height - 1 - row) * rowSize, rowSize);
+      }
+      return out;
     }
 
     @Override

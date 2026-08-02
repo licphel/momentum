@@ -38,6 +38,12 @@ package net.fmhi.world.light;
  */
 public interface LightBuffer {
   /**
+   * Returns this buffer to the pool for reuse.
+   * Call this when done with the buffer.
+   */
+  void recycle();
+
+  /**
    * Returns the red component of this light color.
    *
    * @return the red value, typically in {@code [0.0, 1.0]}
@@ -138,7 +144,7 @@ public interface LightBuffer {
   /**
    * Blends using a formula from the given buf to this.
    *
-   * @param buf     blending source
+   * @param buf   blending source
    * @param formula blending formula
    */
   default void blend(LightBuffer buf, CompositionFormula formula) {
