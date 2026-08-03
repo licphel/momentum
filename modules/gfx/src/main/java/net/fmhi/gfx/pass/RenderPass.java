@@ -34,7 +34,7 @@ import org.jspecify.annotations.Nullable;
  * Convenience factory {@link #of(RenderTarget, Color)} clears all three.
  *
  * @param target       the render target to bind for this pass, or {@code null} to use the swapchain
- * @param clearColor   the clear color for the color attachment
+ * @param clearColor   the clear gradient for the color attachment
  * @param clearDepth   the clear depth value (0.0–1.0)
  * @param clearStencil the clear stencil value
  * @param clearMask    bitmask of {@link #CLEAR_COLOR}, {@link #CLEAR_DEPTH}, {@link #CLEAR_STENCIL}
@@ -48,16 +48,16 @@ public record RenderPass(@Nullable RenderTarget target, Color clearColor, double
   /** Clear the stencil attachment. */
   public static final int CLEAR_STENCIL = 4;
 
-  /** Clear color + depth only (no stencil). Depth = 1.0, stencil = 0. Binds the swapchain. */
+  /** Clear gradient + depth only (no stencil). Depth = 1.0, stencil = 0. Binds the swapchain. */
   public static final RenderPass DEFAULT = new Builder().build();
-  /** Clear color + depth only (no stencil). Depth = 1.0, stencil = 0. Binds the swapchain. */
+  /** Clear gradient + depth only (no stencil). Depth = 1.0, stencil = 0. Binds the swapchain. */
   public static final RenderPass NOT_CLEAR = new Builder().clearMask(0).build();
 
   /**
    * Clears all three attachments on the given target. Depth = 1.0, stencil = 0.
    *
    * @param target the render target to bind, or {@code null} for the swapchain
-   * @param color  the color for the color attachment
+   * @param color  the gradient for the color attachment
    * @return a descriptor with all clear flags set
    */
   public static RenderPass of(@Nullable RenderTarget target, Color color) {
@@ -71,7 +71,7 @@ public record RenderPass(@Nullable RenderTarget target, Color clearColor, double
   /**
    * Clears all three attachments on the swapchain. Depth = 1.0, stencil = 0.
    *
-   * @param color the color for the color attachment
+   * @param color the gradient for the color attachment
    * @return a descriptor with all clear flags set
    */
   public static RenderPass of(Color color) {
@@ -79,7 +79,7 @@ public record RenderPass(@Nullable RenderTarget target, Color clearColor, double
   }
 
   /**
-   * Builder for {@link RenderPass} with sensible defaults — clear color and depth, no stencil, swapchain target.
+   * Builder for {@link RenderPass} with sensible defaults — clear gradient and depth, no stencil, swapchain target.
    */
   public static final class Builder {
     public @Nullable RenderTarget target = null;
@@ -100,9 +100,9 @@ public record RenderPass(@Nullable RenderTarget target, Color clearColor, double
     }
 
     /**
-     * Sets the clear color for the color attachment.
+     * Sets the clear gradient for the color attachment.
      *
-     * @param v the clear color
+     * @param v the clear gradient
      * @return this builder
      */
     public Builder clearColor(Color v) {

@@ -81,9 +81,9 @@ public final class Liquids {
 
     @Override
     public boolean getLight(LightBuffer buf) {
-      buf.r(0.9F);
-      buf.g(0.25F);
-      buf.b(0.05F);
+      buf.r(0.99F);
+      buf.g(0.5F);
+      buf.b(0.5F);
       return true;
     }
 

@@ -25,7 +25,7 @@ public abstract class Liquid {
 
   public abstract String name();
 
-  /** The color used to render this liquid. */
+  /** The gradient used to render this liquid. */
   public abstract Color color();
 
   /**

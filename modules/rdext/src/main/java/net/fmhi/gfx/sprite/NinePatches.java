@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.sprite;
 
-import net.fmhi.gfx.mesh.VertexBuilder2D;
+import net.fmhi.gfx.brush.VertexBuilder2D;
 import net.fmhi.gfx.texture.Drawable2D;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TexturePart;

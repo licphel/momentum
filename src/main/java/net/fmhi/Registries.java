@@ -25,8 +25,9 @@
 package net.fmhi;
 
 import net.fmhi.collection.Palette;
-import net.fmhi.fml.registry.DeferredRegister;
+import net.fmhi.fml.registry.IndirectRegistry;
 import net.fmhi.fml.registry.Holder;
+import net.fmhi.fml.registry.Registry;
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.world.block.Block;
 import net.fmhi.world.block.BlockState;
@@ -39,7 +40,6 @@ import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
 import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.physics.VoxelPlatform;
-import net.fmhi.world.physics.VoxelSlope;
 import net.fmhi.world.util.BlockPos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
@@ -56,8 +56,8 @@ import java.util.List;
 @NullMarked
 public final class Registries {
 
-  public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(Core.NAMESPACE, "block");
-  public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(Core.NAMESPACE, "item");
+  public static final Registry<Block> BLOCKS = new IndirectRegistry<>(Core.NAMESPACE.resolve("block"));
+  public static final Registry<Item> ITEMS = new IndirectRegistry<>(Core.NAMESPACE.resolve("item"));
 
   /** Global palette for all ImmutablePropertyMap states. */
   public static final Palette<ImmutablePropertyMap> PROPERTY_PALETTE = new Palette<>();
@@ -129,18 +129,22 @@ public final class Registries {
   private static final Polygon SHAPE_SLOPE_LEFT = new Polygon(
       new net.fmhi.math.Vector2(0, 0), new net.fmhi.math.Vector2(1, 1), new net.fmhi.math.Vector2(0, 1));
 
-  // Triangular slope collision (Terraria-style): the surface rises linearly
-  // across the tile and pulls the body's feet onto it.
-  // Y-up: top0/top1 are surface offsets from the tile bottom.
+  // Slopes approximated with a staircase of boxes (VoxelClip.generateSlope),
+  // so the clip physics walks them smoothly and the step-up climbs them.
   // ↗ ramp: walks right → goes up (left edge low, right edge high).
-  private static final VoxelClip VOXEL_SLOPE_RIGHT = new VoxelSlope(0F, 1F);
+  private static final VoxelClip VOXEL_SLOPE_RIGHT = VoxelClip.SLOPE_LEFT_DOWN;
   // ↖ ramp: walks left → goes up (left edge high, right edge low).
-  private static final VoxelClip VOXEL_SLOPE_LEFT = new VoxelSlope(1F, 0F);
+  private static final VoxelClip VOXEL_SLOPE_LEFT = VoxelClip.SLOPE_RIGHT_DOWN;
 
   public static final Block SLOPE_RIGHT = registerBlock("slope_right", new Block() {
     @Override
     public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
       return SHAPE_SLOPE_RIGHT;
+    }
+
+    @Override
+    public Shape shape(BlockState state) {
+      return Shape.PARTIAL; // liquids fill the slope gaps
     }
 
     @Override
@@ -158,6 +162,11 @@ public final class Registries {
     @Override
     public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
       return SHAPE_SLOPE_LEFT;
+    }
+
+    @Override
+    public Shape shape(BlockState state) {
+      return Shape.PARTIAL; // liquids fill the slope gaps
     }
 
     @Override
@@ -179,12 +188,12 @@ public final class Registries {
 
   // -- items --------------------------------------------------------------
 
-  public static final Holder<Item> AIR_ITEM = ITEMS.register("air", Item::new);
+  public static final Holder<Item> AIR_ITEM = ITEMS.register(Core.NAMESPACE.resolve("air"), Item::new);
 
   // -- registration -------------------------------------------------------
 
   private static Block registerBlock(String name, Block block) {
-    BLOCKS.register(name, () -> block);
+    BLOCKS.register(Core.NAMESPACE.resolve(name), () -> block);
     ALL_BLOCKS.add(block);
     return block;
   }
@@ -204,6 +213,9 @@ public final class Registries {
       block.propertyDef().collectStates(PROPERTY_PALETTE);
       block.fillStates();
     }
+
+    BLOCKS.freeze();
+    ITEMS.freeze();
 
     BlockState.EMPTY = Registries.AIR.defaultState();
   }

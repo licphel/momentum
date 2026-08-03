@@ -5,11 +5,7 @@ plugins {
 dependencies {
   api project(':fmhi-core')
   api project(':fmhi-audio')
-  compileOnly 'org.jspecify:jspecify:1.0.0'
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-openal:${lwjgl_version}"
-
-  implementation 'org.apache.logging.log4j:log4j-core:2.25.4'
-  implementation 'org.apache.logging.log4j:log4j-api:2.25.4'
 }

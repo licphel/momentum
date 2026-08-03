@@ -33,6 +33,8 @@ import net.fmhi.codec.tag.CompoundTag;
 import net.fmhi.fml.resource.ResourceFinder;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
+import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.tint.SimpleGradient;
 import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
@@ -45,9 +47,9 @@ import net.fmhi.gfx.input.KeyCode;
 import net.fmhi.gfx.input.Modifiers;
 import net.fmhi.gfx.io.ImageInfo;
 import net.fmhi.gfx.io.ImageInputStream;
-import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.brush.BatchedGraphics2D;
 import net.fmhi.gfx.mesh.Mesh;
-import net.fmhi.gfx.mesh.MeshGraphics2D;
+import net.fmhi.gfx.brush.MeshGraphics2D;
 import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.shader.*;
@@ -226,14 +228,14 @@ public class TestVertexBuilder2D {
 
     // --- Texture ---
     ImageInputStream img = ImageInputStream.open(new FileInputStream(ResourceFinder.getAppRoot().resolve(".ref",
-        "a" + ".png").toFile()));
+        "img" + ".png").toFile()));
     ImageInfo texInfo = img.info();
     TextureDesc texDesc =
         new TextureDesc.Builder().width(texInfo.width()).height(texInfo.height()).initialBytes(texInfo.pixels()).mipLevels(4).build();
     Texture texture = dev.getTexture(texDesc);
     Texture resized = dev.getTexture(new TextureDesc.Builder().width(500).height(500).build());
-    texture.blit(resized, 0, 0, texture.width(), texture.height(), 0, 0, 5, 5);
-    resized.blit(texture, 0, 0, 5, 5, 0, 0, 5, 5);
+    texture.blit(resized, 0, 0, texture.width(), texture.height(), 0, 0, 150, 50);
+    resized.blit(texture, 0, 0, 150, 50, 0, 0, 150, 50);
 
     Sampler sampler =
         dev.getSampler(new SamplerDesc.Builder().minFilter(TextureFilter.LINEAR_MIPMAP_LINEAR).magFilter(TextureFilter.LINEAR).build());
@@ -346,8 +348,9 @@ public class TestVertexBuilder2D {
       enc.drawIndexed(CUBE_INDICES.length, 0);
       enc.queuedExecute();
        */
+      dev.getTransformHandler().flipY(true);
 
-      MeshGraphics2D g = new MeshGraphics2D(dev);
+      MeshGraphics2D g = new MeshGraphics2D(new VertexData(), dev);
       g.begin(RenderPass.DEFAULT);
       g.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
       MutableText cns = new MutableText().justify(true).flipY(true).maxWidth(260);
@@ -364,7 +367,7 @@ public class TestVertexBuilder2D {
           "within " + "ourselves during the quiet, uncelebrated moments—the times when no one is watching, yet we " +
           "choose to keep " + "going. Embrace the journey with all its imperfections, for it is through struggle that" +
           " we discover who we " + "truly are.").with(new TextFormat.Builder(font).size(8).build()));
-      cns.append(Literal.of("Insert a BIG component!").with(new TextFormat(font, Color.WHITE,
+      cns.append(Literal.of("Insert a BIG component!").with(new TextFormat(font, new SimpleGradient(Color.WHITE),
           Font.ITALIC | Font.BOLD | Font.UNDERLINE, 16)));
       cns.append(Literal.of("Success is not final, failure is not fatal: it is the courage to continue that " +
           "counts. Every morning brings a fresh opportunity to start anew, to shed the weight of yesterday's " +
@@ -375,11 +378,11 @@ public class TestVertexBuilder2D {
           "within " + "ourselves during the quiet, uncelebrated moments—the times when no one is watching, yet we " +
           "choose to keep " + "going. Embrace the journey with all its imperfections, for it is through struggle that" +
           " we discover who we " + "truly are.").with(new TextFormat.Builder(font2).size(8).build()));
-      cns.append(Literal.of("多语言测试多语言测试多语言测试多语言测试多语言测试").with(new TextFormat(font2, Color.WHITE,
+      cns.append(Literal.of("多语言测试多语言测试多语言测试多语言测试多语言测试").with(new TextFormat(font2, new SimpleGradient(Color.WHITE),
           Font.ITALIC | Font.STRIKETHROUGH | Font.UNDERLINE, 8)));
       cns.newline();
       g.drawRectangleFrame(0, 0, 256, 256);
-      g.drawTexture(cns.raster().entries()[0].glyph().texPart().src(), 0, 0, 256, 256);
+      g.drawTexture(texture, 0, 0, texture.width(), texture.height(), 0, 0, texture.width(), texture.height() / 2);
       g.drawText(cns, 200, 100);
       g.drawRectangle(200, 100, 3, 3);
       g.setColor(Color.RED);
@@ -427,7 +430,7 @@ public class TestVertexBuilder2D {
 
       g.end();
 
-      BatchedGraphics2D bg = new BatchedGraphics2D(dev);
+      BatchedGraphics2D bg = new BatchedGraphics2D(new VertexData(), dev);
       Mesh mesh = g.bake(dev);
 
       bg.begin();

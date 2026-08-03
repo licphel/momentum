@@ -28,94 +28,96 @@ import net.fmhi.fml.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * A namespace-keyed collection of registered entries.
+ * A namespace-keyed collection of typed entries, supporting lookup by
+ * identifier and reverse lookup by entry identity.
  *
- * <p>Each registry is itself identified by an {@link Identifier}. Entries
- * are registered under their own identifiers and can be looked up by
- * identity (entry → id) and by id (id → entry).
+ * <p>Each registry has its own {@link Identifier} and stores entries
+ * registered under theirs. A registry accepts new entries during the
+ * registration phase only; once frozen, further registration is rejected.
  *
- * <p>Registries are frozen after the registration phase; once frozen,
- * no further entries may be added.
- *
- * @param <T> the type of entries in this registry
- * @see DeferredRegister
+ * @param <T> the type of entries stored in this registry
  */
-public interface Registry<T> extends Iterable<T> {
+public interface Registry<T extends RegistryEntry<T>> extends Iterable<T> {
   /**
-   * Returns this registry's own identifier within the root registry.
+   * Returns the identifier under which this registry itself is registered.
    *
    * @return the registry key
    */
   Identifier key();
 
   /**
-   * Registers an entry under the given identifier.
+   * Registers an entry under the given identifier, creating its value
+   * through the supplier.
    *
-   * @param id    the entry identifier
-   * @param value the entry value
-   * @return the registered value, for chaining
-   * @throws IllegalStateException    if the registry is frozen
-   * @throws IllegalArgumentException if the identifier is already registered
+   * <p>The supplier is evaluated once at registration time; the returned
+   * holder refers to the created value and remains valid afterward.
+   *
+   * @param id       the identifier to register the entry under
+   * @param supplier creates the entry value
+   * @return a holder for the registered value
+   * @throws IllegalStateException    if this registry is frozen
+   * @throws IllegalArgumentException if an entry is already registered under the identifier
    */
-  T register(Identifier id, T value);
+  Holder<T> register(Identifier id, Supplier<? extends T> supplier);
 
   /**
-   * Looks up an entry by its identifier.
+   * Looks up the entry registered under the given identifier.
    *
-   * @param id the entry identifier
-   * @return the registered value, or {@code null} if not found
+   * @param id the identifier to look up
+   * @return the registered value, or {@code null} if none is registered under the identifier
    */
   @Nullable T get(Identifier id);
 
   /**
-   * Looks up the identifier for a registered entry.
+   * Looks up the identifier under which the given entry is registered.
    *
-   * @param value the entry
+   * @param value the entry to look up
    * @return the identifier, or {@code null} if the entry is not in this registry
    */
   @Nullable Identifier getId(T value);
 
   /**
-   * Returns whether this registry contains the given identifier.
+   * Returns whether an entry is registered under the given identifier.
    *
-   * @param id the entry identifier
-   * @return {@code true} if registered
+   * @param id the identifier to test
+   * @return {@code true} if an entry is registered under it
    */
   boolean contains(Identifier id);
 
   /**
-   * Returns the set of all registered identifiers.
+   * Returns all identifiers registered in this registry.
    *
-   * @return an unmodifiable view of the key set
+   * @return an unmodifiable view of the registered identifiers
    */
   Set<Identifier> keys();
 
   /**
-   * Returns a stream of all registered entries.
+   * Returns a stream over all registered entries.
    *
-   * @return a sequential stream
+   * @return a sequential stream of the entries
    */
   Stream<T> stream();
 
   /**
-   * Returns the number of entries in this registry.
+   * Returns the number of registered entries.
    *
    * @return the entry count
    */
   int size();
 
   /**
-   * Freezes this registry, preventing further registration.
+   * Prevents any further registration.
    */
   void freeze();
 
   /**
-   * Returns whether this registry is frozen.
+   * Returns whether further registration is prevented.
    *
-   * @return {@code true} if frozen
+   * @return {@code true} if this registry is frozen
    */
   boolean isFrozen();
 }

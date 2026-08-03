@@ -25,7 +25,7 @@
 package net.fmhi.world.light;
 
 /**
- * Index constants for the color channels of a light value, used to select
+ * Index constants for the gradient channels of a light value, used to select
  * individual channels when operating on raw light buffers.
  */
 public final class Channel {

@@ -25,9 +25,9 @@
 package net.fmhi.world.light;
 
 /**
- * A mutable RGB light color, with components typically in {@code [0, 1]}.
+ * A mutable RGB light gradient, with components typically in {@code [0, 1]}.
  *
- * <p>Implementations represent a single color sample used throughout the
+ * <p>Implementations represent a single gradient sample used throughout the
  * lighting system. Values are expected to be normalized to {@code [0.0, 1.0]},
  * though higher values may temporarily appear while light propagates.
  * Thread-safety is implementation-specific.
@@ -44,49 +44,49 @@ public interface LightBuffer {
   void recycle();
 
   /**
-   * Returns the red component of this light color.
+   * Returns the red component of this light gradient.
    *
    * @return the red value, typically in {@code [0.0, 1.0]}
    */
   float r();
 
   /**
-   * Returns the green component of this light color.
+   * Returns the green component of this light gradient.
    *
    * @return the green value, typically in {@code [0.0, 1.0]}
    */
   float g();
 
   /**
-   * Returns the blue component of this light color.
+   * Returns the blue component of this light gradient.
    *
    * @return the blue value, typically in {@code [0.0, 1.0]}
    */
   float b();
 
   /**
-   * Sets the red component of this light color.
+   * Sets the red component of this light gradient.
    *
    * @param v the new red value, in {@code [0.0, 1.0]}
    */
   void r(float v);
 
   /**
-   * Sets the green component of this light color.
+   * Sets the green component of this light gradient.
    *
    * @param v the new green value, in {@code [0.0, 1.0]}
    */
   void g(float v);
 
   /**
-   * Sets the blue component of this light color.
+   * Sets the blue component of this light gradient.
    *
    * @param v the new blue value, in {@code [0.0, 1.0]}
    */
   void b(float v);
 
   /**
-   * Copies the color from the given buffer into this one.
+   * Copies the gradient from the given buffer into this one.
    *
    * @param buf the buffer to copy from
    */
@@ -97,7 +97,7 @@ public interface LightBuffer {
   }
 
   /**
-   * Replaces each channel with the brighter of this color and the given one.
+   * Replaces each channel with the brighter of this gradient and the given one.
    *
    * @param buf the buffer to compare against
    */
@@ -108,7 +108,7 @@ public interface LightBuffer {
   }
 
   /**
-   * Replaces each channel with the darker of this color and the given one.
+   * Replaces each channel with the darker of this gradient and the given one.
    *
    * @param buf the buffer to compare against
    */
@@ -119,7 +119,7 @@ public interface LightBuffer {
   }
 
   /**
-   * Multiplies each channel of this color by the corresponding channel of the
+   * Multiplies each channel of this gradient by the corresponding channel of the
    * given buffer.
    *
    * @param buf the buffer to multiply by
@@ -131,7 +131,7 @@ public interface LightBuffer {
   }
 
   /**
-   * Multiplies each channel of this color by the given scalar.
+   * Multiplies each channel of this gradient by the given scalar.
    *
    * @param f the scalar to multiply by
    */

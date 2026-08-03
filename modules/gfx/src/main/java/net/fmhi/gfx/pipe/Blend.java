@@ -31,7 +31,7 @@ import net.fmhi.math.Color;
  *
  * <p>Blending combines the output of the fragment shader (the <em>source</em>)
  * with the value already in the framebuffer (the <em>destination</em>). A {@code Blend} specifies the factors,
- * functions, and constant color used in that combination.
+ * functions, and constant gradient used in that combination.
  *
  * <p>The RGB and alpha channels can use separate source/destination factors
  * and blend functions, enabling effects like:
@@ -51,7 +51,7 @@ import net.fmhi.math.Color;
  * @param dstAlpha  destination factor for the alpha channel
  * @param alphaFunc blend function applied to the alpha result
  * @param enable    {@code true} to enable blending
- * @param constant  constant blend color (used with {@link BlendFactor#CONSTANT_COLOR} etc.)
+ * @param constant  constant blend gradient (used with {@link BlendFactor#CONSTANT_COLOR} etc.)
  */
 public record Blend(boolean enable, BlendFactor srcColor, BlendFactor dstColor, BlendFunc colorFunc,
                     BlendFactor srcAlpha, BlendFactor dstAlpha, BlendFunc alphaFunc, Color constant) {

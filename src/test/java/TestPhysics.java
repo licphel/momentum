@@ -47,7 +47,7 @@ public class TestPhysics {
     p.enterChunk(level);
     p.setVelocity(10F, 0F);
     for (int i = 0; i < 30; i++) p.tick(1F / 60F, level);
-    float right = p.position().xf() + p.width();
+    float right = p.bounds().maxX();
     assert right <= 6.01F : "should stop at the wall, right edge " + right;
     System.out.println("testWallBlocks OK");
   }
@@ -80,7 +80,7 @@ public class TestPhysics {
     p.enterChunk(level);
     p.setVelocity(4F, 0F);
     for (int i = 0; i < 60; i++) p.tick(1F / 60F, level);
-    float right = p.position().xf() + p.width();
+    float right = p.bounds().maxX();
     assert right <= 6.01F : "wall should stop the player, right=" + right;
     System.out.println("testNoAutoStepWall OK");
   }
@@ -97,8 +97,8 @@ public class TestPhysics {
     for (int i = 0; i < 60; i++) p.tick(1F / 60F, level);
     // the body top starts at 3.65, the ceiling bottom is 4: the slope
     // would raise the feet to 2 (top 4.65), but the ceiling must stop it
-    assert p.position().yf() + p.height() <= 4.01F
-        : "player was pushed into the ceiling, top=" + (p.position().yf() + p.height());
+    assert p.bounds().maxY() <= 4.01F
+        : "player was pushed into the ceiling, top=" + (p.bounds().maxY());
     System.out.println("testHeadRoom OK");
   }
 

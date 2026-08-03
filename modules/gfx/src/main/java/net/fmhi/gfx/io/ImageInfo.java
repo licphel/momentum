@@ -29,7 +29,7 @@ package net.fmhi.gfx.io;
  *
  * @param width    image width in pixels
  * @param height   image height in pixels
- * @param channels number of color channels (3 = RGB, 4 = RGBA)
+ * @param channels number of gradient channels (3 = RGB, 4 = RGBA)
  * @param pixels   raw pixel data in row-major order, length = {@code width * height * channels}
  */
 public record ImageInfo(int width, int height, int channels, byte[] pixels) {
@@ -38,7 +38,7 @@ public record ImageInfo(int width, int height, int channels, byte[] pixels) {
    *
    * @param width    image width in pixels
    * @param height   image height in pixels
-   * @param channels number of color channels (3 = RGB, 4 = RGBA)
+   * @param channels number of gradient channels (3 = RGB, 4 = RGBA)
    * @param pixels   raw pixel data in row-major order, length = {@code width * height * channels}
    */
   public ImageInfo {

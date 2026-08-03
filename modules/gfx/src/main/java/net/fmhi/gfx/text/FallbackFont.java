@@ -33,7 +33,7 @@ import java.nio.ByteBuffer;
 
 /**
  * Lazy-initialized built-in font.
-
+ *
  * <p>Call {@link #init(Device)} once before use; subsequent calls are no-ops.
  *
  * <p>All fields are thread-safe after initialization.

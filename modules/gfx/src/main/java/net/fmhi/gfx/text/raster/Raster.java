@@ -25,9 +25,9 @@
 package net.fmhi.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
+import net.fmhi.gfx.brush.tint.Gradient;
 import net.fmhi.gfx.text.Meta;
 import net.fmhi.math.Box2D;
-import net.fmhi.math.Color;
 import net.fmhi.math.Vector2;
 import org.jspecify.annotations.Nullable;
 
@@ -189,13 +189,13 @@ public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float last
    * A render entry for a single glyph.
    *
    * @param glyph     the rasterized glyph bitmap, or {@code null} if the glyph has no visual representation
-   * @param color     the glyph color
+   * @param gradient  the glyph gradient
    * @param bounds    the bearing-adjusted bounding rectangle in visual space
    * @param scale     the rendering scale factor
    * @param metaInfo  optional metadata, or {@code null} if none
    * @param charIndex the absolute character index in the merged source text
    */
-  public record Entry(@Nullable Glyph glyph, Color color, Box2D bounds, float scale, Meta @Nullable [] metaInfo,
+  public record Entry(@Nullable Glyph glyph, Gradient gradient, Box2D bounds, float scale, Meta @Nullable [] metaInfo,
                       int charIndex) {
   }
 
@@ -203,8 +203,8 @@ public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float last
    * A decoration line (underline or strikethrough) in visual space.
    *
    * @param bounds the bounding rectangle of the stroke
-   * @param color  the stroke color
+   * @param gradient  the stroke gradient
    */
-  public record Stroke(Box2D bounds, Color color) {
+  public record Stroke(Box2D bounds, Gradient gradient) {
   }
 }

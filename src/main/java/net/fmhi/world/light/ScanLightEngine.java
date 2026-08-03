@@ -153,7 +153,7 @@ public class ScanLightEngine extends LightEngine {
    * {@link #DARK_LUMINANCE} are stored as darkness.
    *
    * @param o       the working buffer offset of the tile
-   * @param channel the color channel to spread
+   * @param channel the gradient channel to spread
    * @param x       the tile X coordinate
    * @param y       the tile Y coordinate
    */

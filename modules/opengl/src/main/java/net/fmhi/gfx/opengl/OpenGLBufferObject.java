@@ -162,6 +162,9 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
   public void close() {
     ctx.submit(() -> {
       if (handle != 0) {
+        // drop VAOs referencing this buffer before the GL handle is freed,
+        // otherwise the handle could be recycled under a dangling VAO
+        ctx.vaos.invalidateBuffer(handle);
         glDeleteBuffers(handle);
         handle = 0;
       }

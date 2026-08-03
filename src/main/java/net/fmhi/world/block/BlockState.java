@@ -61,6 +61,17 @@ public final class BlockState extends BlockStateHolder {
     return block.slope(this);
   }
 
+  /** Whether the tile only fills its bottom half (Terraria half brick). */
+  public boolean halfBrick() {
+    return block.halfBrick(this);
+  }
+
+  /** Whether the block renders dynamically (animated) and must be drawn
+   * every frame instead of being baked into a chunk mesh. */
+  public boolean isAnimatedRendering() {
+    return block.isAnimatedRendering(this);
+  }
+
   /** Whether the tile lets light through (not a full {@link Shape#SOLID}). */
   public void filterSkylight(LightBuffer l) {
     block.filterSkylight(this, l);

@@ -28,6 +28,7 @@ import net.fmhi.codec.tag.CompoundTag;
 import net.fmhi.codec.tag.ListTag;
 import net.fmhi.fml.Identifier;
 import net.fmhi.fml.registry.Registry;
+import net.fmhi.fml.registry.RegistryEntry;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -50,7 +51,7 @@ import java.util.function.Function;
  *
  * @param <T> the registry entry type
  */
-public final class TagManager<T> {
+public final class TagManager<T extends RegistryEntry<T>> {
   private final Registry<T> registry;
   private final Map<Identifier, SimpleTag<T>> tags = new LinkedHashMap<>();
   private boolean resolved;

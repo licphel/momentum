@@ -1,12 +1,13 @@
 /*
  * MIT License — direct port of Terraria 1.3 player movement physics
- * (Collision.TileCollision / StepUp / StepDown / SlopeCollision),
- * adapted to a Y-up world: the position is the feet, y grows upward.
- * The tile unit is 1.0 (Terraria's 16 px).
+ * (Collision.TileCollision / SlopeCollision / WalkDownSlope / StepUp /
+ * StepDown and their call order in Player.Update), adapted to a Y-up
+ * world: the position is the feet, y grows upward, and the tile unit is
+ * 1.0 (Terraria's 16 px). All pixel constants are divided by 16.
  *
- * Terraria treats velocity as "movement per frame"; here the velocity is
- * per second and the per-frame displacement is {@code velocity × dt}, so
- * the public API stays velocity-per-second.
+ * Terraria treats velocity as "movement per frame"; here velocity is per
+ * second and the collision routines operate on the per-frame displacement
+ * (velocity × dt), so the public API stays velocity-per-second.
  */
 
 package net.fmhi.world.physics;
@@ -14,6 +15,7 @@ package net.fmhi.world.physics;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;
 import net.fmhi.world.block.BlockState;
+import net.fmhi.world.block.Shape;
 import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.fluid.Liquids;
@@ -22,16 +24,38 @@ import net.fmhi.world.level.Level;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Terraria-style physics: every frame the movement is clipped per axis
- * against the solid tiles ({@link #tileCollision}), the body steps up or
- * down one-block ledges ({@link #stepUp}, {@link #stepDown}) and slides
- * along slopes ({@link #slopeCollision}). Position is the feet; the body
- * spans {@code [x, x+width] × [y, y+height]} upward.
+ * against the solid tiles ({@link #tileCollision}), the body walks up or
+ * down one-block ledges ({@link #stepUp}, {@link #stepDown}), slides
+ * along slopes ({@link #slopeCollision}) and drops through platforms
+ * while holding down. Position is the feet; the body spans
+ * {@code [x, x+width] × [y, y+height]} upward.
  */
 @NullMarked
 public abstract class TRPhyObj {
+
+  /** 1 Terraria pixel in tile units (a tile is 1.0 = 16 px). */
+  private static final float PX = 1F / 16F;
+  /** Collision room kept under a ceiling (TileCollision's +0.01 px). */
+  private static final float CEILING_ROOM = 0.01F * PX;
+  /** Minimum downward speed kept when pressed against a ceiling slope
+   * (SlopeCollision's 0.0101 px/frame). */
+  private static final float SLOPE_FALL_MIN = 0.0101F * PX;
+  /** A fall faster than this lands on a platform even while dropping
+   * through (TileCollision: {@code Velocity.Y > 1.0}). */
+  private static final float FALL_THROUGH_SPEED = 1F * PX;
+  /** Slope-surface snap tolerance (SlopeCollision's ±1 px). */
+  private static final float SLOPE_SNAP = 1F * PX;
+  /** Maximum step height (StepUp's 16.1 px). */
+  private static final float STEP_UP_MAX = 16.1F * PX;
+  /** Ledge drop range walked by StepDown: 7..17 px. */
+  private static final float STEP_DOWN_MIN = 7F * PX;
+  private static final float STEP_DOWN_MAX = 17F * PX;
+  /** Half-brick height (8 px). */
+  private static final float HALF_BRICK = 8F * PX;
 
   private static final float TOLERANCE = 0.001F;
   private static final float MAX_SPEED = 64F;
@@ -46,6 +70,10 @@ public abstract class TRPhyObj {
   /** Terraria Collision.up / Collision.down from the last tile collision. */
   private boolean collidedUp;
   private boolean collidedDown;
+  /** Terraria Collision.stair / stairFall / sloping. */
+  private boolean stair;
+  private boolean stairFall;
+  private boolean sloping;
 
   // -- parameters ---------------------------------------------------------
 
@@ -134,43 +162,51 @@ public abstract class TRPhyObj {
       velocity = velocity.multiply(keep);
     }
 
-    // -- Terraria movement -------------------------------------------------
+    // -- Terraria movement (Player.Update order) --------------------------
     boolean fallThrough = fallThroughSustain > 0;
 
-    // step down a ledge while resting on the ground and falling
-    if (onGround && velocity.y() < 0F) {
-      stepDown(level);
+    // SlopeDownMovement → WalkDownSlope: only at the exact gravity step
+    // (Terraria: velocity.Y == gravity) a downward slope pulls the body
+    // down with the horizontal speed
+    walkDownSlope(level, d);
+
+    // StepDown / StepUp also only fire at the gravity step, and StepUp
+    // never while holding down (Terraria: velocity.Y >= gravity &&
+    // !controlDown)
+    if (Math.abs(velocity.y() + gravity * d) < TOLERANCE) {
+      stepDown(level, d);
     }
-    // step up a ledge while resting on the ground
-    if (onGround && !fallThrough) {
-      stepUp(level);
+    if (velocity.y() <= -gravity * d + TOLERANCE && !fallThrough) {
+      stepUp(level, d);
     }
 
-    // dry collision: clip the displacement per axis (Terraria
-    // TileCollision), then apply the move
-    Vector2 disp = tileCollision(velocity.multiply(d), level);
-    if (collidedUp) {
-      disp = new Vector2(disp.x(), 0.01F);
-    }
-    position = new PrecisePos(position.xf() + disp.x(), position.yf() + disp.y());
+    // DryCollision → TileCollision: clip the per-frame displacement, then
+    // apply it (Terraria: position += velocity)
+    var tc = tileCollision(velocity.multiply(d), level);
+    Vector2 disp = tc.disp();
+    // sample the contact state before SlopeCollision re-runs TileCollision
+    // and resets it (Terraria: UpdateTouchingTiles runs before
+    // SlopingCollision)
+    boolean groundHit = collidedDown;
+    boolean headHit = collidedUp;
+    position = new PrecisePos(position.xf() + disp.x() + tc.pushOut().x(),
+        position.yf() + disp.y() + tc.pushOut().y());
 
-    // slope correction (Terraria SlopeCollision / SlopingCollision)
-    SlopeResult slope = slopeCollision(disp, level, fallThrough);
+    // SlopingCollision → SlopeCollision (fall = stairFall, forced while
+    // dropping through platforms); it corrects the already-moved position
+    SlopeResult slope = slopeCollision(disp, level, stairFall || fallThrough);
     position = slope.position;
     disp = slope.displacement;
+    stairFall = this.stairFall || fallThrough;
 
     // velocity reflects the clipped displacement
     velocity = new Vector2(disp.x() / d, disp.y() / d);
 
-    // ground state: re-check after the slope pass
-    collidedDown = false;
-    collidedUp = false;
-    tileCollision(disp, level);
-    onGround = collidedDown && velocity.y() <= 0F;
+    onGround = groundHit && velocity.y() <= 0F;
 
     // bounce on blocked axes
-    if (collidedUp && velocity.y() > 0F) velocity = new Vector2(velocity.x(), velocity.y() * -bounceFactor);
-    if (collidedDown && velocity.y() < 0F) velocity = new Vector2(velocity.x(), velocity.y() * -bounceFactor);
+    if (headHit && velocity.y() > 0F) velocity = new Vector2(velocity.x(), velocity.y() * -bounceFactor);
+    if (groundHit && velocity.y() < 0F) velocity = new Vector2(velocity.x(), velocity.y() * -bounceFactor);
 
     // ground friction
     if (onGround && groundFriction > 0F) {
@@ -181,151 +217,324 @@ public abstract class TRPhyObj {
 
   // -- Terraria TileCollision ---------------------------------------------
 
+  private record TileColResult(Vector2 disp, Vector2 pushOut) {
+  }
+
   /**
-   * Clips the displacement against the solid tiles the body sweeps over,
-   * per axis (Terraria Collision.TileCollision). Sets
-   * {@link #collidedUp}/{@link #collidedDown}.
+   * Clips the displacement against the solid tiles the moved body
+   * overlaps, per axis (Collision.TileCollision, lines 1534-1650).
+   * Sets {@link #collidedUp}/{@link #collidedDown}. Platforms only clip
+   * while landing from above, and are skipped while dropping through
+   * unless the fall exceeds 1 px/frame.
+   *
+   * <p>The returned {@link TileColResult#pushOut()} is a positional
+   * correction (pushing a body out of an overlap it cannot normally be
+   * in); it must not feed back into the velocity.
    */
-  private Vector2 tileCollision(Vector2 disp, Level level) {
+  private TileColResult tileCollision(Vector2 disp, Level level) {
     collidedUp = false;
     collidedDown = false;
-    Vector2 result = disp;
+    Vector2 result = disp;   // clipped displacement (vector2_1)
+    Vector2 orig = disp;     // requested displacement (vector2_2)
+    Vector2 pushOut = Vector2.ZERO;
 
-    float px = position.xf();
-    float feet = position.yf();
-    float pxr = px + width();
-    float top = feet + height();
-    // moved position (Terraria checks the destination against the tiles)
-    float mvx = px + disp.x();
-    float mvy = feet + disp.y();
+    float px = position.xf();      // body left
+    float feet = position.yf();    // body bottom (the feet, Y-up)
+    float pxr = px + width();      // body right
+    float top = feet + height();   // body top
+    float mvx = px + disp.x();     // moved body (Terraria checks the
+    float mvy = feet + disp.y();   // destination against the tiles)
 
-    int minBX = (int) Math.floor(mvx) - 1;
-    int maxBX = (int) Math.floor(mvx + width()) + 2;
-    int minBY = (int) Math.floor(mvy) - 1;
-    int maxBY = (int) Math.floor(mvy + height()) + 2;
+    int minBX = (int) Math.floor(px) - 1;
+    int maxBX = (int) Math.floor(pxr) + 2;
+    int minBY = (int) Math.floor(feet) - 1;
+    int maxBY = (int) Math.floor(top) + 2;
+    // Terraria num5/6 = X-collision tile, num7/8 = landing tile (-1 none)
+    int num5 = -1;
+    int num6 = -1;
+    int num7 = -1;
+    int num8 = -1;
+    // Terraria num13 sentinel starts far below the body (Y-down); here
+    // far above, so the first real ground always updates it
+    float num13 = minBY - 2F;
 
-    for (int bx = minBX; bx <= maxBX; bx++) {
-      for (int by = minBY; by <= maxBY; by++) {
-        int slope = tileSlope(bx, by, level);
+    for (int bx = minBX; bx < maxBX; bx++) {
+      for (int by = minBY; by < maxBY; by++) {
         boolean solid = tileSolid(bx, by, level);
         boolean platform = !solid && tilePlatform(bx, by, level);
         if (!solid && !platform) continue;
 
-        // the tile box [bx, bx+1] × [by, by+1] (Y-up); the feet resting
-        // exactly on the top count as touching
-        if (!(mvx + width() > bx && mvx < bx + 1F && mvy + height() > by && mvy <= by + 1F)) continue;
+        // tile box [bx, bx+1] × [by, by+1]; a half brick only fills the
+        // bottom half (Terraria shifts the box top down 8 px)
+        float boxMinY = by;
+        float boxMaxY = by + 1F;
+        if (halfBrick(bx, by, level)) boxMaxY = by + HALF_BRICK;
 
-        // slopes: a body near the surface is not blocked (Terraria flag2)
-        if (slope > 0) {
-          boolean flag2 = false;
-          if (slope == 2 && feet + Math.abs(disp.x()) + 1F >= by + 1F && px >= bx) flag2 = true;
-          if (slope == 1 && feet + Math.abs(disp.x()) + 1F >= by + 1F && pxr <= bx + 1F) flag2 = true;
-          if (flag2) continue;
+        // the moved body intersects the tile box
+        if (!(mvx + width() > bx && mvx < bx + 1F
+            && mvy + height() > boxMinY && mvy < boxMaxY)) continue;
+
+        // slopes: a body near the surface is not clipped (Terraria flag2)
+        boolean flag1 = false;
+        boolean flag2 = false;
+        int slope = tileSlope(bx, by, level);
+        if (slope > 2) {
+          // ceiling slopes 3/4: the head within |dx| px of the tile bottom
+          if (slope == 3 && top - Math.abs(disp.x()) <= by && px >= bx) flag2 = true;
+          if (slope == 4 && top - Math.abs(disp.x()) <= by && pxr <= bx + 1F) flag2 = true;
+        } else if (slope > 0) {
+          // floor slopes 1/2: the feet within |dx| px of the tile top
+          flag1 = true;
+          if (slope == 1 && feet + Math.abs(disp.x()) >= boxMaxY && px >= bx) flag2 = true;
+          if (slope == 2 && feet + Math.abs(disp.x()) >= boxMaxY && pxr <= bx + 1F) flag2 = true;
         }
+        if (flag2) continue;
 
-        // landing: the moved feet reach the tile top while the feet are
-        // at or inside the tile (Y-up: feet >= bottom). Only the tile the
-        // feet actually touch counts, so a wall only clips the body's X.
-        if (mvy <= by + 1F && feet >= by) {
+        // landing: the feet rest on the tile top (Y-up: feet >= top)
+        if (feet >= boxMaxY) {
           collidedDown = true;
-          boolean falling = disp.y() < 0F;
-          if (!platform || !(fallThroughSustain > 0 || falling)) {
-            if (falling) {
-              float clip = (by + 1F) - feet;
-              result = new Vector2(result.x(), Math.max(disp.y(), clip));
-            } else if (!platform) {
-              result = new Vector2(result.x(), Math.min(disp.y(), (by + 1F) - feet));
+          if ((!platform || fallThroughSustain <= 0 || -disp.y() > FALL_THROUGH_SPEED)
+              && num13 < boxMaxY) {
+            num7 = bx;
+            num8 = by;
+            if (halfBrick(bx, by, level)) num8++;
+            if (num7 != num5 && !flag1) {
+              // Terraria assigns the landing clip directly (the body lands
+              // exactly on the tile top, however far the fall reached)
+              result = new Vector2(result.x(), boxMaxY - feet);
+              num13 = boxMaxY;
             }
           }
         } else if (pxr <= bx && !platform) {
-          // body left of the tile, moving right
-          result = new Vector2(Math.min(result.x(), bx - pxr), result.y());
+          // body left of the tile, moving right; a slope in the tile to
+          // the left lets the body pass (Terraria checks tile[x-1])
+          if (tileSlope(bx - 1, by, level) != 2 && tileSlope(bx - 1, by, level) != 4) {
+            num5 = bx;
+            num6 = by;
+            if (num6 != num8)
+              result = new Vector2(Math.min(result.x(), bx - pxr), result.y());
+            if (num7 == num5)
+              result = new Vector2(result.x(), orig.y());
+          }
         } else if (px >= bx + 1F && !platform) {
           // body right of the tile, moving left
-          result = new Vector2(Math.max(result.x(), bx + 1F - px), result.y());
-        } else if (top <= by && mvy + height() >= by && !platform) {
+          if (tileSlope(bx + 1, by, level) != 1 && tileSlope(bx + 1, by, level) != 3) {
+            num5 = bx;
+            num6 = by;
+            if (num6 != num8)
+              result = new Vector2(Math.max(result.x(), bx + 1F - px), result.y());
+            if (num7 == num5)
+              result = new Vector2(result.x(), orig.y());
+          }
+        } else if (top <= by && !platform) {
           // the top crosses the tile bottom from below: rising into it
           collidedUp = true;
-          result = new Vector2(result.x(), Math.min(result.y(), by - top));
+          num7 = bx;
+          num8 = by;
+          result = new Vector2(result.x(), by - top - CEILING_ROOM);
+          if (num8 == num6)
+            result = new Vector2(orig.x(), result.y());
+        }
+
+        // overlap guard: if the moved body still overlaps this solid tile
+        // (riding a wall edge, a block placed into the body), push it out
+        // along the smallest penetration axis so it cannot tunnel through
+        // the tile and out of the ground
+        if (!platform) {
+          float rx = px + result.x();
+          float rfeet = feet + result.y();
+          if (rx + width() > bx && rx < bx + 1F
+              && rfeet + height() > boxMinY && rfeet < boxMaxY) {
+            float up = boxMaxY - rfeet;
+            float down = rfeet + height() - boxMinY;
+            float left = rx + width() - bx;
+            float right = bx + 1F - rx;
+            float best = Math.min(Math.min(up, down), Math.min(left, right));
+            if (best > TOLERANCE) {
+              if (best == up) pushOut = new Vector2(pushOut.x(), Math.max(pushOut.y(), up));
+              else if (best == down) pushOut = new Vector2(pushOut.x(), Math.min(pushOut.y(), -down));
+              else if (best == left) pushOut = new Vector2(Math.min(pushOut.x(), -left), pushOut.y());
+              else pushOut = new Vector2(Math.max(pushOut.x(), right), pushOut.y());
+            }
+          }
         }
       }
     }
-    return result;
+    return new TileColResult(result, pushOut);
+  }
+
+  // -- Terraria WalkDownSlope ---------------------------------------------
+
+  /**
+   * Pulls the body down a slope it is standing on: at the exact gravity
+   * step, a downward slope adds the horizontal speed to the fall
+   * (Collision.WalkDownSlope, lines 957-1040).
+   */
+  private void walkDownSlope(Level level, float d) {
+    if (Math.abs(velocity.y() + gravity * d) > TOLERANCE) return;
+    float px = position.xf();
+    float feet = position.yf();
+    float top = feet + height();
+    int minBX = (int) Math.floor(px);
+    int maxBX = (int) Math.floor(px + width());
+    int row = (int) Math.floor(feet - 4F * PX);   // the row 4 px below the feet
+    // sentinel: a row far above the body (Y-up; Terraria uses far below)
+    float num7 = row + 4F;
+    int index1 = -1;
+    int index2 = -1;
+    int slopeDir = velocity.x() < 0F ? 2 : 1;     // Terraria num8
+    for (int bx = minBX; bx <= maxBX; bx++) {
+      for (int by = row - 1; by <= row; by++) {
+        boolean solid = tileSolid(bx, by, level) || tilePlatform(bx, by, level);
+        if (!solid) continue;
+        float tileTop = by + 1F;
+        if (halfBrick(bx, by, level)) tileTop = by + HALF_BRICK;
+        // the tile top is within 1..17 px below the feet (Terraria tests a
+        // rect just above the tile, Y-down)
+        if (!(px + width() > bx && px < bx + 1F
+            && top > by + 1F + PX && feet < by + 1F + (1F + 16F) * PX)) continue;
+        if (tileTop >= num7) {
+          if (num7 == tileTop) {
+            // a tie with a previous slope only picks a slope of the same
+            // downward direction
+            if (tileSlope(bx, by, level) != 0) {
+              if (index1 != -1 && index2 != -1 && tileSlope(index1, index2, level) != 0) {
+                if (tileSlope(bx, by, level) == slopeDir) {
+                  num7 = tileTop;
+                  index1 = bx;
+                  index2 = by;
+                }
+              } else {
+                num7 = tileTop;
+                index1 = bx;
+                index2 = by;
+              }
+            }
+          } else {
+            num7 = tileTop;
+            index1 = bx;
+            index2 = by;
+          }
+        }
+      }
+    }
+    if (index1 != -1 && index2 != -1 && tileSlope(index1, index2, level) > 0) {
+      int slope = tileSlope(index1, index2, level);
+      float num10;
+      if (slope == 2) {                         // ↗: walking left is downhill
+        num10 = (index1 + 1F) - (px + width());
+        if (feet <= index2 + 1F - num10 && velocity.x() < 0F) {
+          velocity = new Vector2(velocity.x(), velocity.y() - Math.abs(velocity.x()));
+        }
+      } else if (slope == 1) {                  // ↖: walking right is downhill
+        num10 = px - index1;
+        if (feet <= index2 + 1F - num10 && velocity.x() > 0F) {
+          velocity = new Vector2(velocity.x(), velocity.y() - Math.abs(velocity.x()));
+        }
+      }
+    }
   }
 
   // -- Terraria StepUp / StepDown -----------------------------------------
 
   /**
-   * Smoothly walks the body down a ledge up to one block high (Terraria
-   * Collision.StepDown). Y-up: down means smaller y.
+   * Walks the body down a ledge of 7..17 px when falling at the gravity
+   * step (Collision.StepDown, lines 2188-2238). The body drops onto the
+   * highest tile top below it; slopes in the scanned row cancel the step.
    */
-  private void stepDown(Level level) {
-    float px = position.xf() + velocity.x() * 0.0166667F;
+  private void stepDown(Level level, float d) {
+    float px = position.xf() + velocity.x() * d;
     float feet = position.yf();
     int minBX = (int) Math.floor(px);
     int maxBX = (int) Math.floor(px + width());
-    int row = (int) Math.floor(feet);
-    float lowest = Float.MAX_VALUE;
+    int row = (int) Math.floor(feet - 4F * PX);   // the row 4 px below the feet
+    int num4 = (int) Math.ceil(height());          // body height in tiles
+    boolean flag = false;
+    // sentinel: a row far above the body (Y-up, so any ground below the
+    // feet updates it)
+    float num5 = row + num4 + 2F;
     for (int bx = minBX; bx <= maxBX; bx++) {
-      for (int by = row; by <= row + 1; by++) {
-        if (!tileSolid(bx, by, level) && !tilePlatform(bx, by, level)) continue;
+      for (int by = row - 1; by <= row; by++) {
+        if (tileSlope(bx, by, level) != 0) flag = true;   // any slope cancels
+        boolean solid = tileSolid(bx, by, level) || tilePlatform(bx, by, level);
+        if (!solid) continue;
         float tileTop = by + 1F;
-        // the body intersects this tile's footprint
-        if (px + width() > bx && px < bx + 1F && feet + height() > by && feet < by + 1F) {
-          lowest = Math.min(lowest, tileTop);
-        }
+        if (halfBrick(bx, by, level)) tileTop = by + HALF_BRICK;
+        // the tile top is within 1..17 px below the feet (Terraria tests a
+        // rect just above the tile, Y-down)
+        if (!(px + width() > bx && px < bx + 1F
+            && feet + height() > by + 1F + PX && feet < by + 1F + (1F + 16F) * PX)) continue;
+        if (tileTop > num5) num5 = tileTop;      // highest ground wins
       }
     }
-    float drop = lowest - feet;
-    if (drop <= 0F || drop >= 1F) return;
-    if (drop > 0.44F && drop < 1.06F) return;
-    position = new PrecisePos(position.xf(), lowest);
+    // Y-up: a ground below the feet gives a positive drop
+    float drop = feet - num5;
+    if (drop <= STEP_DOWN_MIN || drop >= STEP_DOWN_MAX || flag) return;
+    position = new PrecisePos(position.xf(), num5);
   }
 
   /**
-   * Steps the body up a ledge no higher than one block (Terraria
-   * Collision.StepUp): the tile just above the feet must be climbable
-   * (slope or platform, never a solid wall), with head room above.
+   * Steps the body up a ledge no higher than one block
+   * (Collision.StepUp, lines 2240-2342): the tile just above the feet
+   * must be climbable (platform, slope in the body's low half, half
+   * brick with a clear tile above), with head room and a clear
+   * back-tile at the head row.
    */
-  private void stepUp(Level level) {
+  private void stepUp(Level level, float d) {
     int dir = velocity.x() < 0F ? -1 : velocity.x() > 0F ? 1 : 0;
-    if (dir == 0) return;
-    float px = position.xf() + velocity.x() * 0.0166667F;
+    float px = position.xf() + velocity.x() * d;
     float feet = position.yf();
+    float centerX = position.xf() + width() / 2F;
     int col = (int) Math.floor(px + width() / 2F + (width() / 2F + 1F) * dir);
-    int footRow = (int) Math.floor(feet);
-    int rows = (int) Math.ceil(height());
+    int footRow = (int) Math.floor(feet - PX);     // the row containing the feet
+    int num2 = (int) Math.ceil(height());          // body height in tiles
 
-    int slope = tileSlope(col, footRow + 1, level);
-    boolean stepTile = slope > 0 || tilePlatform(col, footRow + 1, level);
-    if (!stepTile) return;
-
-    // head room: the column above the step must be clear
-    for (int r = footRow + 2; r <= footRow + rows + 1; r++) {
-      if (tileSolid(col, r, level)) return;
+    if (chunkAt(col, footRow, level) == null) return;
+    for (int index2 = 1; index2 < num2 + 2; index2++) {
+      if (chunkAt(col, footRow + index2, level) == null) return;
     }
+    if (chunkAt(col - dir, footRow + num2, level) == null) return;
 
-    float top;
-    if (slope > 0) {
-      // the slope surface under the body's leading edge (Y-up: slope 2 ↗
-      // rises from bottom-left to top-right, slope 1 ↖ the mirror)
-      float offset = dir > 0 ? (px + width() - col) : (col + 1F - px);
-      top = footRow + 1F + (slope == 2 ? offset : 1F - offset);
-    } else {
-      top = footRow + 2F; // platform top
+    // head room: tiles 2..num2 above the feet must not be solid
+    boolean flag1 = true;
+    for (int index2 = 2; index2 < num2 + 1; index2++) {
+      flag1 = flag1 && !tileSolid(col, footRow + index2, level);
     }
-    float rise = top - feet;
-    if (rise <= 0F || rise > 1F) return;
+    // the back tile at the head row must not be solid
+    boolean flag3 = !tileSolid(col - dir, footRow + num2, level);
 
-    // try the move with the body raised; it must not collide
-    Vector2 savedVel = velocity;
-    position = new PrecisePos(position.xf(), feet + rise);
-    Vector2 disp = tileCollision(velocity.multiply(0.0166667F), level);
-    if (Math.abs(disp.x()) < TOLERANCE) {
-      // blocked: undo
-      position = new PrecisePos(position.xf(), feet);
-      velocity = savedVel;
-    }
+    // flag7: the tile just above the feet is climbable — a platform, or a
+    // slope under the body's low half, or a half brick with a clear tile
+    // above
+    int s1 = tileSlope(col, footRow + 1, level);
+    boolean flag7 = !tileSolid(col, footRow + 1, level)
+        || ((s1 == 1 && centerX > col) || (s1 == 2 && centerX < col + 1F))
+        || (halfBrick(col, footRow + 1, level) && !tileSolid(col, footRow + num2 + 1, level));
+
+    // flag8 (Terraria's ternary): when the foot tile is solid the step is
+    // allowed; when it is passable (air, platform, slope with the body on
+    // its low side) the tile just above the feet must be an active half
+    // brick — so a body falling through air never steps up
+    int s4 = tileSlope(col, footRow, level);
+    boolean x = !tileSolid(col, footRow, level)
+        || (s4 != 0 && (s4 != 1 || centerX >= col) && (s4 != 2 || centerX <= col + 1F))
+        || (s4 != 0 && feet >= footRow + 1F)
+        || !tileSolid(col, footRow, level);
+    boolean flag8 = (x
+            ? (tileActive(col, footRow + 1, level) && halfBrick(col, footRow + 1, level))
+            : true)
+        && !(tilePlatform(col, footRow, level) && tilePlatform(col, footRow + 1, level));
+
+    if (col >= px + width() || col + 1F <= px) return;
+    if (!flag8 || !flag7 || !flag1 || !flag3) return;
+
+    float num3 = footRow + 1F;                     // the step top
+    if (halfBrick(col, footRow + 1, level)) num3 -= HALF_BRICK;
+    else if (halfBrick(col, footRow, level)) num3 += HALF_BRICK;
+    if (num3 <= feet) return;
+    float rise = num3 - feet;
+    if (rise > STEP_UP_MAX) return;
+    position = new PrecisePos(position.xf(), num3);
   }
 
   // -- Terraria SlopeCollision ---------------------------------------------
@@ -334,61 +543,173 @@ public abstract class TRPhyObj {
   }
 
   /**
-   * Slides the body along slopes: the feet are pulled onto the slope
-   * surface and the vertical displacement is zeroed (Terraria
-   * Collision.SlopeCollision).
+   * Slides the body along slopes: the feet are pulled onto floor-slope
+   * surfaces and the head under ceiling slopes, the vertical velocity is
+   * zeroed, and the moved position is re-clipped so a blocked lift slides
+   * the body sideways (Collision.SlopeCollision, lines 1254-1444).
    */
   private SlopeResult slopeCollision(Vector2 disp, Level level, boolean fall) {
+    stair = false;
+    stairFall = false;
+    boolean[] flagArray = new boolean[5];
+    // Terraria num1/num2: the best floor/ceiling surface so far, measured
+    // at the body top (Y-down smaller = higher; here larger = higher)
     float px = position.xf();
     float feet = position.yf();
     float pxr = px + width();
     float top = feet + height();
+    float num1 = top;
+    float num2 = top;
+    sloping = false;
 
+    float newX = px;        // Terraria vector2_2 (new position)
     float newY = feet;
-    Vector2 newDisp = disp;
+    Vector2 newDisp = disp; // Terraria vector2_3 (velocity; per-frame here)
 
     int minBX = (int) Math.floor(px) - 1;
     int maxBX = (int) Math.floor(pxr) + 2;
     int minBY = (int) Math.floor(feet) - 1;
     int maxBY = (int) Math.floor(top) + 2;
 
-    for (int bx = minBX; bx <= maxBX; bx++) {
-      for (int by = minBY; by <= maxBY; by++) {
+    for (int bx = minBX; bx < maxBX; bx++) {
+      for (int by = minBY; by < maxBY; by++) {
+        boolean solid = tileSolid(bx, by, level);
+        boolean platform = !solid && tilePlatform(bx, by, level);
+        if (!solid && !platform) continue;
+
+        float boxMinY = by;
+        float boxMaxY = by + 1F;
+        if (halfBrick(bx, by, level)) boxMaxY = by + HALF_BRICK;
+
+        // the body intersects the tile box (the already-moved position,
+        // as Terraria calls SlopeCollision after applying the velocity)
+        if (!(pxr > bx && px < bx + 1F && top > boxMinY && feet < boxMaxY)) continue;
+
+        boolean flag1 = true;
         int slope = tileSlope(bx, by, level);
-        if (slope != 1 && slope != 2) continue;
-        if (!tileSolid(bx, by, level)) continue;
+        if (slope > 0) {
+          if (slope > 2) {
+            // ceiling slopes 3/4: the head within |dx|+1 px of the tile
+            // bottom
+            if (slope == 3 && top - (Math.abs(disp.x()) + SLOPE_SNAP) <= by && px >= bx) flag1 = true;
+            if (slope == 4 && top - (Math.abs(disp.x()) + SLOPE_SNAP) <= by && pxr <= bx + 1F) flag1 = true;
+          } else {
+            // floor slopes 1/2: the feet within |dx|+1 px of the tile top
+            if (slope == 1 && feet + Math.abs(disp.x()) + SLOPE_SNAP >= boxMaxY && px >= bx) flag1 = true;
+            if (slope == 2 && feet + Math.abs(disp.x()) + SLOPE_SNAP >= boxMaxY && pxr <= bx + 1F) flag1 = true;
+          }
+        }
+        if (platform) {
+          // platforms never block upward movement and only matter while
+          // the feet are within 1+|dx| px of the tile
+          if (disp.y() > 0F) flag1 = false;
+          if (feet > boxMaxY || feet + (SLOPE_SNAP + Math.abs(disp.x())) < by) flag1 = false;
+        }
+        if (!flag1) continue;
+
+        boolean flag2 = fall && platform;
+        int index3 = slope;
+        // full-tile box (Terraria resets the half-brick offset here)
         if (!(pxr > bx && px < bx + 1F && top > by && feet < by + 1F)) continue;
 
-        float offset;
-        if (slope == 2) offset = pxr - bx;      // ↗ high right
-        else offset = bx + 1F - px;             // ↖ high left
-        if (offset >= 0F) {
-          // the feet at or above the slope surface rest on it (Y-up: the
-          // feet are pulled down onto the surface)
-          if (feet >= by + offset) {
-            float target = by + offset;
-            if (target < newY) {
-              if (fall) continue;
-              newY = target;
-              if (newDisp.y() > 0F) newDisp = new Vector2(newDisp.x(), 0F);
+        if (index3 == 3 || index3 == 4) {
+          // ceiling slopes: press the body down under the surface
+          float num12 = index3 == 3 ? px - bx : (bx + 1F) - pxr;
+          if (num12 >= 0F) {
+            if (top <= by + 1F - num12) {
+              float num13 = (by + 1F) - top - num12;
+              if (top + num13 > num2) {
+                newY = feet + num13;
+                num2 = newY;
+                if (newDisp.y() > -SLOPE_FALL_MIN)
+                  newDisp = new Vector2(newDisp.x(), -SLOPE_FALL_MIN);
+                flagArray[index3] = true;
+              }
+            }
+          } else if (top > by) {
+            float num13 = by + 1F;
+            if (newY < num13) {
+              newY = num13;
+              if (newDisp.y() > -SLOPE_FALL_MIN)
+                newDisp = new Vector2(newDisp.x(), -SLOPE_FALL_MIN);
             }
           }
-        } else if (feet > by) {
-          float target = by + 1F;
-          if (newY < target) {
-            newY = target;
-            if (newDisp.y() > 0F) newDisp = new Vector2(newDisp.x(), 0F);
+        }
+        if (index3 == 1 || index3 == 2) {
+          // floor slopes: pull the feet up onto the surface. The surface
+          // is measured from the tile top downward in Terraria (Y-down);
+          // Y-up it is by+1-num12 (from the tile bottom upward)
+          float num12 = index3 == 1 ? px - bx : (bx + 1F) - pxr;
+          if (num12 >= 0F) {
+            if (feet <= by + 1F - num12) {
+              float num13 = by + 1F - num12 - feet;
+              if (top + num13 > num1) {
+                if (flag2) {
+                  stairFall = true;
+                } else {
+                  stair = platform;
+                  newY = feet + num13;
+                  num1 = newY;
+                  if (newDisp.y() > 0F)
+                    newDisp = new Vector2(newDisp.x(), 0F);
+                  flagArray[index3] = true;
+                }
+              }
+            }
+          } else if (platform && feet - (4F * PX + Math.abs(disp.x())) > by + 1F) {
+            // the feet are more than 4+|dx| px above the platform
+            if (flag2) stairFall = true;
+          } else {
+            float num13 = by + 1F;
+            if (newY < num13) {
+              if (flag2) {
+                stairFall = true;
+              } else {
+                stair = platform;
+                newY = num13;
+                if (newDisp.y() > 0F)
+                  newDisp = new Vector2(newDisp.x(), 0F);
+              }
+            }
           }
         }
       }
     }
-    return new SlopeResult(new PrecisePos(px, newY), newDisp);
+
+    // verify: re-clip the moved displacement; a blocked lift (or push)
+    // slides the body sideways, away from the slope
+    Vector2 disp1 = new Vector2(disp.x(), newY - feet);
+    Vector2 clip2 = tileCollision(disp1, level).disp();
+    if (clip2.y() < disp1.y()) {
+      // the slope lift was blocked from above (head hit)
+      float num11 = disp1.y() - clip2.y();
+      newY = feet + clip2.y();
+      if (flagArray[1]) newX = px - num11;
+      if (flagArray[2]) newX = px + num11;
+      newDisp = Vector2.ZERO;
+      collidedUp = false;
+    } else if (clip2.y() > disp1.y()) {
+      // the ceiling push was blocked from below (feet hit)
+      float num11 = clip2.y() - disp1.y();
+      newY = feet + clip2.y();
+      if (flagArray[3]) newX = px - num11;
+      if (flagArray[4]) newX = px + num11;
+      newDisp = Vector2.ZERO;
+    }
+    return new SlopeResult(new PrecisePos(newX, newY), newDisp);
   }
 
   // -- tile queries --------------------------------------------------------
 
-  private @org.jspecify.annotations.Nullable Chunk chunkAt(int wx, int wy, Level level) {
+  private @Nullable Chunk chunkAt(int wx, int wy, Level level) {
     return level.getChunkByKey(ChunkPos.packBlockPosAsLong(wx, wy));
+  }
+
+  /** Whether the tile holds a block (Terraria {@code tile.active()}). */
+  private boolean tileActive(int wx, int wy, Level level) {
+    Chunk c = chunkAt(wx, wy, level);
+    if (c == null) return false;
+    return c.getBlock(wx, wy).shape() != Shape.VACUUM;
   }
 
   private boolean tileSolid(int wx, int wy, Level level) {
@@ -411,6 +732,13 @@ public abstract class TRPhyObj {
     Chunk c = chunkAt(wx, wy, level);
     if (c == null) return 0;
     return c.getBlock(wx, wy).slope();
+  }
+
+  /** Terraria Tile.halfBrick: the tile only fills its bottom half. */
+  private boolean halfBrick(int wx, int wy, Level level) {
+    Chunk c = chunkAt(wx, wy, level);
+    if (c == null) return false;
+    return c.getBlock(wx, wy).halfBrick();
   }
 
   // -- liquid contact ------------------------------------------------------

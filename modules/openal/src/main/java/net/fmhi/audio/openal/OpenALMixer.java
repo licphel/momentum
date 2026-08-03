@@ -68,6 +68,7 @@ public final class OpenALMixer implements Mixer {
   private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
+  private long lastCheckErrorMs;
 
   /**
    * Creates a new mixer, opens the default OpenAL device and context, and starts the audio thread.
@@ -89,12 +90,20 @@ public final class OpenALMixer implements Mixer {
   }
 
   public void pollEvents() {
-    submit(() -> {
-      int err;
-      while ((err = alGetError()) != AL_NO_ERROR) {
-        LOGGER.warn("OpenAL error: 0x{}", Integer.toHexString(err));
-      }
+    long ms = System.currentTimeMillis();
 
+    if (ms -  lastCheckErrorMs > 1000) {
+      lastCheckErrorMs = ms;
+
+      submit(() -> {
+        int err;
+        while ((err = alGetError()) != AL_NO_ERROR) {
+          LOGGER.warn("OpenAL error: 0x{}", Integer.toHexString(err));
+        }
+      });
+    }
+
+    submit(() -> {
       List<OpenALClip> gc = new ArrayList<>();
 
       /*

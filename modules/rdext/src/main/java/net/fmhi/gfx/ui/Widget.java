@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.ui;
 
-import net.fmhi.gfx.mesh.Graphics2D;
+import net.fmhi.gfx.brush.Graphics2D;
 import net.fmhi.math.Box2D;
 import org.jspecify.annotations.Nullable;
 

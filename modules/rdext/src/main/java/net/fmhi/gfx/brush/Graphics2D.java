@@ -22,9 +22,11 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
+import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.gfx.math.TransformHandler;
+import net.fmhi.gfx.mesh.Mesh;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.pipe.Pipeline;
@@ -32,30 +34,31 @@ import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Matrix4x4;
-import net.fmhi.gfx.math.Camera2D;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A batched 2D drawing context backed by vertex and index staging buffers.
+ * A 2D drawing context that records draw commands into staging buffers and submits them
+ * to the GPU.
  *
- * <p>A {@code Graphics2D} records draw commands — textures, rectangles, lines, points, and text —
- * into staging buffers and submits them to the GPU via {@link #flush()}. It carries render state
- * including a camera, sampler, render target, viewport, scissor test, pipeline, resource set, and
- * view-projection matrix. All of these affect subsequent draw calls until changed.
+ * <p>Carries the render state — camera, sampler, render target, viewport, scissor test,
+ * pipeline, resource set, and view-projection matrix — that applies to subsequent draws
+ * until changed. Textures, rectangles, lines, points, and text are recorded with
+ * {@link VertexBuilder2D} and submitted via {@link #flush()}.
  *
- * <p>This class is not thread-safe.
+ * <p>Not thread-safe; each instance must be confined to a single thread.
  *
  * @see BatchedGraphics2D
  * @see MeshGraphics2D
  */
-public abstract class Graphics2D extends InplaceVertexBuilder2D implements AutoCloseable {
+public abstract class Graphics2D extends VertexBuilder2D implements AutoCloseable {
   /**
-   * Creates a graphics 2D.
+   * Creates a new {@code Graphics2D}.
    *
-   * @param transformHandler the backend-specific transform handler
+   * @param data              the staging area receiving vertices and indices
+   * @param transformHandler  the backend-specific transform handler
    */
-  public Graphics2D(TransformHandler transformHandler) {
-    super(transformHandler);
+  public Graphics2D(VertexData data, TransformHandler transformHandler) {
+    super(data, transformHandler);
   }
 
   /**
@@ -82,7 +85,7 @@ public abstract class Graphics2D extends InplaceVertexBuilder2D implements AutoC
   /**
    * Sets the sampler, flushing pending draws first.
    *
-   * @param sampler the sampler to use
+   * @param sampler the sampler to use; {@code null} unbinds
    */
   public abstract void setSampler(@Nullable Sampler sampler);
 
@@ -157,8 +160,8 @@ public abstract class Graphics2D extends InplaceVertexBuilder2D implements AutoC
   /**
    * Pushes a scissor rectangle in world coordinates, flushing pending draws first.
    *
-   * <p>The world-space rectangle is projected to screen coordinates using the current
-   * camera and viewport.
+   * <p>The rectangle is projected to screen coordinates using the current camera and
+   * viewport.
    *
    * @param box the scissor rectangle in world coordinates
    */

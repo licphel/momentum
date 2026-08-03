@@ -37,7 +37,7 @@ import net.fmhi.math.Color;
  * @param wrapX           U-axis wrapping mode
  * @param wrapY           V-axis wrapping mode
  * @param wrapZ           W-axis wrapping mode
- * @param wrapBorderColor border color for {@link TextureWrap#CLAMP_TO_BORDER}
+ * @param wrapBorderColor border gradient for {@link TextureWrap#CLAMP_TO_BORDER}
  * @param lodBias         level-of-detail bias
  * @param minLod          minimum LOD clamp
  * @param maxLod          maximum LOD clamp
@@ -61,12 +61,12 @@ public record SamplerDesc(TextureFilter magFilter, TextureFilter minFilter, Text
       new Builder().minFilter(TextureFilter.NEAREST).magFilter(TextureFilter.NEAREST).build();
 
   /**
-   * Builder for {@link SamplerDesc} with sensible defaults — linear filtering, repeat wrapping, no anisotropy.
+   * Builder for {@link SamplerDesc} with sensible defaults — nearest filtering, repeat wrapping, no anisotropy.
    */
   public static final class Builder {
-    public TextureFilter magFilter = TextureFilter.LINEAR;
-    public TextureFilter minFilter = TextureFilter.LINEAR;
-    public TextureFilter mipmapFilter = TextureFilter.LINEAR;
+    public TextureFilter magFilter = TextureFilter.NEAREST;
+    public TextureFilter minFilter = TextureFilter.NEAREST;
+    public TextureFilter mipmapFilter = TextureFilter.NEAREST;
     public TextureWrap wrapX = TextureWrap.REPEAT;
     public TextureWrap wrapY = TextureWrap.REPEAT;
     public TextureWrap wrapZ = TextureWrap.REPEAT;

@@ -124,7 +124,7 @@ public record Color(float red, float green, float blue, float alpha) {
     if (saturation == 0.0F) {
       return new Color(value, value, value, alpha);
     }
-    float h = (hue % 360.0F) / 60.0F;
+    float h = hue * 6;
     int i = (int) h;
     float f = h - i;
     float p = value * (1.0F - saturation);
@@ -143,7 +143,7 @@ public record Color(float red, float green, float blue, float alpha) {
   /**
    * Creates RGBA color from HSV color.
    *
-   * @param hue        hue in {@code [0, 360)}
+   * @param hue        hue in {@code [0, 1)}
    * @param saturation saturation in {@code [0, 1]}
    * @param value      value in {@code [0, 1]}
    * @return opaque RGB color

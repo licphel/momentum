@@ -24,6 +24,7 @@
 
 package net.fmhi.world.level;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.fmhi.Registries;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.Shape;
@@ -39,10 +40,12 @@ import net.fmhi.world.util.ChunkPos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+
+import java.util.ArrayList;
 import java.util.Collection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 /**
  * A chunked 2D world.
@@ -52,13 +55,27 @@ import java.util.Set;
  */
 @NullMarked
 public class Level {
+  /** Length of a full day in game ticks (60 Hz, 20 s per game minute, 24 h). */
+  public static final long TICKS_PER_DAY = 60L * 20 * 24;
+  /** Chunks farther than this (in chunk units) from the focus are unloaded. */
+  public static final int UNLOAD_RADIUS_CHUNKS = 32;
 
   private long ticks;
+  /** Game time within the current day, advanced at the day clock's pace. */
+  private double dayTicks;
+  /** Multiplier on the day clock; 1 is real time. */
+  private float timeScale = 1F;
   private final ChunkGenerator generator;
   private final long seed;
-  private final Map<Long, Chunk> chunks = new HashMap<>();
+  private final Long2ObjectMap<Chunk> chunks = new Long2ObjectOpenHashMap<>();
   private final LightEngine lightEngine = new ScanLightEngine(this);
   private final FluidEngine fluidEngine = new FluidEngine(this);
+  /** Focus in world block coordinates; chunks farther than
+   * {@link #UNLOAD_RADIUS_CHUNKS} are unloaded every tick. */
+  private double focusX;
+  private double focusY;
+  /** Notified with each chunk position that unloads (e.g. to release meshes). */
+  private @Nullable Consumer<ChunkPos> unloadListener;
 
   /**
    * Creates a level with the given chunk generator.
@@ -80,7 +97,9 @@ public class Level {
   // -- tick ----------------------------------------------------------------
 
   public void tick(double delta) {
+    unloadFarChunks();
     ticks++;
+    dayTicks += delta * 60.0 * timeScale;
     fluidEngine.tick(delta);
     for (Chunk chunk : Set.copyOf(chunks.values())) {
       chunk.tick(delta);
@@ -88,6 +107,22 @@ public class Level {
   }
 
   public long getTicks() { return ticks; }
+
+  /**
+   * Returns the game time within the current day, in ticks (fractional).
+   */
+  public double ticksOfDay() { return dayTicks; }
+
+  /**
+   * Returns the multiplier on the day clock; 1 is real time.
+   */
+  public float timeScale() { return timeScale; }
+
+  /**
+   * Sets the multiplier on the day clock. Only the day clock is affected;
+   * simulation ticks, fluids and entities keep their real-time pace.
+   */
+  public void setTimeScale(float timeScale) { this.timeScale = timeScale; }
 
   // -- chunks --------------------------------------------------------------
 
@@ -139,12 +174,46 @@ public class Level {
   public int loadedChunkCount() { return chunks.size(); }
 
   /**
+   * Sets the streaming focus; chunks farther than {@link #UNLOAD_RADIUS_CHUNKS}
+   * from it are unloaded every tick.
+   */
+  public void setFocus(double x, double y) {
+    focusX = x;
+    focusY = y;
+  }
+
+  /** Registers a callback invoked with each chunk position that unloads. */
+  public void setUnloadListener(@Nullable Consumer<ChunkPos> listener) {
+    this.unloadListener = listener;
+  }
+
+  /**
+   * Unloads every chunk farther than {@link #UNLOAD_RADIUS_CHUNKS} from the
+   * focus, so explored areas do not accumulate for the whole session.
+   */
+  private void unloadFarChunks() {
+    long radiusSq = (long) UNLOAD_RADIUS_CHUNKS * UNLOAD_RADIUS_CHUNKS;
+    int fcx = Math.floorDiv((int) focusX, ChunkPos.SIZE);
+    int fcy = Math.floorDiv((int) focusY, ChunkPos.SIZE);
+    var candidates = new ArrayList<ChunkPos>();
+    for (var it = chunks.keySet().longIterator(); it.hasNext(); ) {
+      long key = it.nextLong();
+      long dx = (key >> 32) - fcx;
+      long dy = ((int) key) - fcy;
+      if (dx * dx + dy * dy > radiusSq) candidates.add(ChunkPos.fromLong(key));
+    }
+    for (ChunkPos pos : candidates) unloadChunk(pos);
+  }
+
+  /**
    * Removes the chunk from the world and its liquid cells from the fluid
-   * engine (the chunk is regenerated on next access).
+   * engine (the chunk is regenerated on next access). Notifies the unload
+   * listener so retained render meshes can be released.
    */
   public void unloadChunk(ChunkPos pos) {
     chunks.remove(pos.asLong());
     fluidEngine.delChunk(pos);
+    if (unloadListener != null) unloadListener.accept(pos);
   }
 
   // -- tiles ---------------------------------------------------------------
@@ -176,11 +245,45 @@ public class Level {
     if (state.shape() == Shape.SOLID) {
       chunk.setLiquid(pos.x(), pos.y(), Liquids.EMPTY, 0);
     }
+    markDirtyNeighbours(pos.x(), pos.y(), true);
+    lightEngine.requestRecalc();
   }
 
   public void setWall(BlockPos pos, BlockState state) {
     Chunk chunk = getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(pos.x(), pos.y()));
     chunk.setWall(pos.x(), pos.y(), state);
+    markDirtyNeighbours(pos.x(), pos.y(), false);
+    lightEngine.requestRecalc();
+  }
+
+  /**
+   * A tile on a chunk border changes the border pieces of the adjacent
+   * chunk (its edges depend on this tile); a corner tile affects all four
+   * surrounding chunks (Enchant NearDirty). {@code front} selects whether
+   * the block or the wall layer of the neighbours is invalidated.
+   */
+  private void markDirtyNeighbours(int wx, int wy, boolean front) {
+    int cs = ChunkPos.SIZE;
+    int lx = Math.floorMod(wx, cs);
+    int ly = Math.floorMod(wy, cs);
+    int cx = Math.floorDiv(wx, cs);
+    int cy = Math.floorDiv(wy, cs);
+    if (lx == 0) dirtyChunk(cx - 1, cy, front);
+    if (lx == cs - 1) dirtyChunk(cx + 1, cy, front);
+    if (ly == 0) dirtyChunk(cx, cy - 1, front);
+    if (ly == cs - 1) dirtyChunk(cx, cy + 1, front);
+    if (lx == 0 && ly == 0) dirtyChunk(cx - 1, cy - 1, front);
+    if (lx == cs - 1 && ly == 0) dirtyChunk(cx + 1, cy - 1, front);
+    if (lx == 0 && ly == cs - 1) dirtyChunk(cx - 1, cy + 1, front);
+    if (lx == cs - 1 && ly == cs - 1) dirtyChunk(cx + 1, cy + 1, front);
+  }
+
+  private void dirtyChunk(int cx, int cy, boolean front) {
+    Chunk c = chunks.get(((long) cx << 32) | (cy & 0xFFFFFFFFL));
+    if (c != null) {
+      if (front) c.frontDirty = true;
+      else c.backDirty = true;
+    }
   }
 
   /**
@@ -207,6 +310,9 @@ public class Level {
   public void setLiquid(int x, int y, Liquid liquid, int level) {
     getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(x, y)).setLiquid(x, y, liquid, level);
     if (level > 0) fluidEngine.join(x, y);
+    // only liquid edits from gameplay mark the light stale; the fluid
+    // simulation's per-tick writes stay cheap
+    lightEngine.requestRecalc();
   }
 
   /**
@@ -243,5 +349,13 @@ public class Level {
   public LiquidStack getLiquidStack(int x, int y) {
     int lv = getLiquidLevel(x, y);
     return lv <= 0 ? LiquidStack.EMPTY : new LiquidStack(Liquids.byId(getLiquidType(x, y)), lv);
+  }
+
+  public int getSeaLevel() {
+    return 0;
+  }
+
+  public int getSpaceLevel() {
+    return 256;
   }
 }

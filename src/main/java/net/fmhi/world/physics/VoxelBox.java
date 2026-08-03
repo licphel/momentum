@@ -21,6 +21,11 @@ public final class VoxelBox implements VoxelClip {
     this.h = h;
   }
 
+  public float x() { return x; }
+  public float y() { return y; }
+  public float w() { return w; }
+  public float h() { return h; }
+
   @Override
   public float clipX(float dx, Box2D aabb, float ox, float oy) {
     float ax = ox + x;
@@ -56,7 +61,17 @@ public final class VoxelBox implements VoxelClip {
   @Override
   public float topAt(float x0, float x1, float ox, float oy) {
     float ax = ox + x;
-    if (x1 <= ax || x0 >= ax + w) return Float.NaN;
+    // inclusive edges: a body exactly on a box edge still covers it, so
+    // a staircase surface measured across the body does not jump a step
+    if (x1 < ax || x0 > ax + w) return Float.NaN;
     return oy + y + h;
+  }
+
+  @Override
+  public float surfaceAt(float x, float ox, float oy) {
+    // inclusive edges, so a point exactly on a box edge is covered
+    float tx = x - ox;
+    if (tx >= this.x && tx <= this.x + this.w) return oy + this.y + this.h;
+    return Float.NaN;
   }
 }

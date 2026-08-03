@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.GraphicsException;
@@ -31,23 +31,23 @@ import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
+import net.fmhi.gfx.mesh.Mesh;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.pipe.*;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
-import net.fmhi.gfx.texture.TextureFilter;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Matrix4x4;
 import net.fmhi.util.ResourceProvider;
 
 /**
- * A per-frame 2D batch renderer that submits draw calls directly to the GPU each flush.
+ * A per-frame 2D batch renderer that submits draw calls directly to the GPU on each flush.
  *
  * <p>Uses built-in shaders for textured sprites, colored primitives, lines, and points.
- * Each call to {@link #flush(boolean)} submits accumulated vertex and index data, uploads
- * the view-projection matrix, and executes the encoder. This class is suitable for immediate-mode
+ * Each call to {@link #flush(boolean)} submits the accumulated vertex and index data,
+ * uploads the view-projection matrix, and executes the encoder. Suitable for immediate-mode
  * rendering where geometry changes every frame.
  *
  * <p>For retained-mode rendering where geometry is recorded once and replayed, use
@@ -73,10 +73,11 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   /**
    * Creates a new {@code BatchedGraphics2D} backed by the given device.
    *
+   * @param data   the staging area receiving vertices and indices
    * @param device the GPU device
    */
-  public BatchedGraphics2D(Device device) {
-    super(device.getTransformHandler());
+  public BatchedGraphics2D(VertexData data, Device device) {
+    super(data, device.getTransformHandler());
 
     ResourceProvider rp = ResourceProvider.classpath(BatchedGraphics2D.class);
     ShaderProgram spCol = ShaderProgram.load(device,
@@ -105,8 +106,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
         .blend(Blend.ALPHA_MIX).depth(Depth.DISABLED).rasterization(RasterizationDesc.NOT_CULL)
         .shaderProgram(spTex).vertexLayout(vlTexture).resourceLayouts(rslTexture).build());
 
-    defSampler = device.getSampler(new SamplerDesc.Builder()
-        .minFilter(TextureFilter.LINEAR).magFilter(TextureFilter.LINEAR).build());
+    defSampler = device.getSampler(SamplerDesc.DEFAULT);
 
     encoder = device.getEncoder(EncoderDesc.DEFAULT);
     vbo = device.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STREAM));
@@ -118,6 +118,14 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     this.device = device;
   }
 
+  /**
+   * Replays the sections of the given mesh with the current render state.
+   *
+   * <p>Pending draws are flushed first, and the mesh is drawn with the current camera,
+   * viewport, and scissor.
+   *
+   * @param mesh the mesh to replay
+   */
   @Override
   public void drawMesh(Mesh mesh) {
     flush();
@@ -138,22 +146,24 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   /**
    * Submits pending vertex and index data to the GPU and executes the encoder.
    *
-   * <p>If no vertex data has been recorded and {@code force} is {@code false}, this method
-   * does nothing. Otherwise, it uploads buffers, applies the viewport, scissor, pipeline,
-   * and resource set, then draws and restarts the render pass for the next batch.
+   * <p>If no vertex data has been recorded and {@code force} is {@code false}, nothing is
+   * submitted. Otherwise the buffers are uploaded, the viewport, scissor, pipeline, and
+   * resource set are applied, and the render pass is restarted for the next batch.
    *
    * @param force if {@code true}, submits even when no vertex data has been recorded
    */
   @Override
   public void flush(boolean force) {
-    if (!force && vertexBuf.writerIndex() == 0) {
+    if (!force && data.vertices().writerIndex() == 0) {
       return;
     }
     submitBatch();
   }
 
   /**
-   * Begins a render pass. Must be called before any draw commands.
+   * Begins a render pass and prepares the staging buffers for a new frame.
+   *
+   * <p>Must be called before any draw commands.
    *
    * @param pass the render pass descriptor
    * @throws IllegalStateException if already begun
@@ -170,17 +180,14 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     }
     RenderTarget rt = renderTarget;
     viewport = Box2D.create(0, 0, rt.width(), rt.height());
-    vertexBuf.clear();
-    indexBuf.clear();
-    vertexCount = 0;
-    indexCount = 0;
+    data.clear();
     currentPrimitive = null;
     currentTexture = null;
     encoder.beginPass(pass);
   }
 
   /**
-   * Ends the render pass, flushing pending draws and executing the encoder.
+   * Ends the render pass, submitting remaining draws and executing the encoder.
    *
    * @throws IllegalStateException if not begun
    */
@@ -196,7 +203,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   }
 
   /**
-   * Sets the view-projection matrix and uploads it to the uniform buffer.
+   * Sets the view-projection matrix, uploading it to the uniform buffer.
    *
    * @param vpm the view-projection matrix
    */
@@ -205,29 +212,32 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     uploadVP(vpm);
   }
 
+  /**
+   * Uploads the recorded vertex and index data and issues a draw with the current render
+   * state.
+   *
+   * <p>Does nothing if no primitive has been selected or no camera is set.
+   */
   private void submitBatch() {
     if (currentPrimitive == null || camera == null) {
       return;
     }
 
-    int vc = vertexCount;
-    int ic = indexCount;
-    vertexCount = 0;
-    indexCount = 0;
+    int vc = data.vertexCount();
+    int ic = data.indexCount();
 
-    int vr = vertexBuf.readerIndex();
-    int vw = vertexBuf.writerIndex();
-    int ir = indexBuf.readerIndex();
-    int iw = indexBuf.writerIndex();
-    byte[] rawV = vertexBuf.backingArray();
-    byte[] rawI = indexBuf.backingArray();
+    int vr = data.vertices().readerIndex();
+    int vw = data.vertices().writerIndex();
+    int ir = data.indices().readerIndex();
+    int iw = data.indices().writerIndex();
+    byte[] rawV = data.vertices().backingArray();
+    byte[] rawI = data.indices().backingArray();
 
     if (rawV == null || rawI == null) {
       throw new NullPointerException("Vertex buf or index buf has no backing array. Heap buf expected");
     }
 
-    vertexBuf.clear();
-    indexBuf.clear();
+    data.clear();
 
     uploadVP(camera.viewProjectionMatrix());
     vbo.submit(rawV, vr, vw - vr);
@@ -277,8 +287,8 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   }
 
   /**
-   * Returns the pipeline that would be used for the current primitive: the custom pipeline
-   * if set, or the appropriate built-in pipeline otherwise.
+   * Resolves the pipeline for the current primitive: the custom pipeline when set,
+   * otherwise the matching built-in pipeline.
    *
    * @return the resolved pipeline
    */
@@ -290,7 +300,8 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   }
 
   /**
-   * Returns the resource set layout matching {@link #resolvePipeline()}.
+   * Resolves the resource set layout for the current primitive, matching
+   * {@link #resolvePipeline()}.
    *
    * @return the resolved resource set layout
    */
@@ -299,7 +310,8 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   }
 
   /**
-   * Releases all GPU resources: the encoder, vertex buffer, index buffer, and uniform buffer.
+   * Releases all GPU resources: the encoder, vertex buffer, index buffer, uniform buffer,
+   * pipelines, and default sampler.
    */
   @Override
   public void close() {

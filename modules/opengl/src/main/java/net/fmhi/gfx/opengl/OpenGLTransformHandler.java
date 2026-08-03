@@ -10,6 +10,8 @@ import net.fmhi.util.InternalApi;
  */
 @InternalApi
 public class OpenGLTransformHandler implements TransformHandler {
+  boolean flipY;
+
   @Override
   public float u(Texture tex, float u) {
     return u / tex.width();
@@ -22,6 +24,11 @@ public class OpenGLTransformHandler implements TransformHandler {
 
   @Override
   public Matrix4x4 createOrthographic(float left, float right, float bottom, float top, float near, float far) {
+    if (flipY) {
+      float tmp = top;
+      top = bottom;
+      bottom = tmp;
+    }
     return Matrix4x4.createOrthographic(left, right, bottom, top, near, far);
   }
 
@@ -30,4 +37,13 @@ public class OpenGLTransformHandler implements TransformHandler {
     return Matrix4x4.createPerspective(fovY, aspect, near, far);
   }
 
+  @Override
+  public void flipY(boolean flipY) {
+    this.flipY = flipY;
+  }
+
+  @Override
+  public boolean isYFlipped() {
+    return flipY;
+  }
 }

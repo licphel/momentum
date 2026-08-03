@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.text.raster;
 
-import net.fmhi.math.Color;
+import net.fmhi.gfx.brush.tint.Gradient;
 
 /**
  * A glyph positioned by the layout pass, ready for rendering.
@@ -43,9 +43,9 @@ import net.fmhi.math.Color;
  * @param fontSize   the font size, in pixels
  * @param scale      the rendering scale factor
  * @param glyphId    the glyph index used to look up the bitmap
- * @param color      the glyph color
+ * @param gradient   the glyph gradient
  * @param ownerIndex the index of the owning literal in the source list
  */
 public record LayoutGlyph(int start, int end, float x, float y, float w, float xOffset, float yOffset, float fontSize,
-                          float scale, int glyphId, Color color, int ownerIndex) {
+                          float scale, int glyphId, Gradient gradient, int ownerIndex) {
 }

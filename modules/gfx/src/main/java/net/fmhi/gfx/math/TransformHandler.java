@@ -58,4 +58,18 @@ public interface TransformHandler {
    * @return perspective projection matrix
    */
   Matrix4x4 createPerspective(float fovY, float aspect, float near, float far);
+
+  /**
+   * Sets the y-axis points upward or downward.
+   *
+   * @param flipY whether to flip y down
+   */
+  void flipY(boolean flipY);
+
+  /**
+   * Returns whether to use flip-Y.
+   *
+   * @return the flip-Y flag
+   */
+  boolean isYFlipped();
 }

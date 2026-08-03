@@ -1,9 +1,9 @@
 package net.fmhi.world.light;
 
 import net.fmhi.gfx.Device;
+import net.fmhi.gfx.brush.tint.QuadGradient;
 import net.fmhi.gfx.math.Camera2D;
-import net.fmhi.gfx.mesh.BatchedGraphics2D;
-import net.fmhi.gfx.mesh.Primitive2D;
+import net.fmhi.gfx.brush.BatchedGraphics2D;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.pass.RenderTargetDesc;
@@ -47,9 +47,9 @@ public abstract class LightEngine implements AutoCloseable {
   /** Number of floats per tile: raw RGB, AO factors and per-vertex RGB. */
   public static final int STRIDE = 19;
   /** Dimming factor applied to light on walls. */
-  public static final float WALL_MULTIPLIER = 0.75F;
+  public static final float WALL_MULTIPLIER = 0.7F;
   /** Darkening applied per solid neighbor when computing ambient occlusion. */
-  public static final float AO_STRENGTH = 0.08F;
+  public static final float AO_STRENGTH = 0.12F;
   /** Maximum light value in normalized units. */
   public static final float MAX_VALUE_GENERAL = 1F;
   /** Light level of a single discrete step of {@link #MAX_VALUE_GENERAL}. */
@@ -60,7 +60,7 @@ public abstract class LightEngine implements AutoCloseable {
   protected static final int MIN_SIZE = 64;
   /** Largest allowed window side, in tiles. */
   protected static final int MAX_SIZE = 512;
-  /** Sunlight color used to seed sky illumination. */
+  /** Sunlight gradient used to seed sky illumination; injected externally each tick. */
   public final LightBuffer sunlight = SimpleLightBuffer.pooled();
   protected final Level level;
   /** Completed buffer, read by the renderer. */
@@ -90,6 +90,16 @@ public abstract class LightEngine implements AutoCloseable {
   private float[] beamLayer;
   /** Whether to enable lighting; false will make lightmap full bright. */
   public boolean enabled = true;
+  /** Debug switch: skip the light computation and draw the lightmaps as
+   * plain white rectangles, to isolate the lightmap rendering cost. */
+  public boolean fullBright;
+  /** Set when world content changed since the last computation; the compute
+   * pass is skipped entirely while this is clear. */
+  private volatile boolean worldDirty = true;
+  /** The sunlight values the last computation was seeded with. */
+  private volatile float lastSunR;
+  private volatile float lastSunG;
+  private volatile float lastSunB;
 
   /**
    * Creates a light engine for the given level, allocating its initial front,
@@ -99,6 +109,10 @@ public abstract class LightEngine implements AutoCloseable {
    */
   protected LightEngine(Level level) {
     this.level = level;
+    // seed white until the day phase (CelestialUtil) is injected externally
+    sunlight.r(1F);
+    sunlight.g(1F);
+    sunlight.b(1F);
     int len = sizeX * sizeY * STRIDE;
     this.front = new float[len];
     this.back = new float[len];
@@ -118,14 +132,9 @@ public abstract class LightEngine implements AutoCloseable {
    * @param y        the tile Y coordinate
    * @param out      the buffer to receive the sky light
    */
-  public static void skyEmit(LightBuffer skyLight, int x, int y, LightBuffer out) {
-    if (y >= 60) {
-      out.r(0);
-      out.g(0);
-      out.b(0);
-      return;
-    }
+  public void skyEmit(LightBuffer skyLight, int x, int y, LightBuffer out) {
     out.copy(skyLight);
+    out.mul(CelestialUtil.backEmissionStrength(level, y));
   }
 
   /**
@@ -607,6 +616,22 @@ public abstract class LightEngine implements AutoCloseable {
       int minCY = (int) Math.floor((cp.y() - vh / 2F) / cs);
       int maxCY = (int) Math.floor((cp.y() + vh / 2F) / cs);
 
+      if (fullBright) {
+        // one full-view rectangle per lightmap: no per-tile work at all
+        g.begin(RenderPass.of(frontLightRT, Color.BLACK));
+        g.setCamera(cam);
+        g.setColor(Color.WHITE);
+        g.drawRectangle(cp.x() - vw / 2F, cp.y() - vh / 2F, vw, vh);
+        g.end();
+
+        g.begin(RenderPass.of(wallLightRT, Color.BLACK));
+        g.setCamera(cam);
+        g.setColor(Color.WHITE);
+        g.drawRectangle(cp.x() - vw / 2F, cp.y() - vh / 2F, vw, vh);
+        g.end();
+        return;
+      }
+
       // front lightmap: blocks, sky, entities — full brightness
       g.begin(RenderPass.of(frontLightRT, Color.BLACK));
       g.setCamera(cam);
@@ -633,8 +658,7 @@ public abstract class LightEngine implements AutoCloseable {
    */
   private void drawTiles(BatchedGraphics2D g,
                          int minCX, int maxCX, int minCY, int maxCY, boolean wall) {
-    g.setPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
-    g.setTexture(null);
+    QuadGradient tg = new QuadGradient();
 
     for (int cx = minCX; cx <= maxCX; cx++) {
       for (int cy = minCY; cy <= maxCY; cy++) {
@@ -646,45 +670,23 @@ public abstract class LightEngine implements AutoCloseable {
             BlockState block = chunk.getBlock(lx, ly);
             BlockState wallS = chunk.getWall(lx, ly);
             boolean hasWall = wallS != BlockState.EMPTY;
-            // wall lightmap: every wall tile — walls are always visible
-            // even behind blocks (blocks don't necessarily occlude walls)
-            if (wall && !hasWall) {
-              continue;
-            }
-            // front lightmap: ALL tiles — blocks, sky, entities always
-            // receive front light; the wall layer is a separate composite
-            // so pure-wall tiles aren't double-lit
+            float m = wall && hasWall ? WALL_MULTIPLIER : 1F;
 
             int off = bufferIndex(wx, wy);
             if (off < 0) {
               continue;
             }
             float[] buf = buffer();
-            float m = wall ? WALL_MULTIPLIER : 1F;
-            int base = g.vertexCount();
-            g.putPosColor(wx, wy, 0, Color.pack(
-                r(buf, off, 0) * m,
-                g(buf, off, 0) * m,
-                b(buf, off, 0) * m,
-                1F));
-            g.putPosColor(wx + 1, wy, 0, Color.pack(
-                r(buf, off, 1) * m,
-                g(buf, off, 1) * m,
-                b(buf, off, 1) * m,
-                1F));
-            g.putPosColor(wx + 1, wy + 1, 0, Color.pack(
-                r(buf, off, 2) * m,
-                g(buf, off, 2) * m,
-                b(buf, off, 2) * m,
-                1F));
-            g.putPosColor(wx, wy + 1, 0, Color.pack(
-                r(buf, off, 3) * m,
-                g(buf, off, 3) * m,
-                b(buf, off, 3) * m,
-                1F));
-            g.putQuadIndices(base);
-            g.addVertex(4);
-            g.addIndex(6);
+
+            tg.setColors(
+                Color.pack(r(buf, off, 0) * m, g(buf, off, 0) * m, b(buf, off, 0) * m, 1F),
+                Color.pack(r(buf, off, 1) * m, g(buf, off, 1) * m, b(buf, off, 1) * m, 1F),
+                Color.pack(r(buf, off, 2) * m, g(buf, off, 2) * m, b(buf, off, 2) * m, 1F),
+                Color.pack(r(buf, off, 3) * m, g(buf, off, 3) * m, b(buf, off, 3) * m, 1F)
+            );
+
+            g.setGradient(tg);
+            g.drawRectangle(wx, wy, 1, 1);
           }
         }
       }
@@ -728,7 +730,7 @@ public abstract class LightEngine implements AutoCloseable {
    * the four per-vertex values, darkened by the tile's ambient occlusion.
    *
    * @param o       the tile offset in the working buffer
-   * @param channel the color channel to populate
+   * @param channel the gradient channel to populate
    * @param x       the tile X coordinate
    * @param y       the tile Y coordinate
    */
@@ -765,11 +767,27 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
+   * Marks the light stale after world content changed (block, wall or
+   * liquid edits); the next {@link #tick(Box2D)} recomputes it.
+   */
+  public void requestRecalc() {
+    worldDirty = true;
+  }
+
+  /**
    * Rebuilds the light window around the given camera bounds.
+   *
+   * <p>The full-window computation is skipped while nothing changed: the
+   * world is untouched, the sunlight is within the previous values, and the
+   * camera is still inside the computed window (the window is the view plus
+   * {@link #SPREAD_MARGIN} on every side, so normal movement rides along).
    *
    * @param cam the camera bounds to cover
    */
   public void tick(Box2D cam) {
+    if (fullBright) {
+      return; // no light data needed in full-bright mode
+    }
     // adapt window to the visible area + spread margin
     requestSize((int) Math.ceil(cam.width()) + 2 * SPREAD_MARGIN + 4,
         (int) Math.ceil(cam.height()) + 2 * SPREAD_MARGIN + 4);
@@ -778,6 +796,16 @@ public abstract class LightEngine implements AutoCloseable {
       return;
     }
     if (done || worker == null) {
+      boolean skyDirty = Math.abs(sunlight.r() - lastSunR) > 0.01F
+          || Math.abs(sunlight.g() - lastSunG) > 0.01F
+          || Math.abs(sunlight.b() - lastSunB) > 0.01F;
+      boolean camDirty = windowMissesCamera(cam);
+      if (!worldDirty && !skyDirty && !camDirty) {
+        return; // nothing changed — keep the current front buffer
+      }
+      lastSunR = sunlight.r();
+      lastSunG = sunlight.g();
+      lastSunB = sunlight.b();
       // resize only while idle. the worker must not see the array change
       if (applyPendingResize()) {
         onResized();
@@ -785,16 +813,27 @@ public abstract class LightEngine implements AutoCloseable {
       swap();
       worker = Thread.ofVirtual().start(() -> {
         calculate(cam);
+        worldDirty = false;
         done = true;
       });
     }
     oriX = (int) Math.floor(cam.centralX()) - sizeX / 2;
     oriY = (int) Math.floor(cam.centralY()) - sizeY / 2;
+  }
 
-    // TODO: sunlight variance
-    sunlight.r(1F);
-    sunlight.g(1F);
-    sunlight.b(1F);
+  /**
+   * Returns whether the requested window (view + spread margin) no longer
+   * fits inside the current light window, i.e. the camera moved so far that
+   * the cached light no longer covers it.
+   */
+  private boolean windowMissesCamera(Box2D cam) {
+    int nw = clamp((int) Math.ceil(cam.width()) + 2 * SPREAD_MARGIN + 4, MIN_SIZE, MAX_SIZE);
+    int nh = clamp((int) Math.ceil(cam.height()) + 2 * SPREAD_MARGIN + 4, MIN_SIZE, MAX_SIZE);
+    int rx = (int) Math.floor(cam.centralX()) - nw / 2;
+    int ry = (int) Math.floor(cam.centralY()) - nh / 2;
+    return nw != sizeX || nh != sizeY
+        || rx < oriX || rx + nw > oriX + sizeX
+        || ry < oriY || ry + nh > oriY + sizeY;
   }
 
   /**
@@ -817,7 +856,7 @@ public abstract class LightEngine implements AutoCloseable {
    *
    * @param x       the tile X coordinate
    * @param y       the tile Y coordinate
-   * @param channel the color channel to read
+   * @param channel the gradient channel to read
    * @return the channel light value, or zero if the tile is outside the
    * window
    */

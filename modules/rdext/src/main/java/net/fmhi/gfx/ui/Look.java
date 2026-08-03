@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.ui;
 
-import net.fmhi.gfx.mesh.Alignment;
-import net.fmhi.gfx.mesh.Graphics2D;
+import net.fmhi.gfx.brush.Alignment;
+import net.fmhi.gfx.brush.Graphics2D;
 import net.fmhi.gfx.text.Text;
 import net.fmhi.gfx.ui.look.ModernFlat;
 import net.fmhi.math.Box2D;
@@ -38,7 +38,7 @@ import org.jspecify.annotations.Nullable;
  * {@code draw*} method receives the widget's current state and absolute bounds, and must render using only the given
  * {@link Graphics2D}. Every draw method must restore the g color to {@code Color.WHITE} before returning so the
  * caller's
- * color state is not corrupted.
+ * gradient state is not corrupted.
  *
  * <p>Metric methods such as {@link #titleBarHeight()}, {@link #resizeHandleSize()}, and
  * {@link #borderWidth()} are called during layout and must return stable values within a single frame. The framework

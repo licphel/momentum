@@ -28,38 +28,44 @@ import net.fmhi.fml.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Stream;
 
 /**
- * Default {@link Registry} implementation backed by a {@link LinkedHashMap}.
+ * Shared state and lookup behavior for {@link Registry} implementations.
  *
- * <p>Entries retain insertion order. The registry can be frozen to prevent
- * further modification after the registration phase.
+ * <p>Concrete subclasses decide when each entry's supplier is evaluated:
+ * {@link DirectRegistry} evaluates it at registration time,
+ * {@link IndirectRegistry} when the registry is frozen.
  *
- * @param <T> the entry type
+ * @param <T> registry type
  */
-public final class SimpleRegistry<T> implements Registry<T> {
+public abstract class AbstractRegistry<T extends RegistryEntry<T>> implements Registry<T> {
   private final Identifier key;
   private final Map<Identifier, T> byId = new LinkedHashMap<>();
   private final Map<T, Identifier> byValue = new IdentityHashMap<>();
+  private final AtomicInteger nextId = new AtomicInteger();
   private boolean frozen;
 
   /**
    * Creates a new unfrozen registry.
    *
-   * @param key the registry identifier
+   * @param key the identifier of this registry
    */
-  public SimpleRegistry(Identifier key) {
+  protected AbstractRegistry(Identifier key) {
     this.key = key;
   }
 
-  @Override
-  public Identifier key() {
-    return key;
-  }
-
-  @Override
-  public T register(Identifier id, T value) {
+  /**
+   * Registers an already-created value, assigning its registry metadata.
+   *
+   * @param id    the identifier to register the value under
+   * @param value the entry value
+   * @return the registered value
+   * @throws IllegalStateException    if this registry is frozen
+   * @throws IllegalArgumentException if an entry is already registered under the identifier
+   */
+  protected T registerValue(Identifier id, T value) {
     if (frozen) {
       throw new IllegalStateException("Registry '" + key + "' is frozen");
     }
@@ -68,7 +74,15 @@ public final class SimpleRegistry<T> implements Registry<T> {
     }
     byId.put(id, value);
     byValue.put(value, id);
+    RegistryContext ctx = value.getRegistryContext();
+    ctx.putId(id);
+    ctx.putIndex(nextId.getAndIncrement());
     return value;
+  }
+
+  @Override
+  public Identifier key() {
+    return key;
   }
 
   @Override

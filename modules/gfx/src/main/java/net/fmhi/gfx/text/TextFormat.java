@@ -24,12 +24,14 @@
 
 package net.fmhi.gfx.text;
 
+import net.fmhi.gfx.brush.tint.Gradient;
+import net.fmhi.gfx.brush.tint.SimpleGradient;
 import net.fmhi.math.Color;
 
 /**
  * Immutable text styling attributes for a span of text.
  *
- * <p>A {@code TextFormat} combines a {@link Font}, a text color, font style
+ * <p>A {@code TextFormat} combines a {@link Font}, a text gradient, font style
  * flags, and a font size. Each wither method returns a new instance, leaving
  * the original unchanged.
  *
@@ -37,22 +39,27 @@ import net.fmhi.math.Color;
  * construction.
  *
  * @param font      the font used to render the text
- * @param color     the text color
+ * @param gradient  the text gradient
  * @param fontStyle a bitmask of style flags from {@link Font}
  * @param fontSize  the font size in pixels
  * @see Font#REGULAR
  * @see Font#BOLD
  * @see Font#ITALIC
  */
-public record TextFormat(Font font, Color color, int fontStyle, float fontSize) {
+public record TextFormat(Font font, Gradient gradient, int fontStyle, float fontSize) {
   /**
-   * Returns a default style using the built-in font, white color, regular
+   * Returns a default style using the built-in font, white gradient, regular
    * weight, and the default font size.
    *
    * @return a default text style
    */
   public static TextFormat of() {
-    return new TextFormat(FallbackFont.acquire(), Color.WHITE, Font.REGULAR, Font.DEFAULT_SIZE);
+    return new TextFormat(
+        FallbackFont.acquire(),
+        new SimpleGradient(),
+        Font.REGULAR,
+        Font.DEFAULT_SIZE
+    );
   }
 
   /**
@@ -62,17 +69,27 @@ public record TextFormat(Font font, Color color, int fontStyle, float fontSize) 
    * @return a new style with the updated font
    */
   public TextFormat font(Font font) {
-    return new TextFormat(font, color, fontStyle, fontSize);
+    return new TextFormat(font, gradient, fontStyle, fontSize);
   }
 
   /**
-   * Returns a copy of this style with the given text color.
+   * Returns a copy of this style with the given text gradient.
    *
-   * @param color the replacement color
-   * @return a new style with the updated color
+   * @param color the replacement gradient
+   * @return a new style with the updated gradient
    */
   public TextFormat color(Color color) {
-    return new TextFormat(font, color, fontStyle, fontSize);
+    return gradient(new SimpleGradient(color));
+  }
+
+  /**
+   * Returns a copy of this style with the given text gradient.
+   *
+   * @param gradient the replacement gradient
+   * @return a new style with the updated gradient
+   */
+  public TextFormat gradient(Gradient gradient) {
+    return new TextFormat(font, gradient, fontStyle, fontSize);
   }
 
   /**
@@ -82,7 +99,7 @@ public record TextFormat(Font font, Color color, int fontStyle, float fontSize) 
    * @return a new style with the updated font size
    */
   public TextFormat size(float fontSize) {
-    return new TextFormat(font, color, fontStyle, fontSize);
+    return new TextFormat(font, gradient, fontStyle, fontSize);
   }
 
   /**
@@ -92,18 +109,18 @@ public record TextFormat(Font font, Color color, int fontStyle, float fontSize) 
    * @return a new style with the updated font
    */
   public TextFormat style(Font font) {
-    return new TextFormat(font, color, fontStyle, fontSize);
+    return new TextFormat(font, gradient, fontStyle, fontSize);
   }
 
   /**
    * Fluent builder for {@link TextFormat} instances.
    *
-   * <p>Defaults: color is {@link Color#WHITE}, style is
+   * <p>Defaults: gradient is {@link Color#WHITE}, style is
    * {@link Font#REGULAR}, font size is {@link Font#DEFAULT_SIZE}.
    */
   public static final class Builder {
     private final Font font;
-    private Color color = Color.WHITE;
+    private Gradient gradient = new SimpleGradient();
     private int fontStyle = Font.REGULAR;
     private float fontSize = Font.DEFAULT_SIZE;
 
@@ -117,13 +134,24 @@ public record TextFormat(Font font, Color color, int fontStyle, float fontSize) 
     }
 
     /**
-     * Sets the text color.
+     * Sets the text gradient.
      *
-     * @param color the text color
+     * @param color the text gradient
      * @return this builder, for chaining
      */
     public Builder color(Color color) {
-      this.color = color;
+      this.gradient = new SimpleGradient(color);
+      return this;
+    }
+
+    /**
+     * Sets the text gradient.
+     *
+     * @param gradient the text gradient
+     * @return this builder, for chaining
+     */
+    public Builder color(Gradient gradient) {
+      this.gradient = gradient;
       return this;
     }
 
@@ -158,7 +186,7 @@ public record TextFormat(Font font, Color color, int fontStyle, float fontSize) 
      * @return a new style with the configured attributes
      */
     public TextFormat build() {
-      return new TextFormat(this.font, this.color, this.fontStyle, this.fontSize);
+      return new TextFormat(this.font, this.gradient, this.fontStyle, this.fontSize);
     }
   }
 }

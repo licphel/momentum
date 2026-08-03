@@ -75,6 +75,17 @@ subprojects {
   }
 
   tasks.withType(Test).configureEach { useJUnitPlatform() }
+
+  // Shared dependencies, injected into every module from here so the
+  // per-module build scripts stay free of boilerplate.
+  dependencies {
+    compileOnly libs.jspecify
+    testCompileOnly libs.jspecify
+    implementation libs.log4j.api
+    implementation libs.log4j.core
+    implementation libs.fastutil
+    implementation libs.jackson.databind
+  }
 }
 
 repositories { mavenCentral() }
@@ -86,12 +97,15 @@ dependencies {
   allSubprojects.each { implementation it }
   allSubprojects.each { testImplementation it }
 
-  compileOnly 'org.jspecify:jspecify:1.0.0'
-  testCompileOnly 'org.jspecify:jspecify:1.0.0'
+  compileOnly libs.jspecify
+  testCompileOnly libs.jspecify
 
   testImplementation platform('org.junit:junit-bom:5.10.0')
   testImplementation 'org.junit.jupiter:junit-jupiter'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
+  // primitive-keyed collections: no boxing on the hot chunk lookup paths
+  implementation libs.fastutil
 
   implementation "org.lwjgl:lwjgl:${lwjgl_version}"
   implementation "org.lwjgl:lwjgl-opengl:${lwjgl_version}"

@@ -1,5 +1,7 @@
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
+import net.fmhi.gfx.brush.tint.Gradient;
+import net.fmhi.gfx.math.TransformHandler;
 import net.fmhi.gfx.text.Text;
 import net.fmhi.gfx.text.raster.Glyph;
 import net.fmhi.gfx.text.raster.Raster;
@@ -7,27 +9,43 @@ import net.fmhi.gfx.texture.Drawable2D;
 import net.fmhi.gfx.texture.FragileTexture;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TexturePart;
-import net.fmhi.math.*;
+import net.fmhi.math.Box2D;
+import net.fmhi.math.FastTrigonometric;
+import net.fmhi.math.Vector2;
+import net.fmhi.math.Vector3;
 import net.fmhi.math.dim2.Curve2D;
 import org.jspecify.annotations.Nullable;
 
 /**
- * A 2D vertex builder that extends {@link VertexBuilder} with texture, shape, and text drawing
- * operations.
+ * A 2D vertex builder extending {@link VertexBuilder} with texture, shape, and text drawing.
  *
- * <p>All coordinates are in world units and are transformed by the current transform stack.
- * Draw flags, color tint, and the current sampler affect subsequent draw calls until changed.
- * Texture source regions are specified in texel coordinates.
+ * <p>All coordinates are in world units and pass through the current transform stack. Draw
+ * flags, gradient tint, and the bound texture affect subsequent draw calls until changed;
+ * texture source regions are specified in texel coordinates. Not thread-safe; each instance
+ * must be confined to a single thread.
  *
  * @see VertexBuilder
  */
-public interface VertexBuilder2D extends VertexBuilder {
+public class VertexBuilder2D extends VertexBuilder {
+  protected @Nullable Primitive2D currentPrimitive;
+  protected @Nullable Texture currentTexture;
+
   /**
-   * Draws a region of a texture at the given position and size.
+   * Creates a new {@code VertexBuilder2D} writing into the given staging area.
    *
-   * <p>The source region {@code (u, v, uw, vh)} is specified in texel coordinates.
-   * The destination rectangle {@code (x, y, w, h)} is in world units and is transformed by
-   * the current transform stack. Current draw flags, color, and sampler are applied.
+   * @param data              the staging area receiving vertices and indices
+   * @param transformHandler  the transform handler used for coordinate conversion
+   */
+  public VertexBuilder2D(VertexData data, TransformHandler transformHandler) {
+    super(data, transformHandler);
+  }
+
+  /**
+   * Draws a region of a texture into the given destination rectangle.
+   *
+   * <p>The source region {@code (u, v, uw, vh)} is specified in texel coordinates; the
+   * destination rectangle is in world units and passes through the current transform stack.
+   * The current draw flags, gradient, and texture are applied.
    *
    * @param tex the texture to draw; does nothing if {@code null}
    * @param x   the X position in world units
@@ -39,17 +57,49 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param uw  the width of the source region in texels
    * @param vh  the height of the source region in texels
    */
-  void drawTexture(@Nullable FragileTexture tex, float x, float y, float w, float h, float u, float v
-      , float uw, float vh);
+  public void drawTexture(@Nullable FragileTexture tex, float x, float y, float w, float h, float u, float v
+      , float uw, float vh) {
+    if (tex == null) {
+      return;
+    }
+    Texture pinned = tex.pin();
+    if (pinned == null) {
+      return;
+    }
+    setPrimitive(Primitive2D.TEXTURE_TRIANGLE_INDEXED);
+    setTexture(pinned);
+
+    float u1 = transformHandler.u(pinned, u);
+    float v1 = transformHandler.v(pinned, v);
+    float u2 = transformHandler.u(pinned, u + uw);
+    float v2 = transformHandler.v(pinned, v + vh);
+
+    if ((flags & DrawingFlags.FLIP_X) != 0) {
+      float t = u1;
+      u1 = u2;
+      u2 = t;
+    }
+    if (((flags & DrawingFlags.FLIP_Y) == 0) ^ transformHandler.isYFlipped()) {
+      float t = v1;
+      v1 = v2;
+      v2 = t;
+    }
+
+    putPosColorUv(x, y, 0, gradient.getColor(0), u1, v1);
+    putPosColorUv(x + w, y, 0, gradient.getColor(1), u2, v1);
+    putPosColorUv(x + w, y + h, 0, gradient.getColor(2), u2, v2);
+    putPosColorUv(x, y + h, 0, gradient.getColor(3), u1, v2);
+    endQuad();
+  }
 
   /**
-   * Draws a source region of a texture into a destination rectangle.
+   * Draws the region of a texture given by {@code src} into the destination rectangle.
    *
    * @param tex the texture to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    * @param src the source region in texel coordinates
    */
-  default void drawTexture(@Nullable FragileTexture tex, Box2D dst, Box2D src) {
+  public void drawTexture(@Nullable FragileTexture tex, Box2D dst, Box2D src) {
     if (tex == null) {
       return;
     }
@@ -58,12 +108,12 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws the entire texture into a destination rectangle.
+   * Draws the full texture into a destination rectangle.
    *
    * @param tex the texture to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    */
-  default void drawTexture(@Nullable FragileTexture tex, Box2D dst) {
+  public void drawTexture(@Nullable FragileTexture tex, Box2D dst) {
     if (tex == null) {
       return;
     }
@@ -75,7 +125,7 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws the entire texture at the given position and size.
+   * Draws the full texture at the given position and size.
    *
    * @param tex the texture to draw; does nothing if {@code null}
    * @param x   the X position in world units
@@ -83,7 +133,7 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param w   the width in world units
    * @param h   the height in world units
    */
-  default void drawTexture(@Nullable FragileTexture tex, float x, float y, float w, float h) {
+  public void drawTexture(@Nullable FragileTexture tex, float x, float y, float w, float h) {
     if (tex == null) {
       return;
     }
@@ -95,12 +145,12 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a texture part's region into a destination rectangle.
+   * Draws the region of a texture part into a destination rectangle.
    *
-   * @param texPart the texture part defining the source texture and region
+   * @param texPart the texture part providing the source texture and region
    * @param dst     the destination rectangle in world units
    */
-  default void drawTexture(@Nullable TexturePart texPart, Box2D dst) {
+  public void drawTexture(@Nullable TexturePart texPart, Box2D dst) {
     if (texPart == null) {
       return;
     }
@@ -108,13 +158,15 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a texture part with an additional source region offset.
+   * Draws a source region of a texture part into a destination rectangle.
+   *
+   * <p>The source region is offset from the texture part's UV origin.
    *
    * @param texPart the texture part
    * @param dst     the destination rectangle in world units
    * @param src     the source region relative to the texture part's UV origin, in texels
    */
-  default void drawTexture(@Nullable TexturePart texPart, Box2D dst, Box2D src) {
+  public void drawTexture(@Nullable TexturePart texPart, Box2D dst, Box2D src) {
     if (texPart == null) {
       return;
     }
@@ -122,7 +174,7 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a texture part's full region at the given position and size.
+   * Draws the full region of a texture part at the given position and size.
    *
    * @param texPart the texture part
    * @param x       the X position in world units
@@ -130,7 +182,7 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param w       the width in world units
    * @param h       the height in world units
    */
-  default void drawTexture(@Nullable TexturePart texPart, float x, float y, float w, float h) {
+  public void drawTexture(@Nullable TexturePart texPart, float x, float y, float w, float h) {
     if (texPart == null) {
       return;
     }
@@ -140,7 +192,7 @@ public interface VertexBuilder2D extends VertexBuilder {
   /**
    * Draws a region of a texture part at the given position and size.
    *
-   * <p>The source region is offset by the texture part's UV origin.
+   * <p>The source region is offset from the texture part's UV origin.
    *
    * @param texPart the texture part
    * @param x       the X position in world units
@@ -152,8 +204,8 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param uw      the width of the source region in texels
    * @param vh      the height of the source region in texels
    */
-  default void drawTexture(@Nullable TexturePart texPart, float x, float y, float w, float h, float u, float v,
-                           float uw, float vh) {
+  public void drawTexture(@Nullable TexturePart texPart, float x, float y, float w, float h, float u, float v,
+                          float uw, float vh) {
     if (texPart == null) {
       return;
     }
@@ -161,12 +213,12 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a {@link Drawable2D} into a destination rectangle.
+   * Draws a {@link Drawable2D} scaled to fit a destination rectangle.
    *
    * @param t   the drawable to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    */
-  default void draw(@Nullable Drawable2D t, Box2D dst) {
+  public void draw(@Nullable Drawable2D t, Box2D dst) {
     if (t == null) {
       return;
     }
@@ -174,13 +226,13 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a {@link Drawable2D} with a source region into a destination rectangle.
+   * Draws a {@link Drawable2D}, mapping a source region onto a destination rectangle.
    *
    * @param t   the drawable to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    * @param src the source region in texel coordinates
    */
-  default void draw(@Nullable Drawable2D t, Box2D dst, Box2D src) {
+  public void draw(@Nullable Drawable2D t, Box2D dst, Box2D src) {
     if (t == null) {
       return;
     }
@@ -188,7 +240,7 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a {@link Drawable2D} at the given position and size.
+   * Draws a {@link Drawable2D} scaled to the given position and size.
    *
    * @param t the drawable to draw; does nothing if {@code null}
    * @param x the X position in world units
@@ -196,7 +248,7 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param w the width in world units
    * @param h the height in world units
    */
-  default void draw(@Nullable Drawable2D t, float x, float y, float w, float h) {
+  public void draw(@Nullable Drawable2D t, float x, float y, float w, float h) {
     if (t == null) {
       return;
     }
@@ -204,7 +256,7 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a {@link Drawable2D} at the given position, size, and source region.
+   * Draws a {@link Drawable2D}, mapping a source region onto the given position and size.
    *
    * @param t  the drawable to draw; does nothing if {@code null}
    * @param x  the X position in world units
@@ -216,7 +268,7 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param uw the U coordinate range in texels
    * @param vh the V coordinate range in texels
    */
-  default void draw(@Nullable Drawable2D t, float x, float y, float w, float h, float u, float v, float uw, float vh) {
+  public void draw(@Nullable Drawable2D t, float x, float y, float w, float h, float u, float v, float uw, float vh) {
     if (t == null) {
       return;
     }
@@ -224,33 +276,41 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a filled rectangle at the given position and size.
+   * Draws a filled rectangle with the given dimensions.
    *
    * @param x the X position in world units
    * @param y the Y position in world units
    * @param w the width in world units
    * @param h the height in world units
    */
-  void drawRectangle(float x, float y, float w, float h);
+  public void drawRectangle(float x, float y, float w, float h) {
+    setPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
+
+    putPosColor(x, y, 0, gradient.getColor(0));
+    putPosColor(x + w, y, 0, gradient.getColor(1));
+    putPosColor(x + w, y + h, 0, gradient.getColor(2));
+    putPosColor(x, y + h, 0, gradient.getColor(3));
+    endQuad();
+  }
 
   /**
-   * Draws a filled rectangle.
+   * Draws a filled rectangle covering the given destination rectangle.
    *
    * @param dst the destination rectangle in world units
    */
-  default void drawRectangle(Box2D dst) {
+  public void drawRectangle(Box2D dst) {
     drawRectangle(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
   /**
-   * Draws the outline of a rectangle as four line segments.
+   * Draws the outline of a rectangle as four connected line segments.
    *
    * @param x the X position in world units
    * @param y the Y position in world units
    * @param w the width in world units
    * @param h the height in world units
    */
-  default void drawRectangleFrame(float x, float y, float w, float h) {
+  public void drawRectangleFrame(float x, float y, float w, float h) {
     drawLine(x, y, x + w, y);
     drawLine(x, y, x, y + h);
     drawLine(x + w, y, x + w, y + h);
@@ -258,53 +318,64 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws the outline of a rectangle as four line segments.
+   * Draws the outline of a rectangle as four connected line segments.
    *
    * @param dst the destination rectangle in world units
    */
-  default void drawRectangleFrame(Box2D dst) {
+  public void drawRectangleFrame(Box2D dst) {
     drawRectangleFrame(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
   /**
-   * Draws a line segment between two points.
+   * Draws a line segment between two endpoints.
    *
    * @param x1 the X coordinate of the first endpoint
    * @param y1 the Y coordinate of the first endpoint
    * @param x2 the X coordinate of the second endpoint
    * @param y2 the Y coordinate of the second endpoint
    */
-  void drawLine(float x1, float y1, float x2, float y2);
+  public void drawLine(float x1, float y1, float x2, float y2) {
+    setPrimitive(Primitive2D.COLOR_LINE);
+
+    putPosColor(x1, y1, 0, gradient.getColor(0));
+    putPosColor(x2, y2, 0, gradient.getColor(1));
+    data.addVertex(2);
+  }
 
   /**
-   * Draws a line segment between two vectors.
+   * Draws a line segment between two positions.
    *
-   * @param from the first endpoint
-   * @param to   the second endpoint
+   * @param from the first endpoint in world units
+   * @param to   the second endpoint in world units
    */
-  default void drawLine(Vector2 from, Vector2 to) {
+  public void drawLine(Vector2 from, Vector2 to) {
     drawLine(from.x(), from.y(), to.x(), to.y());
   }
 
   /**
-   * Draws a single point at the given coordinates.
+   * Draws a point at the specified coordinates.
    *
    * @param x the X coordinate in world units
    * @param y the Y coordinate in world units
    */
-  void drawPoint(float x, float y);
+  public void drawPoint(float x, float y) {
+    setPrimitive(Primitive2D.COLOR_POINT);
+
+    putPosColor(x, y, 0, gradient.getColor(0));
+    data.addVertex(1);
+  }
 
   /**
-   * Draws a single point at the given position.
+   * Draws a point at the specified position.
    *
    * @param at the position in world units
    */
-  default void drawPoint(Vector2 at) {
+  public void drawPoint(Vector2 at) {
     drawPoint(at.x(), at.y());
   }
 
   /**
-   * Draws a filled triangle.
+   * Draws a filled triangle from three vertex positions.
    *
    * @param x1 the X coordinate of the first vertex
    * @param y1 the Y coordinate of the first vertex
@@ -313,21 +384,28 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param x3 the X coordinate of the third vertex
    * @param y3 the Y coordinate of the third vertex
    */
-  void drawTriangle(float x1, float y1, float x2, float y2, float x3, float y3);
+  public void drawTriangle(float x1, float y1, float x2, float y2, float x3, float y3) {
+    setPrimitive(Primitive2D.COLOR_TRIANGLE);
+
+    putPosColor(x1, y1, 0, gradient.getColor(0));
+    putPosColor(x2, y2, 0, gradient.getColor(1));
+    putPosColor(x3, y3, 0, gradient.getColor(2));
+    data.addVertex(3);
+  }
 
   /**
-   * Draws a filled triangle.
+   * Draws a filled triangle from three vertex positions.
    *
-   * @param a the first vertex
-   * @param b the second vertex
-   * @param c the third vertex
+   * @param a the first vertex in world units
+   * @param b the second vertex in world units
+   * @param c the third vertex in world units
    */
-  default void drawTriangle(Vector2 a, Vector2 b, Vector2 c) {
+  public void drawTriangle(Vector2 a, Vector2 b, Vector2 c) {
     drawTriangle(a.x(), a.y(), b.x(), b.y(), c.x(), c.y());
   }
 
   /**
-   * Draws the outline of a triangle as three line segments.
+   * Draws the outline of a triangle as three connected line segments.
    *
    * @param x1 the X coordinate of the first vertex
    * @param y1 the Y coordinate of the first vertex
@@ -336,32 +414,32 @@ public interface VertexBuilder2D extends VertexBuilder {
    * @param x3 the X coordinate of the third vertex
    * @param y3 the Y coordinate of the third vertex
    */
-  default void drawTriangleFrame(float x1, float y1, float x2, float y2, float x3, float y3) {
+  public void drawTriangleFrame(float x1, float y1, float x2, float y2, float x3, float y3) {
     drawLine(x1, y1, x2, y2);
     drawLine(x2, y2, x3, y3);
     drawLine(x3, y3, x1, y1);
   }
 
   /**
-   * Draws the outline of a triangle as three line segments.
+   * Draws the outline of a triangle as three connected line segments.
    *
-   * @param a the first vertex
-   * @param b the second vertex
-   * @param c the third vertex
+   * @param a the first vertex in world units
+   * @param b the second vertex in world units
+   * @param c the third vertex in world units
    */
-  default void drawTriangleFrame(Vector2 a, Vector2 b, Vector2 c) {
+  public void drawTriangleFrame(Vector2 a, Vector2 b, Vector2 c) {
     drawTriangleFrame(a.x(), a.y(), b.x(), b.y(), c.x(), c.y());
   }
 
   /**
-   * Draws a filled oval (axis-aligned ellipse).
+   * Draws a filled oval (axis-aligned ellipse) inscribed in the given bounding box.
    *
    * @param x the X position of the bounding box
    * @param y the Y position of the bounding box
-   * @param w the width
-   * @param h the height
+   * @param w the width of the bounding box
+   * @param h the height of the bounding box
    */
-  default void drawOval(float x, float y, float w, float h) {
+  public void drawOval(float x, float y, float w, float h) {
     float rx = w / 2f;
     float ry = h / 2f;
     float cx = x + rx;
@@ -383,24 +461,25 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a filled oval (axis-aligned ellipse).
+   * Draws a filled oval (axis-aligned ellipse) inscribed in the given bounding box.
    *
    * @param dst the bounding box in world units
    */
-  default void drawOval(Box2D dst) {
+  public void drawOval(Box2D dst) {
     drawOval(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
   /**
-   * Draws the outline of an oval as line segments. The segment count is automatically
-   * determined from the transformed size — larger ovals use more segments for smoothness.
+   * Draws the outline of an oval as connected line segments.
+   *
+   * <p>The segment count adapts to the transformed size so that larger ovals stay smooth.
    *
    * @param x the X position of the bounding box
    * @param y the Y position of the bounding box
-   * @param w the width
-   * @param h the height
+   * @param w the width of the bounding box
+   * @param h the height of the bounding box
    */
-  default void drawOvalFrame(float x, float y, float w, float h) {
+  public void drawOvalFrame(float x, float y, float w, float h) {
     float rx = w / 2.0f;
     float ry = h / 2.0f;
     float cx = x + rx;
@@ -422,25 +501,26 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws the outline of an oval as line segments. The segment count is automatically
-   * determined from the transformed size — larger ovals use more segments for smoothness.
+   * Draws the outline of an oval as connected line segments.
+   *
+   * <p>The segment count adapts to the transformed size so that larger ovals stay smooth.
    *
    * @param dst the bounding box in world units
    */
-  default void drawOvalFrame(Box2D dst) {
+  public void drawOvalFrame(Box2D dst) {
     drawOvalFrame(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
   /**
-   * Draws a parametric curve as line segments.
+   * Draws a parametric curve as connected line segments.
    *
-   * <p>The curve is sampled at {@code segments} evenly-spaced values of {@code t} in
-   * {@code [0, 1]} and drawn as connected line segments. More segments produce a smoother curve.
+   * <p>The curve is sampled at {@code segments} evenly spaced parameter values in
+   * {@code [0, 1]}; more segments produce a smoother result.
    *
    * @param curve    the parametric curve to evaluate
    * @param segments the number of line segments
    */
-  default void drawCurve(Curve2D curve, int segments) {
+  public void drawCurve(Curve2D curve, int segments) {
     if (segments <= 0) {
       return;
     }
@@ -459,9 +539,9 @@ public interface VertexBuilder2D extends VertexBuilder {
    *
    * <p>Does nothing if fewer than 3 vertices are provided.
    *
-   * @param vertices the polygon vertices in order
+   * @param vertices the polygon vertices in winding order
    */
-  default void drawPolygon(Vector2... vertices) {
+  public void drawPolygon(Vector2... vertices) {
     if (vertices.length < 3) {
       return;
     }
@@ -476,9 +556,9 @@ public interface VertexBuilder2D extends VertexBuilder {
    *
    * <p>Does nothing if fewer than 2 vertices are provided.
    *
-   * @param vertices the polygon vertices in order
+   * @param vertices the polygon vertices in winding order
    */
-  default void drawPolygonFrame(Vector2... vertices) {
+  public void drawPolygonFrame(Vector2... vertices) {
     if (vertices.length < 2) {
       return;
     }
@@ -490,18 +570,18 @@ public interface VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Draws a text blob at the given position with the specified alignment.
+   * Draws a text blob anchored at the given position with the specified alignment.
    *
    * <p>The alignment determines how the text is positioned relative to the anchor point
-   * {@code (x, y)}. For example, {@link Alignment#CENTRAL} centers the text both horizontally
-   * and vertically.
+   * {@code (x, y)}. For example, {@link Alignment#CENTRAL} centers the text both
+   * horizontally and vertically.
    *
    * @param text      the text blob to draw; does nothing if {@code null}
    * @param x         the anchor X coordinate in world units
    * @param y         the anchor Y coordinate in world units
    * @param alignment the alignment relative to the anchor point
    */
-  default void drawText(@Nullable Text text, float x, float y, Alignment alignment) {
+  public void drawText(@Nullable Text text, float x, float y, Alignment alignment) {
     if (text == null) {
       return;
     }
@@ -524,8 +604,7 @@ public interface VertexBuilder2D extends VertexBuilder {
     // Subtract it so that the text block's visual top aligns with (tx, ty).
     float originY = rasterBd.minY();
 
-    Color originalColor = color();
-
+    Gradient originalColor = gradient();
     for (Raster.Entry entry : raster.entries()) {
       Glyph cg = entry.glyph();
       if (cg == null) {
@@ -533,54 +612,55 @@ public interface VertexBuilder2D extends VertexBuilder {
       }
 
       // Bearings are baked in (gx, gy, pixelW, pixelH)
-      setColor(entry.color());
+      setGradient(entry.gradient());
       Box2D bounds = entry.bounds();
       drawTexture(cg.texPart(), tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
     }
 
     for (Raster.Stroke stroke : raster.strokes()) {
-      setColor(stroke.color());
+      setGradient(stroke.gradient());
       Box2D bounds = stroke.bounds();
       drawRectangle(tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
     }
 
-    setColor(originalColor);
+    setGradient(originalColor);
   }
 
   /**
-   * Draws a text blob at the given position with {@link Alignment#LEFT_UP} alignment.
+   * Draws a text blob anchored at the given position with {@link Alignment#LEFT_UP}.
    *
    * @param text the text blob to draw; does nothing if {@code null}
    * @param x    the anchor X coordinate in world units
    * @param y    the anchor Y coordinate in world units
    */
-  default void drawText(@Nullable Text text, float x, float y) {
+  public void drawText(@Nullable Text text, float x, float y) {
     drawText(text, x, y, Alignment.LEFT_UP);
   }
 
   /**
-   * Draws a text blob at the given position with the specified alignment.
+   * Draws a text blob anchored at the given position with the specified alignment.
    *
    * @param text      the text blob to draw; does nothing if {@code null}
    * @param pos       the anchor position in world units
    * @param alignment the alignment relative to the anchor point
    */
-  default void drawText(@Nullable Text text, Vector2 pos, Alignment alignment) {
+  public void drawText(@Nullable Text text, Vector2 pos, Alignment alignment) {
     drawText(text, pos.x(), pos.y(), alignment);
   }
 
   /**
-   * Draws a text blob at the given position with {@link Alignment#LEFT_UP} alignment.
+   * Draws a text blob anchored at the given position with {@link Alignment#LEFT_UP}.
    *
    * @param text the text blob to draw; does nothing if {@code null}
    * @param pos  the anchor position in world units
    */
-  default void drawText(@Nullable Text text, Vector2 pos) {
+  public void drawText(@Nullable Text text, Vector2 pos) {
     drawText(text, pos.x(), pos.y());
   }
 
   /**
-   * Computes the number of segments for an oval based on its approximated transformed radius.
+   * Computes the segment count for an oval from its transformed radius, so that detail
+   * scales with the on-screen size.
    *
    * @param x the X position of the bounding box
    * @param y the Y position of the bounding box
@@ -600,5 +680,42 @@ public interface VertexBuilder2D extends VertexBuilder {
     float screenRx = (float) Math.sqrt(dx * dx + dy * dy);
     int segments = (int) (screenRx * Math.PI * 0.5f);
     return Math.clamp(segments, 8, 128);
+  }
+
+  /**
+   * Hook invoked just before the current primitive or texture is replaced, allowing
+   * subclasses to flush pending state tied to the previous values.
+   */
+  protected void flush0() {
+  }
+
+  /**
+   * Selects the primitive type for subsequent draws.
+   *
+   * <p>Changing the primitive flushes pending draws first; a switch to the already active
+   * primitive does nothing.
+   *
+   * @param primitive the primitive type to use
+   */
+  public void setPrimitive(Primitive2D primitive) {
+    if (primitive != currentPrimitive) {
+      flush0();
+      currentPrimitive = primitive;
+    }
+  }
+
+  /**
+   * Binds the texture for subsequent draws.
+   *
+   * <p>Changing the texture flushes pending draws first; a switch to the already bound
+   * texture does nothing.
+   *
+   * @param tex the texture to bind; {@code null} unbinds
+   */
+  public void setTexture(@Nullable Texture tex) {
+    if (tex != currentTexture) {
+      flush0();
+      currentTexture = tex;
+    }
   }
 }

@@ -14,12 +14,10 @@
             <option value="$PROJECT_DIR$/modules/fml" />
             <option value="$PROJECT_DIR$/modules/gfx" />
             <option value="$PROJECT_DIR$/modules/glfw" />
-            <option value="$PROJECT_DIR$/modules/mod" />
             <option value="$PROJECT_DIR$/modules/network" />
             <option value="$PROJECT_DIR$/modules/openal" />
             <option value="$PROJECT_DIR$/modules/opengl" />
             <option value="$PROJECT_DIR$/modules/rdext" />
-            <option value="$PROJECT_DIR$/modules/registry" />
           </set>
         </option>
       </GradleProjectSettings>

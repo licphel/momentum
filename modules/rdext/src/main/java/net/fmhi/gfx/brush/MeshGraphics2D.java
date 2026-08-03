@@ -22,12 +22,15 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
+import net.fmhi.gfx.mesh.Material;
+import net.fmhi.gfx.mesh.Mesh;
+import net.fmhi.gfx.mesh.Section;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pipe.Pipeline;
 import net.fmhi.gfx.pipe.Topology;
@@ -43,14 +46,13 @@ import java.util.List;
 /**
  * Records 2D geometry into a retained-mode {@link Mesh} for later replay.
  *
- * <p>Unlike {@link BatchedGraphics2D} which submits draw calls directly to the GPU each flush,
- * {@code MeshGraphics2D} accumulates vertex and index data across flushes into section drafts.
- * Call {@link #bake(Device)} to produce an immutable {@link Mesh} that can be drawn via
- * {@link Graphics2D#drawMesh(Mesh)}.
+ * <p>Unlike {@link BatchedGraphics2D}, which submits draw calls to the GPU on every flush,
+ * {@code MeshGraphics2D} accumulates vertex and index data across flushes into section
+ * drafts. Call {@link #bake(Device)} to produce an immutable {@link Mesh} that can be drawn
+ * later via {@link Graphics2D#drawMesh(Mesh)}.
  *
- * <p>{@link #begin(RenderPass)} and {@link #end()} are essential, too. However, the render pass
- * has no effect - it is managed
- * externally when the baked mesh is drawn.
+ * <p>{@link #begin(RenderPass)} and {@link #end()} have no effect in this implementation;
+ * render pass management is the caller's responsibility when drawing the baked mesh.
  *
  * @see BatchedGraphics2D
  * @see Mesh
@@ -61,48 +63,58 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
   /**
    * Creates a new {@code MeshGraphics2D} backed by the given device.
    *
+   * @param data   the staging area receiving vertices and indices
    * @param device the GPU device
    */
-  public MeshGraphics2D(Device device) {
-    super(device);
+  public MeshGraphics2D(VertexData data, Device device) {
+    super(data, device);
   }
 
   /**
-   * Records the current vertex and index data as a section draft, then clears the staging
-   * buffers for the next batch. Does not submit to the GPU.
+   * Captures the recorded vertex and index data as a section draft, then clears the
+   * staging buffers for the next batch. Does not submit anything to the GPU.
    *
-   * @param force if {@code true}, ignored — empty buffers are simply not recorded
+   * @param force ignored; an empty batch is never recorded
    */
   @Override
   public void flush(boolean force) {
-    if (vertexCount <= 0 && indexCount <= 0) {
+    if (data.vertexCount() <= 0 && data.indexCount() <= 0) {
       return;
     }
-    byte[] vertices = vertexBuf.copiedArray();
-    byte[] indices = indexBuf.copiedArray();
-    vertexBuf.clear();
-    indexBuf.clear();
-    vertexCount = 0;
-    indexCount = 0;
+    byte[] vertices = data.vertices().copiedArray();
+    byte[] indices = data.indices().copiedArray();
+    data.clear();
     drafts.add(new SectionDraft(vertices, indices,
         currentPrimitive, currentTexture, sampler == null ? defSampler : sampler,
         resolvePipeline(), resolveResourceSetLayout()));
   }
 
+  /**
+   * No-op; render pass management is deferred until the baked mesh is drawn.
+   *
+   * @param pass the render pass descriptor; ignored
+   */
   @Override
   public void begin(RenderPass pass) {
   }
 
+  /**
+   * No-op; render pass management is deferred until the baked mesh is drawn.
+   */
   @Override
   public void end() {
+    flush(true);
+    drafts.clear();
   }
 
   /**
-   * Bakes all recorded section drafts into an immutable {@link Mesh}.
+   * Converts all recorded section drafts into an immutable {@link Mesh}.
    *
-   * <p>Each draft is converted into a {@link Section} with its own vertex and index buffers,
-   * material, and topology. The returned mesh shares the uniform buffer with this graphics
-   * context and can be drawn with {@link Graphics2D#drawMesh(Mesh)}.
+   * <p>Each draft becomes a {@link Section} with its own vertex and index buffers, material,
+   * and topology. Every baked mesh owns its own uniform buffer, so meshes cached from one
+   * context can be created and closed independently — a shared ubo would be released by the
+   * first {@link Mesh#close()}. The result can be drawn with
+   * {@link Graphics2D#drawMesh(Mesh)}.
    *
    * @param device the GPU device to allocate buffers from
    * @return a new mesh containing all recorded geometry
@@ -111,12 +123,14 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
     flush(true);
     List<Section> sections = new ArrayList<>();
 
+    BufferObject meshUbo = device.getBuffer(BufferObjectDesc.uniform());
+    meshUbo.allocate(64, null);
     for (SectionDraft d : drafts) {
       if (d.primitive() == null) {
         continue;
       }
       ResourceSet rs = device.getResourceSet(d.rsl);
-      rs.bindUniform(0, ubo, 64);
+      rs.bindUniform(0, meshUbo, 64);
       boolean tex = d.primitive().isTextured();
       if (tex && d.texture() != null && d.sampler() != null) {
         rs.bindTexture(1, d.texture(), d.sampler());
@@ -135,7 +149,7 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
       sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount, top));
     }
 
-    return new Mesh(ubo, List.copyOf(sections));
+    return new Mesh(meshUbo, List.copyOf(sections));
   }
 
   private record SectionDraft(byte[] vertices,

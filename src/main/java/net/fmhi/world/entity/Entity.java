@@ -29,45 +29,40 @@ import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightBuffer;
-import net.fmhi.world.physics.TRPhyObj;
+import net.fmhi.world.physics.SBPhyObj;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 @NullMarked
-public class Entity extends TRPhyObj {
+public class Entity extends SBPhyObj {
 
   private final float w;
   private final float h;
-  private ChunkPos chunkPos = new ChunkPos(0, 0);
+  public ChunkPos chunkPos = new ChunkPos(0, 0);
+  public long lastTick;
 
   protected Entity(float width, float height) {
     this.w = width;
     this.h = height;
-    gravity = 65F;
     // lighter than water, so entities float in liquids
     density = 0.85F;
   }
 
-  public Box2D bounds() {
-    return Box2D.create(position.xf(), position.yf(), w, h);
+  @Override
+  public Box2D collisionBox() {
+    // local box, bottom-left origin (the position is the feet, Y-up)
+    return Box2D.create(0F, 0F, w, h);
   }
 
-  @Override public float width() { return w; }
-  @Override public float height() { return h; }
+  @Override
+  protected float gravity() {
+    return 65F;
+  }
 
   public void tick(double dt, Level level) {
     super.tick(dt, level);
-    ChunkPos newCp = new ChunkPos(
-        Math.floorDiv((int) Math.floor(position.xf()), ChunkPos.SIZE),
-        Math.floorDiv((int) Math.floor(position.yf()), ChunkPos.SIZE));
-    if (!newCp.equals(chunkPos)) {
-      Chunk old = level.getChunk(chunkPos);
-      if (old != null) old.removeEntity(this);
-      level.getOrLoadChunk(newCp).addEntity(this);
-      chunkPos = newCp;
-    }
   }
 
   /** Call once after spawning to place in the correct chunk. */
@@ -90,7 +85,9 @@ public class Entity extends TRPhyObj {
 
       @Override
       public boolean getLight(LightBuffer buf) {
-        getBeam();
+        buf.r(1);
+        buf.g(0.9F);
+        buf.b(0.8F);
         return true;
       }
     };

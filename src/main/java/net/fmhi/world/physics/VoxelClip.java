@@ -38,6 +38,52 @@ public interface VoxelClip {
   /** A full tile. */
   VoxelClip CUBE = new VoxelBox(0F, 0F, 1F, 1F);
 
+  /** The four slope directions (Y-up: the tile spans [0,1]² from the
+   * bottom; "DOWN" surfaces are floors, "UP" surfaces are ceilings). */
+  enum SlopeType {
+    /** Floor slope rising to the right: low left, high right (↗). */
+    LEFT_DOWN,
+    /** Floor slope rising to the left: high left, low right (↖). */
+    RIGHT_DOWN,
+    /** Ceiling slope hanging lower on the left (↗ ceiling). */
+    LEFT_UP,
+    /** Ceiling slope hanging lower on the right (↖ ceiling). */
+    RIGHT_UP
+  }
+
+  /**
+   * Builds a slope approximated by {@code steps} stacked boxes, each
+   * {@code 1/steps} wide. A floor slope stacks the boxes on the tile
+   * bottom; a ceiling slope hangs them from the tile top.
+   *
+   * @param type  the slope direction
+   * @param steps the number of staircase steps (>= 1)
+   */
+  static VoxelClip generateSlope(SlopeType type, int steps) {
+    if (steps < 1) throw new IllegalArgumentException("steps must be >= 1: " + steps);
+    float w = 1F / steps;
+    VoxelBox[] boxes = new VoxelBox[steps];
+    for (int i = 0; i < steps; i++) {
+      float h = (i + 1) * w;
+      switch (type) {
+        case LEFT_DOWN -> boxes[i] = new VoxelBox(i * w, 0F, w, h);
+        case RIGHT_DOWN -> boxes[i] = new VoxelBox(1F - (i + 1) * w, 0F, w, h);
+        case LEFT_UP -> boxes[i] = new VoxelBox(i * w, 1F - h, w, h);
+        case RIGHT_UP -> boxes[i] = new VoxelBox(1F - (i + 1) * w, 1F - h, w, h);
+      }
+    }
+    return VoxelOutline.of(boxes);
+  }
+
+  /** 4-step floor slope rising to the right (↗): low left, high right. */
+  VoxelClip SLOPE_LEFT_DOWN = generateSlope(SlopeType.LEFT_DOWN, 8);
+  /** 4-step floor slope rising to the left (↖): high left, low right. */
+  VoxelClip SLOPE_RIGHT_DOWN = generateSlope(SlopeType.RIGHT_DOWN, 8);
+  /** 4-step ceiling slope hanging lower on the left. */
+  VoxelClip SLOPE_LEFT_UP = generateSlope(SlopeType.LEFT_UP, 8);
+  /** 4-step ceiling slope hanging lower on the right. */
+  VoxelClip SLOPE_RIGHT_UP = generateSlope(SlopeType.RIGHT_UP, 8);
+
   /**
    * Shortens an X movement {@code dx} so the body does not enter this
    * shape. The shape occupies {@code [ox, ox+1] × [oy, oy+1]} with local
@@ -65,4 +111,10 @@ public interface VoxelClip {
    * Used by the step-up logic to measure step height.
    */
   float topAt(float x0, float x1, float ox, float oy);
+
+  /** The surface height at a single world X (the step ahead), or
+   * {@link Float#NaN} if the shape offers no surface there. */
+  default float surfaceAt(float x, float ox, float oy) {
+    return topAt(x, x, ox, oy);
+  }
 }

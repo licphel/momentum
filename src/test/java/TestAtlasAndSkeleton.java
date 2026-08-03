@@ -24,9 +24,10 @@
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
+import net.fmhi.gfx.brush.VertexData;
 import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.brush.BatchedGraphics2D;
 import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.sprite.Bone2D;
@@ -66,7 +67,7 @@ public class TestAtlasAndSkeleton {
     FallbackFont.init(dev);
 
     Camera2D camera = new Camera2D(800, 450, dev.getTransformHandler());
-    BatchedGraphics2D g = new BatchedGraphics2D(dev);
+    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
 
     // --- Atlas set up ---
     Random rng = new Random(SEED);
@@ -235,7 +236,7 @@ public class TestAtlasAndSkeleton {
   private static void drawSkeleton(BatchedGraphics2D g, Skeleton2D skeleton,
                                    Map<String, Matrix3x2> transforms,
                                    float originX, float originY) {
-    // Bone2D length → color pairs
+    // Bone2D length → gradient pairs
     String[][] bones = {
         {"torso", "head",         "#FFCC80"},
         {"torso", "upper_arm_l",  "#FF9966"},

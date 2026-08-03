@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.texture;
 
-import net.fmhi.gfx.mesh.VertexBuilder2D;
+import net.fmhi.gfx.brush.VertexBuilder2D;
 
 /**
  * A drawable object that renders itself using a {@link VertexBuilder2D}.

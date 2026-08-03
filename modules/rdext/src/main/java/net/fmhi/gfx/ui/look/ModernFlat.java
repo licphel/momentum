@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.ui.look;
 
-import net.fmhi.gfx.mesh.Alignment;
-import net.fmhi.gfx.mesh.Graphics2D;
+import net.fmhi.gfx.brush.Alignment;
+import net.fmhi.gfx.brush.Graphics2D;
 import net.fmhi.gfx.text.Text;
 import net.fmhi.gfx.ui.ButtonState;
 import net.fmhi.gfx.ui.Look;

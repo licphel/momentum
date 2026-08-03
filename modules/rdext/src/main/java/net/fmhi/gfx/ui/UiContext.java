@@ -30,7 +30,7 @@ import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.input.KeyAction;
 import net.fmhi.gfx.input.event.*;
-import net.fmhi.gfx.mesh.Graphics2D;
+import net.fmhi.gfx.brush.Graphics2D;
 import net.fmhi.gfx.ui.widget.Window;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;

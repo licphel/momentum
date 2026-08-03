@@ -28,7 +28,9 @@ public final class VoxelSlope implements VoxelClip {
 
   /** The world Y of the surface at the given world X, or NaN outside the
    * tile. */
-  private float surfaceAt(float x, float ox, float oy) {
+  @Override
+  public float surfaceAt(float x, float ox, float oy) {
+    if (x < ox || x > ox + 1F) return Float.NaN;
     float tx = Math.clamp(x - ox, 0F, 1F);
     return oy + top0 + (top1 - top0) * tx;
   }

@@ -22,24 +22,33 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.fml.registry;
+
+import net.fmhi.fml.Identifier;
+
+import java.util.function.Supplier;
 
 /**
- * Bitmask flags for controlling drawing behavior.
+ * A {@link Registry} that evaluates each entry's supplier immediately at
+ * registration time.
  *
- * <p>Combine flags with bitwise OR to enable multiple effects simultaneously.
- * Pass the combined value to {@link VertexBuilder#setFlags(int)}.
+ * <p>Entries are fully available as soon as {@link #register} returns, and
+ * the returned holder is always resolved.
  *
- * @see VertexBuilder#setFlags(int)
+ * @param <T> registry type
  */
-public final class DrawingFlags {
-  /** No flags set. */
-  public static final int NONE = 0;
-  /** Flip the drawn content horizontally. */
-  public static final int FLIP_X = 1;
-  /** Flip the drawn content vertically. */
-  public static final int FLIP_Y = 2;
+public class DirectRegistry<T extends RegistryEntry<T>> extends AbstractRegistry<T> {
+  /**
+   * Creates a new unfrozen registry.
+   *
+   * @param key the identifier of this registry
+   */
+  public DirectRegistry(Identifier key) {
+    super(key);
+  }
 
-  private DrawingFlags() {
+  @Override
+  public Holder<T> register(Identifier id, Supplier<? extends T> supplier) {
+    return new Holder<>(id, registerValue(id, supplier.get()));
   }
 }

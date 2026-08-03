@@ -33,7 +33,7 @@ import net.fmhi.gfx.texture.TextureFilter;
  * <p>A {@code RenderTarget} may represent either:
  * <ul>
  *   <li>The default swapchain view (the visible window), or
- *   <li>An off-screen framebuffer object (FBO) with color and depth/stencil
+ *   <li>An off-screen framebuffer object (FBO) with gradient and depth/stencil
  *       attachments.
  * </ul>
  *

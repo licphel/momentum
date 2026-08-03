@@ -22,19 +22,18 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
 import net.fmhi.gfx.GraphicsException;
+import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.gfx.math.TransformHandler;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.pipe.Pipeline;
 import net.fmhi.gfx.pipe.Scissor;
 import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.texture.Sampler;
-import net.fmhi.gfx.texture.Texture;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;
-import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
@@ -42,19 +41,17 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 
 /**
- * A {@link Graphics2D} base implementation that tracks render state and detects changes.
+ * Base implementation of {@link Graphics2D} that tracks render state and detects changes.
  *
  * <p>When the primitive type, texture, pipeline, or resource set changes, pending draws are
- * automatically flushed before the state is updated. Subclasses provide the actual flush behavior
- * and GPU submission logic.
+ * flushed automatically before the state is updated. Subclasses provide the actual flush
+ * behavior and GPU submission logic.
  */
 @InternalApi
 abstract class AbstractStatefulGraphics2D extends Graphics2D {
   private final Deque<Scissor> scissorStack = new ArrayDeque<>();
   protected @Nullable Pipeline currentPipeline;
   protected @Nullable ResourceSet currentResourceSet;
-  protected @Nullable Primitive2D currentPrimitive;
-  protected @Nullable Texture currentTexture;
   protected @Nullable Camera2D camera;
   protected @Nullable Sampler sampler;
   protected @Nullable RenderTarget renderTarget;
@@ -62,38 +59,18 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
   protected Scissor scissor = Scissor.DISABLED;
 
   /**
-   * Creates a graphics 2D.
+   * Creates a new {@code AbstractStatefulGraphics2D}.
    *
-   * @param transformHandler the backend-specific transform handler
+   * @param data              the staging area receiving vertices and indices
+   * @param transformHandler  the backend-specific transform handler
    */
-  public AbstractStatefulGraphics2D(TransformHandler transformHandler) {
-    super(transformHandler);
+  public AbstractStatefulGraphics2D(VertexData data, TransformHandler transformHandler) {
+    super(data, transformHandler);
   }
 
-  /**
-   * Asserts the current primitive type, flushing pending draws if the type changed.
-   *
-   * @param primitive the expected primitive type
-   */
   @Override
-  public void setPrimitive(Primitive2D primitive) {
-    if (primitive != currentPrimitive) {
-      flush();
-      currentPrimitive = primitive;
-    }
-  }
-
-  /**
-   * Asserts the current texture, flushing pending draws if the texture changed.
-   *
-   * @param tex the expected texture
-   */
-  @Override
-  public void setTexture(@Nullable Texture tex) {
-    if (tex != currentTexture) {
-      flush();
-      currentTexture = tex;
-    }
+  protected void flush0() {
+    flush();
   }
 
   @Override
@@ -139,8 +116,8 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
   /**
    * Pushes a scissor rectangle in world coordinates onto the scissor stack.
    *
-   * <p>The world-space rectangle is projected to screen coordinates using the current
-   * camera and viewport. Flushes pending draws before applying.
+   * <p>The rectangle is projected to screen coordinates using the current camera and
+   * viewport. Pending draws are flushed before the new rectangle is applied.
    *
    * @param worldBox the scissor rectangle in world coordinates
    * @throws GraphicsException if no camera is set
@@ -158,7 +135,7 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
 
   /**
    * Restores the previous scissor rectangle from the stack, or disables the scissor test
-   * if the stack is empty. Flushes pending draws before applying.
+   * if the stack is empty. Pending draws are flushed before applying.
    */
   @Override
   public void popScissor() {

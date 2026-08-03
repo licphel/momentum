@@ -31,7 +31,23 @@ public class Chunk {
     this.chunkPos = chunkPos;
   }
 
-  public void tick(double delta) {}
+  public void tick(double delta) {
+    for (Entity e : List.copyOf(entities)) {
+      if (e.lastTick == level.getTicks()) {
+        continue;
+      }
+      e.lastTick = level.getTicks();
+      e.tick(delta, level);
+
+      ChunkPos newCp = e.position().toChunkPos();
+      if (!newCp.equals(chunkPos)) {
+        Chunk old = level.getChunk(chunkPos);
+        if (old != null) old.removeEntity(e);
+        level.getOrLoadChunk(newCp).addEntity(e);
+        e.chunkPos = newCp;
+      }
+    }
+  }
 
   public void setLoaded(boolean loaded) { isLoaded = loaded; }
 
@@ -60,7 +76,16 @@ public class Chunk {
 
   // -- blocks ---------------------------------------------------------------
 
-  public void setBlock(int wx, int wy, BlockState state) { blockMap.set(wx, wy, state); }
+  /** Whether the block mesh of this chunk must be rebuilt. */
+  public boolean frontDirty;
+
+  /** Whether the wall mesh of this chunk must be rebuilt. */
+  public boolean backDirty;
+
+  public void setBlock(int wx, int wy, BlockState state) {
+    blockMap.set(wx, wy, state);
+    frontDirty = true;
+  }
 
   public void setBlock(BlockPos pos, BlockState state) { setBlock(pos.x(), pos.y(), state); }
 
@@ -70,7 +95,10 @@ public class Chunk {
 
   // -- walls ----------------------------------------------------------------
 
-  public void setWall(int wx, int wy, BlockState state) { wallMap.set(wx, wy, state); }
+  public void setWall(int wx, int wy, BlockState state) {
+    wallMap.set(wx, wy, state);
+    backDirty = true;
+  }
 
   public void setWall(BlockPos pos, BlockState state) { setWall(pos.x(), pos.y(), state); }
 
@@ -84,5 +112,5 @@ public class Chunk {
 
   public void removeEntity(Entity e) { entities.remove(e); }
 
-  public List<Entity> entities() { return Collections.unmodifiableList(entities); }
+  public List<Entity> entities() { return entities; }
 }

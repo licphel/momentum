@@ -23,6 +23,6 @@
  */
 
 @NullMarked
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
 import org.jspecify.annotations.NullMarked;

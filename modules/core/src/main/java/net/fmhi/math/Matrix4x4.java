@@ -309,6 +309,34 @@ public record Matrix4x4(float m00, float m10, float m20, float m30, float m01, f
   }
 
   /**
+   * Transforms a 3D/4D position (w = 1).
+   *
+   * @param v position vector, must be 3D/4D
+   * @throws IllegalArgumentException if input array is not 3D/4D
+   */
+  public void transformInplace(float[] v) {
+    if (v.length == 3) {
+      float x = m00 * v[0] + m01 * v[1] + m02 * v[2] + m03;
+      float y = m10 * v[0] + m11 * v[1] + m12 * v[2] + m13;
+      float z = m20 * v[0] + m21 * v[1] + m22 * v[2] + m23;
+      v[0] = x;
+      v[1] = y;
+      v[2] = z;
+    } else if (v.length == 4) {
+      float x = m00 * v[0] + m01 * v[1] + m02 * v[2] + m03 * v[3];
+      float y = m10 * v[0] + m11 * v[1] + m12 * v[2] + m13 * v[3];
+      float z = m20 * v[0] + m21 * v[1] + m22 * v[2] + m23 * v[3];
+      float w = m30 * v[0] + m31 * v[1] + m32 * v[2] + m33 * v[3];
+      v[0] = x;
+      v[1] = y;
+      v[2] = z;
+      v[3] = w;
+    } else {
+      throw new IllegalArgumentException("Not 3D/4D vector");
+    }
+  }
+
+  /**
    * Transforms a 4D vector.
    *
    * @param v vector to transform

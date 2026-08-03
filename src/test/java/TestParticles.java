@@ -24,11 +24,12 @@
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
+import net.fmhi.gfx.brush.VertexData;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
 import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.brush.BatchedGraphics2D;
 import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.particle.Particle2D;
 import net.fmhi.gfx.particle.ParticleSystem2D;
@@ -103,7 +104,7 @@ public class TestParticles {
         .build();
 
     RandomGenerator rng = RandomGenerator.DEFAULT;
-    BatchedGraphics2D g = new BatchedGraphics2D(dev);
+    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
     List<MyParticle> myParticles = new ArrayList<>();
 
     long lastNanos = System.nanoTime();

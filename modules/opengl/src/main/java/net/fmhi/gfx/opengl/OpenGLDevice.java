@@ -74,10 +74,15 @@ public final class OpenGLDevice implements Device {
    * Shared GL state cache — only accessed during {@link #pollEvents()}.
    */
   final OpenGLCache cache = new OpenGLCache();
+  /**
+   * Device-wide VAO cache, shared by all pipelines and invalidated when a buffer dies.
+   */
+  final VaoRegistry vaos = new VaoRegistry(this);
 
   private final Queue<Runnable> queue = new ConcurrentLinkedQueue<>();
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
+  private long lastCheckErrorMs;
   @Nullable View view;
 
   /**
@@ -201,27 +206,33 @@ public final class OpenGLDevice implements Device {
   @Override
   public void execute() {
     Runnable task;
-    while ((task = queue.poll()) != null) {
-      try {
+    try {
+      while ((task = queue.poll()) != null) {
         task.run();
-      } catch (Exception e) {
-        LOGGER.error("OpenGL execution error", e);
       }
+    } catch (Exception e) {
+      LOGGER.error("OpenGL execution error", e);
     }
   }
 
   @Override
   public void pollEvents() {
-    submit(() -> {
-      int err;
-      while ((err = GL11.glGetError()) != GL11.GL_NO_ERROR) {
-        LOGGER.warn("OpenGL error: 0x{}", Integer.toHexString(err));
-      }
-    });
+    long ms = System.currentTimeMillis();
+
+    if (ms -  lastCheckErrorMs > 1000) {
+      lastCheckErrorMs = ms;
+      submit(() -> {
+        int err;
+        while ((err = GL11.glGetError()) != GL11.GL_NO_ERROR) {
+          LOGGER.warn("OpenGL error: 0x{}", Integer.toHexString(err));
+        }
+      });
+    }
   }
 
   @Override
   public void close() {
+    submit(vaos::clear);
     execute();
   }
 }

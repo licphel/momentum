@@ -22,24 +22,24 @@
  * SOFTWARE.
  */
 
-package net.fmhi.gfx.mesh;
+package net.fmhi.gfx.brush;
 
 /**
  * Alignment for positioning content relative to an anchor point.
  *
- * <p>Negative values anchor toward the minimum edge, positive toward the maximum,
- * and zero centers. For example, horizontal {@code -1} aligns left, {@code 0} centers, and
- * {@code 1} aligns right.
+ * <p>Values are {@code -1}, {@code 0}, or {@code 1}: negative aligns toward the minimum
+ * edge, zero centers, and positive aligns toward the maximum edge. For example, a
+ * horizontal value of {@code -1} aligns left and {@code 1} aligns right.
  *
  * @param horizontal the horizontal alignment; {@code -1} for left, {@code 0} for center, {@code 1} for right
  * @param vertical   the vertical alignment; {@code -1} for up, {@code 0} for center, {@code 1} for down
  */
 public record Alignment(int horizontal, int vertical) {
-  /** Aligned left and up. */
+  /** Alignment toward the top-left corner. */
   public static final Alignment LEFT_UP = new Alignment(-1, -1);
-  /** Aligned right and up. */
+  /** Alignment toward the top-right corner. */
   public static final Alignment RIGHT_UP = new Alignment(1, -1);
-  /** Centered horizontally, aligned up. */
+  /** Horizontally centered, aligned toward the top edge. */
   public static final Alignment CENTRAL_UP = new Alignment(0, -1);
   /** Centered both horizontally and vertically. */
   public static final Alignment CENTRAL = new Alignment(0, 0);

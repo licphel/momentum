@@ -24,8 +24,11 @@
 
 package net.fmhi.audio;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+
 import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages automatic cleanup of {@link Clip}s that have finished playing.
@@ -40,7 +43,7 @@ import java.util.concurrent.ConcurrentHashMap;
  * @see Clip
  */
 public final class ClipManager implements AutoCloseable {
-  private final Map<Integer, Clip> clips = new ConcurrentHashMap<>();
+  private final Int2ObjectMap<Clip> clips = Int2ObjectMaps.synchronize(new Int2ObjectOpenHashMap<>());
   private final Thread cleanupThread;
   private volatile boolean running = true;
 
@@ -95,7 +98,7 @@ public final class ClipManager implements AutoCloseable {
       try {
         Thread.sleep(100);
 
-        for (Map.Entry<Integer, Clip> entry : clips.entrySet()) {
+        for (var entry : clips.int2ObjectEntrySet()) {
           Clip clip = entry.getValue();
 
           /*
@@ -105,7 +108,7 @@ public final class ClipManager implements AutoCloseable {
            */
           if (clip.shouldClose()) {
             clip.close();
-            clips.remove(entry.getKey());
+            clips.remove(entry.getIntKey());
           }
         }
       } catch (InterruptedException e) {

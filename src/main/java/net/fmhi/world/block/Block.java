@@ -24,6 +24,8 @@
 
 package net.fmhi.world.block;
 
+import net.fmhi.fml.registry.RegistryContext;
+import net.fmhi.fml.registry.RegistryEntry;
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.property.PropertyDef;
 import net.fmhi.world.light.Beam;
@@ -44,7 +46,14 @@ import java.util.Objects;
 /**
  * Stub for a block type.
  */
-public class Block implements ItemLike {
+public class Block implements ItemLike, RegistryEntry<Block> {
+  private final RegistryContext registryContext = new RegistryContext();
+
+  @Override
+  public RegistryContext getRegistryContext() {
+    return registryContext;
+  }
+
   final PropertyDef propertyDef = new PropertyDef();
   final List<BlockState> states = new ArrayList<>();
   @Nullable BlockState defaultState;
@@ -78,6 +87,18 @@ public class Block implements ItemLike {
    * 3/4 = ceiling slopes. Used by the Terraria physics port. */
   public int slope(BlockState state) {
     return 0;
+  }
+
+  /** Whether the tile only fills its bottom half (Terraria half brick):
+   * its top surface sits 8 px lower. */
+  public boolean halfBrick(BlockState state) {
+    return false;
+  }
+
+  /** Whether the block renders dynamically (animated texture, etc.) and
+   * must be drawn every frame instead of being baked into a chunk mesh. */
+  public boolean isAnimatedRendering(BlockState state) {
+    return false;
   }
 
   /** Restitution: 0 = no bounce, 1 = perfect. */

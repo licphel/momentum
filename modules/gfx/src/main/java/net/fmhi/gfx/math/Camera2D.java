@@ -40,14 +40,13 @@ import net.fmhi.math.Vector3;
  * {@code height/zoom} vertically, centered on the position.
  */
 public class Camera2D {
-  private Vector2 center = Vector2.ZERO;
+  private Vector2 center;
   private float width;
   private float height;
   private float zoom = 1.0F;
   private Matrix4x4 vpMatrix = Matrix4x4.IDENTITY;
   private boolean dirty = true;
   private final TransformHandler handler;
-  private boolean flipY = true;
 
   /**
    * Creates a camera with the specified viewport dimensions.
@@ -61,15 +60,6 @@ public class Camera2D {
     this.height = height;
     this.handler = handler;
     this.center = new Vector2(width / 2, height / 2);
-  }
-
-  /**
-   * Sets the y-axis points upward or downward.
-   *
-   * @param flipY whether to flip y down
-   */
-  public void flipY(boolean flipY) {
-    this.flipY = flipY;
   }
 
   /**
@@ -197,15 +187,6 @@ public class Camera2D {
     float right = center.x() + halfW;
     float top = center.y() + halfH;
     float bottom = center.y() - halfH;
-    /*
-     * Y-down orthographic: flip Y by swapping top/bottom.
-     * (Conform to 2D conventions)
-     */
-    if (flipY) {
-      float tmp = top;
-      top = bottom;
-      bottom = tmp;
-    }
     vpMatrix = handler.createOrthographic(left, right, bottom, top, 0.0F, -1.0F);
   }
 

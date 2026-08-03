@@ -3,6 +3,7 @@ package net.fmhi;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.View;
+import net.fmhi.gfx.brush.VertexData;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.glfw.GlfwView;
@@ -12,7 +13,8 @@ import net.fmhi.gfx.input.Modifiers;
 import net.fmhi.gfx.input.Snapshot;
 import net.fmhi.gfx.input.event.ResizeEvent;
 import net.fmhi.gfx.io.PngInputStream;
-import net.fmhi.gfx.mesh.BatchedGraphics2D;
+import net.fmhi.gfx.brush.BatchedGraphics2D;
+import net.fmhi.gfx.brush.Primitive2D;
 import net.fmhi.gfx.opengl.OpenGLDevice;
 import net.fmhi.gfx.pass.RenderPass;
 import net.fmhi.gfx.pass.RenderTarget;
@@ -20,15 +22,20 @@ import net.fmhi.gfx.pass.RenderTargetDesc;
 import net.fmhi.gfx.pipe.*;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.text.FallbackFont;
+import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.*;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
 import net.fmhi.math.Vector2;
+import net.fmhi.render.LiquidRenderer;
+import net.fmhi.render.SkyRenderer;
+import net.fmhi.render.TileRenderer;
 import net.fmhi.gfx.math.Camera2D;
 
 import net.fmhi.math.random.RandomGenerator;
 import net.fmhi.util.Profiler;
 import net.fmhi.util.ResourceProvider;
+import net.fmhi.util.Util;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.BlockStateHolder;
 import net.fmhi.world.block.Shape;
@@ -39,6 +46,7 @@ import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.FlatTerrainGenerator;
 import net.fmhi.world.level.Level;
+import net.fmhi.world.light.CelestialUtil;
 import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
@@ -63,6 +71,11 @@ public class Main {
   private static final float JUMP_SPEED = 22F;
   private static final int GROUND_Y = 20;
   private static final int WORLD_RADIUS = 16;
+  /** Day clock multiplier while Ctrl is held (8 real minutes → 15 s per day). */
+  private static final float FAST_TIME_SCALE = 32F;
+  private static TileRenderer tileRenderer;
+  private static LiquidRenderer liquidRenderer;
+  private static SkyRenderer skyRenderer;
   private static float worldViewW = 32F;
   static RenderTarget colorRT;
   static Texture texture;
@@ -95,19 +108,28 @@ public class Main {
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
+    tileRenderer = TileRenderer.create(dev);
+    liquidRenderer = LiquidRenderer.create(dev);
+    skyRenderer = new SkyRenderer();
 
     // Y-up: the player position is the feet; the ground block at GROUND_Y
     // spans [GROUND_Y, GROUND_Y+1], so the feet rest on its top
     Entity player = Entity.player(new PrecisePos(0, GROUND_Y + 1F));
     player.enterChunk(level);
+    // release GPU meshes when the chunk streaming drops a chunk
+    level.setUnloadListener(pos -> { if (tileRenderer != null) tileRenderer.unloadChunk(pos); });
 
     List<ThrownItem> thrownItems = new ArrayList<>();
     boolean qWasDown = false;
 
-    var colorfulstate = defaultState(Registries.COLORFUL);
+    var colorfulstate = defaultState(Registries.STONE);
     var airState = defaultState(Registries.AIR);
 
     Camera2D camera = new Camera2D((float) WIN_W, (float) WIN_H, dev.getTransformHandler());
+    // screen-space camera for the sky, fixed to the viewport
+    Camera2D screenCam = new Camera2D((float) WIN_W, (float) WIN_H, dev.getTransformHandler());
+    screenCam.setOrthographic(WIN_W, WIN_H);
+    screenCam.setCenter(new Vector2(WIN_W / 2F, WIN_H / 2F));
 
     // -- off-screen buffers -------------------------------------------------
     colorRT = dev.getRenderTarget(RenderTargetDesc.offscreen(WIN_W, WIN_H));
@@ -119,7 +141,7 @@ public class Main {
     // -- compose pipeline (matches built-in vlTexture vertex layout) -------
     VertexLayout vlCompose = VertexLayout.bake(
         new VertexLayout.Attr(3, VertexAttributeType.FLOAT32, false), // pos
-        new VertexLayout.Attr(4, VertexAttributeType.FLOAT16, false), // color
+        new VertexLayout.Attr(4, VertexAttributeType.FLOAT16, false), // gradient
         new VertexLayout.Attr(2, VertexAttributeType.FLOAT32, false)  // uv
     );
 
@@ -159,25 +181,29 @@ public class Main {
       colorRT = dev.getRenderTarget(RenderTargetDesc.offscreen(e.width(), e.height()));
     });
 
-    BatchedGraphics2D g = new BatchedGraphics2D(dev);
-    long lastNanos = System.nanoTime();
+    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
     Key ML = view.snapshot().key(KeyCode.MOUSE_LEFT);
     Key MR = view.snapshot().key(KeyCode.MOUSE_RIGHT);
-    Vector2 oldCt = Vector2.ZERO;
+    Vector2[] oldCtRef = {Vector2.ZERO};
+    Vector2[] prevCamRef = {Vector2.ZERO};
 
-    while (!view.shouldClose()) {
-      String err = spCompose.checkCompilationError();
-      if (err != null) throw new GraphicsException("Compose shader error:\n" + err);
+    Snapshot[] snapRef = new Snapshot[1];
 
-      long nowNanos = System.nanoTime();
-      float dt = (nowNanos - lastNanos) / 1_000_000_000F;
-      lastNanos = nowNanos;
-      if (dt > 1F / 20F) dt = 1F / 20F;
+    Util.launch(20, () -> {
+      if (view.shouldClose()) {
+        Util.stop();
+      }
 
+      // -- tick: fixed 60 Hz logic ----------------------------------------
+      float dt = Util.delta();
       view.pollEvents();
       Snapshot snap = view.snapshot();
+      snapRef[0] = snap;
 
-      if (snap.isDown(KeyCode.ESCAPE)) break;
+      if (snap.isDown(KeyCode.ESCAPE)) {
+        Util.stop();
+        return;
+      }
       if (snap.isDown(KeyCode.X)) worldViewW = Math.min(400F, worldViewW + 40F * dt);
       if (snap.isDown(KeyCode.Z)) worldViewW = Math.max(8F, worldViewW - 40F * dt);
       if (snap.isDown(KeyCode.S)) player.ignorePlatformTemporarily();
@@ -199,9 +225,6 @@ public class Main {
       var vp = Box2D.create(0, 0, view.width(), view.height());
       var w = camera.unproject(new Vector2((float) snap.cursorX(), (float) snap.cursorY()), vp);
       var bp = new BlockPos((int) Math.floor(w.x()), (int) Math.floor(w.y()));
-
-      // flashlight: beam toward the mouse, relative to the player
-
 
       if (ML.isDown() || MR.isDown()) {
         if (ML.isDown(Modifiers.CONTROL))
@@ -236,38 +259,67 @@ public class Main {
         thrownItems.add(item);
       }
 
+      // focus drives the chunk streaming (which chunks to keep loaded)
+      var pc = player.center();
+      level.setFocus(pc.xf(), pc.yf());
+
+      // debug: hold F1 for the full-bright lightmap (isolates lightmap render cost)
+      level.lightEngine().fullBright = snap.isDown(KeyCode.F1);
+
       level.tick(dt);
-      player.tick(dt, level);
-      for (var item : thrownItems) item.tick(dt, level);
-      thrownItems.removeIf(i -> {
-        if (i.position().y() > 500) {
-          var cp = new ChunkPos(Math.floorDiv((int)Math.floor(i.position().xf()), ChunkPos.SIZE),
-                                Math.floorDiv((int)Math.floor(i.position().yf()), ChunkPos.SIZE));
-          Chunk c = level.getChunk(cp); if (c != null) c.removeEntity(i);
-          return true;
-        }
-        return false;
-      });
+      // hold Ctrl to rush the day cycle (simulation keeps real-time pace)
+      level.setTimeScale(snap.isDown(KeyCode.LEFT_CONTROL) || snap.isDown(KeyCode.RIGHT_CONTROL)
+          ? FAST_TIME_SCALE
+          : 1F);
 
       float wh = worldViewW * view.height() / view.width();
       camera.setOrthographic(worldViewW, wh);
       float cx = player.center().xf();
       float cy = player.center().yf();
 
-      camera.setCenter(oldCt);
-      oldCt = oldCt.add(new Vector2(cx, cy).subtract(oldCt).multiply(0.2F));
-      // -- light engine ----------------------------------------------------
+      prevCamRef[0] = oldCtRef[0];
+      camera.setCenter(oldCtRef[0]);
+      oldCtRef[0] = oldCtRef[0].add(new Vector2(cx, cy).subtract(oldCtRef[0]).multiply(0.2F));
+      // -- sky / light engine ----------------------------------------------
+      // sunlight is injected externally from the day phase (CelestialUtil); the
+      // engine stays time-of-day agnostic
+      Color sun = CelestialUtil.lightingSunlight(level);
+      level.lightEngine().sunlight.r(sun.red());
+      level.lightEngine().sunlight.g(sun.green());
+      level.lightEngine().sunlight.b(sun.blue());
       var camBounds = cameraBounds(camera);
       level.lightEngine().tick(camBounds);
+    }, () -> {
+      // -- draw: once per frame --------------------------------------------
+      String err = spCompose.checkCompilationError();
+      if (err != null) throw new GraphicsException("Compose shader error:\n" + err);
+
+      // camera interpolated between the previous and the current tick
+      camera.setCenter(new Vector2(
+          Util.lerp(prevCamRef[0].x(), oldCtRef[0].x(), Util.partialTicks()),
+          Util.lerp(prevCamRef[0].y(), oldCtRef[0].y(), Util.partialTicks())));
 
       // ===================================================================
-      // PASS 1a: wall layer → wallRT (full bright; tint from lightmap)
+      // PASS 0: sky → swapchain (screen space, behind everything)
       // ===================================================================
-      camera.flipY(false); // world is Y-up: render without flipping
-      g.begin(RenderPass.of(colorRT, new Color(0.05F, 0.05F, 0.08F)));
+      dev.getTransformHandler().flipY(false); // Y-up screen space, like Enchant
+      g.begin(RenderPass.of(new Color(0.05F, 0.05F, 0.08F)));
+      g.setCamera(screenCam);
+      try (Profiler.Scope _ = Profiler.scope("rendering:sky")) {
+        skyRenderer.render(g, level, WIN_W, WIN_H, (int) camera.center().y());
+      }
+      g.end();
+
+      // ===================================================================
+      // PASS 1a: wall layer → wallRT (full bright; tint from lightmap;
+      // clear transparent so the compose alpha-mix reveals the sky)
+      // ===================================================================
+      dev.getTransformHandler().flipY(false); // world is Y-up: render without flipping
+      g.begin(RenderPass.of(colorRT, new Color(0, 0, 0, 0)));
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:wall")) {
-        renderWalls(g, level, camera);
+        if (tileRenderer != null) tileRenderer.renderWalls(g, level, camera);
+        else renderWalls(g, level, camera);
       }
       g.end();
 
@@ -276,16 +328,17 @@ public class Main {
       // always have light — Enchant style)
       // ===================================================================
       level.lightEngine().generateLightmaps(g, camera);
-      camera.flipY(true);
+      dev.getTransformHandler().flipY(true);
 
       // ===================================================================
-      // PASS 2a: wall albedo × wallLightmap → screen (OPAQUE)
+      // PASS 2a: wall albedo × wallLightmap → screen (alpha mix;
+      // transparent background reveals the sky behind)
       // ===================================================================
       Camera2D orthoCam = new Camera2D(WIN_W, WIN_H, dev.getTransformHandler());
       orthoCam.setOrthographic(WIN_W, WIN_H);
       orthoCam.setCenter(new Vector2(WIN_W / 2F, WIN_H / 2F));
       try (Profiler.Scope _ = Profiler.scope("rendering:wall_compose")) {
-        g.begin(RenderPass.DEFAULT);
+        g.begin(RenderPass.NOT_CLEAR);
         g.setCamera(orthoCam);
 
         Texture wallTex = colorRT.pin();
@@ -293,7 +346,7 @@ public class Main {
         rsWall.bindUniform(0, composeUbo, 64);
         if (wallTex != null) rsWall.bindTexture(1, wallTex, lmSampler);
         rsWall.bindTexture(2, le.backLightmap().pin(), lmSampler);
-        g.setPipeline(pipeCompose, rsWall);
+        g.setPipeline(pipeAlpha, rsWall);
         g.setColor(Color.WHITE);
         g.drawTexture(wallTex, 0, 0, WIN_W, WIN_H);
         g.setPipeline(null, null);
@@ -303,23 +356,25 @@ public class Main {
       // ===================================================================
       // PASS 1b: front layer (blocks + entities) → frontRT (transparent bg)
       // ===================================================================
-      camera.flipY(false); // world is Y-up: render without flipping
+      dev.getTransformHandler().flipY(false); // world is Y-up: render without flipping
       g.begin(RenderPass.of(frontRT, new Color(0, 0, 0, 0)));
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:block")) {
-        renderBlocks(g, level, camera);
-        renderLiquids(g, level, camera);
         renderPlayer(g, player);
         for (var item : thrownItems) {
           g.setColor(new Color(1F, 0.8F, 0F));
-          g.drawRectangle(item.bounds().minX(), item.bounds().minY(), item.bounds().width(), item.bounds().height());
+          var ipos = item.renderPosition();
+          var ib = item.bounds();
+          g.drawRectangle(ipos.xf(), ipos.yf(), ib.width(), ib.height());
         }
+        if (liquidRenderer != null) liquidRenderer.render(g, level, camera);
+        else renderLiquids(g, level, camera);
+        if (tileRenderer != null) tileRenderer.render(g, level, camera);
+        else renderBlocks(g, level, camera);
       }
-      for (Chunk chunk : level.loadedChunks()) {
-        g.drawRectangleFrame(chunk.chunkPos.x() * 16, chunk.chunkPos.y() * 16, 16, 16);
-      }
+
       g.end();
-      camera.flipY(true);
+      dev.getTransformHandler().flipY(true);
 
       // ===================================================================
       // PASS 2b: front albedo × frontLightmap → screen (alpha mix —
@@ -337,14 +392,17 @@ public class Main {
         g.setColor(Color.WHITE);
         g.drawTexture(frontTex, 0, 0, WIN_W, WIN_H);
         g.setPipeline(null, null);
+
+        g.drawText(Literal.of("Pos=" + player.position()), 5, 5);
         g.end();
       }
 
-      dev.execute();
       dev.submit(view::present);
+      dev.execute();
+
       dev.pollEvents();
-      snap.clearFrameState();
-    }
+      snapRef[0].clearFrameState();
+    });
 
     g.close();
     pipeCompose.close();
@@ -399,6 +457,10 @@ public class Main {
   }
 
   private static void renderLiquids(BatchedGraphics2D g, Level level, Camera2D cam) {
+    // the tile renderer leaves the batch in the textured pipeline; the
+    // liquid quads below are plain colored vertices (20 B) and must
+    // switch back to the gradient primitive (flushes the pending batch)
+    g.setPrimitive(Primitive2D.COLOR_TRIANGLE_INDEXED);
     var cp = cam.center();
     float vw = cam.width() / cam.zoom();
     float vh = cam.height() / cam.zoom();
@@ -419,14 +481,11 @@ public class Main {
             if (isFalling(level, wx, wy)) {
               // centered rectangle, width scaled by the level (0..1)
               float half = (float) lv / FluidEngine.FULL / 2F;
-              int base = g.vertexCount();
               g.putPosColor(wx + 0.5F - half, wy + 0.5F - half, 0, packed);
               g.putPosColor(wx + 0.5F + half, wy + 0.5F - half, 0, packed);
               g.putPosColor(wx + 0.5F + half, wy + 0.5F + half, 0, packed);
               g.putPosColor(wx + 0.5F - half, wy + 0.5F + half, 0, packed);
-              g.putQuadIndices(base);
-              g.addVertex(4);
-              g.addIndex(6);
+              g.endQuad();
               continue;
             }
             // Y-up: liquid fills the tile from the bottom up; the surface
@@ -434,14 +493,11 @@ public class Main {
             float surf = wy + Math.min(lv, FluidEngine.FULL) / (float) FluidEngine.FULL;
             float topL = (surf + surfaceOf(level, wx - 1, wy, liq, surf)) / 2F;
             float topR = (surf + surfaceOf(level, wx + 1, wy, liq, surf)) / 2F;
-            int base = g.vertexCount();
             g.putPosColor(wx, topL, 0, packed);
             g.putPosColor(wx + 1, topR, 0, packed);
             g.putPosColor(wx + 1, wy, 0, packed);
             g.putPosColor(wx, wy, 0, packed);
-            g.putQuadIndices(base);
-            g.addVertex(4);
-            g.addIndex(6);
+            g.endQuad();
           }
       }
   }
@@ -481,8 +537,9 @@ public class Main {
 
   private static void renderPlayer(BatchedGraphics2D g, Entity p) {
     g.setColor(Color.RED);
+    var rp = p.renderPosition();
     var b = p.bounds();
-    g.drawRectangle(b.minX(), b.minY(), b.width(), b.height());
+    g.drawRectangle(rp.xf(), rp.yf(), b.width(), b.height());
   }
 
   private static Color blockColor(BlockState s) {

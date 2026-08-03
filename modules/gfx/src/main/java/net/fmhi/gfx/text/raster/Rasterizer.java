@@ -25,12 +25,12 @@
 package net.fmhi.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
+import net.fmhi.gfx.brush.tint.Gradient;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.FontMetrics;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.text.harfbuzz.HarfbuzzShaper;
 import net.fmhi.math.Box2D;
-import net.fmhi.math.Color;
 
 import java.util.*;
 
@@ -205,7 +205,7 @@ public final class Rasterizer {
     float runY = 0;
     float runW = 0;
     int runFlags = 0;
-    Color runColor = null;
+    Gradient runGrad = null;
     float runThicknessU = 0;
     float runOffsetU = 0;
     float runThicknessS = 0;
@@ -216,7 +216,7 @@ public final class Rasterizer {
         // Zero-advance glyphs are control chars. Always break the run.
         if (lg.w() <= 0) {
           if (inRun) {
-            flushStroke(result, runFlags, runColor, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
+            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
                 runOffsetS, flipY);
             inRun = false;
           }
@@ -229,7 +229,7 @@ public final class Rasterizer {
 
         if (!wantsDecoration) {
           if (inRun) {
-            flushStroke(result, runFlags, runColor, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
+            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
                 runOffsetS, flipY);
             inRun = false;
           }
@@ -237,7 +237,7 @@ public final class Rasterizer {
         }
 
         float baseline = lg.y();
-        Color color = lit.format().color();
+        Gradient gradient = lit.format().gradient();
         float fs = lit.format().fontSize();
         FontMetrics m = lit.format().font().metrics();
         float thicknessU = Math.abs(m.underlineThickness()) * fs;
@@ -246,13 +246,13 @@ public final class Rasterizer {
         float thicknessS = thicknessU;
         float offsetS = fs * 0.33F;
 
-        boolean sameRun = inRun && flags == runFlags && color.equals(runColor) && Math.abs(baseline - runY) < 0.5F;
+        boolean sameRun = inRun && flags == runFlags && gradient.equals(runGrad) && Math.abs(baseline - runY) < 0.5F;
 
         if (sameRun) {
           runW += lg.w();
         } else {
           if (inRun) {
-            flushStroke(result, runFlags, runColor, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
+            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
                 runOffsetS, flipY);
           }
           inRun = true;
@@ -260,7 +260,7 @@ public final class Rasterizer {
           runY = baseline;
           runW = lg.w();
           runFlags = flags;
-          runColor = color;
+          runGrad = gradient;
           runThicknessU = thicknessU;
           runOffsetU = offsetU;
           runThicknessS = thicknessS;
@@ -270,23 +270,23 @@ public final class Rasterizer {
     }
 
     if (inRun) {
-      flushStroke(result, runFlags, runColor, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS, runOffsetS,
+      flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS, runOffsetS,
           flipY);
     }
 
     return result;
   }
 
-  private static void flushStroke(List<Raster.Stroke> out, int flags, Color color, float x, float baseline,
+  private static void flushStroke(List<Raster.Stroke> out, int flags, Gradient gradient, float x, float baseline,
                                   float width, float thicknessU, float offsetU, float thicknessS, float offsetS,
                                   boolean flipY) {
     if ((flags & Font.UNDERLINE) != 0) {
       float uy = flipY ? baseline - offsetU : baseline + offsetU;
-      out.add(new Raster.Stroke(Box2D.create(x, uy, width, thicknessU), color));
+      out.add(new Raster.Stroke(Box2D.create(x, uy, width, thicknessU), gradient));
     }
     if ((flags & Font.STRIKETHROUGH) != 0) {
       float sy = flipY ? baseline - offsetS : baseline + offsetS;
-      out.add(new Raster.Stroke(Box2D.create(x, sy, width, thicknessS), color));
+      out.add(new Raster.Stroke(Box2D.create(x, sy, width, thicknessS), gradient));
     }
   }
 
@@ -439,7 +439,7 @@ public final class Rasterizer {
         Box2D vb = Box2D.create(gb.gx(), gb.gy(), gb.gw(), gb.gh());
         // charIndex: absolute index in mergedText
         int absCharIndex = run.textStart() + lg.start();
-        entries.add(new Raster.Entry(g, lit.format().color(), vb, lg.scale(), lit.meta(), absCharIndex));
+        entries.add(new Raster.Entry(g, lit.format().gradient(), vb, lg.scale(), lit.meta(), absCharIndex));
       }
     }
 
@@ -561,13 +561,12 @@ public final class Rasterizer {
         relStart = Math.max(0, Math.min(relStart, lineText.length()));
         relEnd = Math.max(relStart, Math.min(relEnd, lineText.length()));
 
-        lineGlyphs[lineGlyphCount++] = new LayoutGlyph(relStart, relEnd, lineCursor,        // x = pure pen cursor,
-            // no xOffset
+        lineGlyphs[lineGlyphCount++] = new LayoutGlyph(relStart, relEnd, lineCursor,
             baseline,          // y = pen-space baseline
             adv,               // w = pixel advance
             sg.xOffset() * fs, // xOffset pixels (render only)
             sg.yOffset() * fs, // yOffset pixels (render only)
-            fs, scale, sg.glyphId(), lit.format().color(), sg.ownerIndex());
+            fs, scale, sg.glyphId(), lit.format().gradient(), sg.ownerIndex());
         lineCursor += adv;
       }
       if (lineGlyphCount < lineGlyphs.length) {

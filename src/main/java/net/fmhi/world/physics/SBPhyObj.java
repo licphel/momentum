@@ -12,6 +12,7 @@ import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
+import net.fmhi.util.Util;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
@@ -32,6 +33,9 @@ public abstract class SBPhyObj {
   // -- state -------------------------------------------------------------
 
   protected PrecisePos position = PrecisePos.ZERO;
+  /** The position at the start of the last tick, for render-time
+   * interpolation ({@link #renderPosition()}). */
+  protected PrecisePos prevPosition = PrecisePos.ZERO;
   protected Vector2 velocity = Vector2.ZERO;
   protected boolean onGround;
   private boolean wasOnGround;
@@ -88,6 +92,18 @@ public abstract class SBPhyObj {
   public void setPosition(PrecisePos pos) {
     this.position = pos;
   }
+
+  /**
+   * The position interpolated between the previous and the current tick
+   * by {@link Util#partialTicks()}, for smooth rendering when the logic
+   * ticks slower than the frame rate (e.g. 20 TPS).
+   */
+  public PrecisePos renderPosition() {
+    float t = Util.partialTicks();
+    return new PrecisePos(
+        Util.lerp(prevPosition.xf(), position.xf(), t),
+        Util.lerp(prevPosition.yf(), position.yf(), t));
+  }
   public Vector2 velocity() { return velocity; }
   public void setVelocity(Vector2 v) { this.velocity = v; }
   public void setVelocity(float vx, float vy) { this.velocity = new Vector2(vx, vy); }
@@ -134,6 +150,7 @@ public abstract class SBPhyObj {
 
   public void tick(double dt, Level level) {
     float d = (float) dt;
+    prevPosition = position;
     wasOnGround = onGround;
 
     if (Math.abs(velocity.x()) > MAX_SPEED) {
@@ -176,14 +193,16 @@ public abstract class SBPhyObj {
     Box2D dest = origin;
     boolean stepped = false;
 
-    if (collisionEnabled && dx != 0F) {
+    if (collisionEnabled && dx0 != 0F) {
       dx = clipX(dx, dest, level);
 
-      // Terraria-style step-up: when a horizontal move is blocked while
-      // standing, step onto a climbable tile (slope, platform) in front,
-      // raising the body exactly onto its surface — but never onto a
-      // solid wall, never higher than stepHeight, and only with head room
-      if (onGround && Math.abs(dx - dx0) > TOLERANCE) {
+      // Terraria-style step-up: while on the ground, any horizontal move
+      // tries to step onto a climbable tile (slope outline, platform) in
+      // front, raising the body exactly onto its surface — but never onto
+      // a solid wall (CUBE), never higher than stepHeight, and only with
+      // head room. Platforms do not clip X, so the attempt must not wait
+      // for a blocked move.
+      if (onGround) {
         float rise = stepRise(dest, dx0, level);
         if (rise > 0F && rise <= stepHeight) {
           Box2D raised = dest.translate(0F, rise);
@@ -237,6 +256,43 @@ public abstract class SBPhyObj {
       float keep = 1F - groundFriction * d;
       velocity = new Vector2(velocity.x() * keep, velocity.y());
     }
+
+    // step-down: follow a slope surface below the feet, so walking
+    // downhill does not leave the slope and float off its edge
+    stepDown(level);
+  }
+
+  /**
+   * Pulls the feet onto a slope outline below them (walking downhill).
+   * Platforms are dropped through normally; solid tiles are handled by
+   * the fall clip.
+   */
+  private void stepDown(Level level) {
+    if (velocity.y() > 0F || fallThroughSustain > 0) return; // rising / dropping through
+    Box2D dest = bounds();
+    int minBX = (int) Math.floor(dest.minX());
+    int maxBX = (int) Math.floor(dest.maxX());
+    int footRow = (int) Math.floor(dest.minY() - TOLERANCE);
+    // solid ground under the body's center: no slope can pull the body
+    // down (a staircase below the floor must not yank the player through
+    // it). Only the center column counts — the body spans two tiles when
+    // crossing a slope, and the flat tile must not cancel the step
+    int centerCol = (int) Math.floor(dest.centralX());
+    if (voxelShape(centerCol, footRow, level) == VoxelClip.CUBE) return;
+    float best = Float.NaN;
+    for (int bx = minBX; bx <= maxBX; bx++) {
+      VoxelClip v = voxelShape(bx, footRow, level);
+      if (v == VoxelClip.EMPTY || v == VoxelClip.CUBE || v instanceof VoxelPlatform) continue;
+      float top = v.topAt(Math.max(dest.minX(), bx), Math.min(dest.maxX(), bx + 1F), bx, footRow);
+      if (Float.isNaN(top) || top >= dest.minY()) continue; // at or above the feet
+      best = Float.isNaN(best) ? top : Math.max(best, top);
+    }
+    if (Float.isNaN(best)) return;
+    float drop = dest.minY() - best;
+    if (drop <= 0F || drop > stepHeight) return;
+    position = new PrecisePos(position.xf(), best);
+    velocity = new Vector2(velocity.x(), 0F);
+    onGround = true;
   }
 
   // -- step-up ------------------------------------------------------------
@@ -255,29 +311,49 @@ public abstract class SBPhyObj {
     int col = dir > 0
         ? (int) Math.floor(dest.maxX() + dx0)
         : (int) Math.floor(dest.minX() + dx0);
-    int footRow = (int) Math.floor(dest.minY());
+    // the row containing the feet: subtract a hair so feet exactly on a
+    // tile top (e.g. standing on the ground) count for the tile below
+    int footRow = (int) Math.floor(dest.minY() - TOLERANCE);
 
     // Terraria flag7: the tile just above the feet must be climbable,
-    // never a solid wall
-    VoxelClip step = voxelShape(col, footRow + 1, level);
-    if (step == VoxelClip.EMPTY || step == VoxelClip.CUBE) return 0F;
+    // never a solid wall. When the body is already inside a staircase
+    // tile (a slope outline), its own higher steps take over.
+    int stepRow = footRow + 1;
+    int stepCol = col;
+    VoxelClip step = voxelShape(stepCol, stepRow, level);
+    if (step == VoxelClip.EMPTY || step == VoxelClip.CUBE) {
+      step = voxelShape(stepCol, footRow, level);
+      stepRow = footRow;
+      if (step == VoxelClip.EMPTY || step == VoxelClip.CUBE) {
+        // the leading edge is already over the flat ground while the body
+        // is still on the slope behind it: measure that slope tile (its
+        // surface clamps to the tile edge, i.e. the top of the slope)
+        stepCol = col - dir;
+        step = voxelShape(stepCol, footRow, level);
+        stepRow = footRow;
+        if (step == VoxelClip.EMPTY || step == VoxelClip.CUBE) return 0F;
+      }
+    }
 
-    float x0 = dir > 0 ? dest.minX() : dest.minX() + dx0;
-    float x1 = dir > 0 ? dest.maxX() + dx0 : dest.maxX();
-    float top = step.topAt(x0, x1, col, footRow + 1);
+    // measure the step at the body's leading edge: the surface ahead of
+    // the movement, so a downhill slope never lifts the body back up
+    float leadX = dir > 0 ? dest.maxX() + dx0 : dest.minX() + dx0;
+    float top = step.surfaceAt(leadX, stepCol, stepRow);
     if (Float.isNaN(top)) return 0F;
     float rise = top - dest.minY();
     if (rise <= 0F || rise > stepHeight) return 0F;
 
-    // head room: every tile the raised body would newly occupy, across all
-    // its columns, must be clear — except the step tile itself
+    // head room: every tile the raised body would occupy above the step
+    // must be clear of solid blocks (a ceiling overhead must not push the
+    // body back down and jitter). Platforms are passable, so a platform
+    // ledge ahead never blocks the step
     int minCol = (int) Math.floor(dir > 0 ? dest.minX() + dx0 : dest.minX());
     int maxCol = (int) Math.floor(dir > 0 ? dest.maxX() + dx0 : dest.maxX());
     int headRow = (int) Math.floor(dest.maxY() + rise);
     for (int c = minCol; c <= maxCol; c++) {
-      for (int r = footRow + 1; r <= headRow; r++) {
-        if (c == col && r == footRow + 1) continue; // the step tile itself
-        if (voxelShape(c, r, level) != VoxelClip.EMPTY) return 0F;
+      for (int r = stepRow + 1; r <= headRow; r++) {
+        VoxelClip v = voxelShape(c, r, level);
+        if (v != VoxelClip.EMPTY && !(v instanceof VoxelPlatform)) return 0F;
       }
     }
     return rise;

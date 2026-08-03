@@ -27,47 +27,59 @@ package net.fmhi.fml.registry;
 import net.fmhi.fml.Identifier;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
- * A holder for a lazily-registered value.
+ * A stable reference to a registered value, also serving as a
+ * {@link Supplier} of that value.
  *
- * <p>Created by {@link DeferredRegister#register(String, Supplier)} during
- * mod construction. The value is not available until the registration phase
- * completes. Calling {@link #get()} before registration throws
- * {@link IllegalStateException}.
- *
- * <p>Registry objects are typed suppliers: they can be used anywhere a
- * {@link Supplier} is expected.
+ * <p>Direct registries ({@link DirectRegistry}) create the holder with the
+ * value already resolved; deferred registries ({@link IndirectRegistry})
+ * resolve it when the registry is frozen. Reading an unresolved holder
+ * fails, so callers must not read a deferred holder before its registry is
+ * frozen. Safe for concurrent use once the value is resolved.
  *
  * @param <T> the type of the registered value
  */
 public class Holder<T> implements Supplier<T> {
   private final Identifier id;
-  private @Nullable T value;
-  private boolean present;
+  private volatile @Nullable T value;
 
   /**
-   * Creates a holder reference.
+   * Creates a holder with the value already resolved.
    *
-   * @param id holder id
+   * @param id    the identifier the value is registered under
+   * @param value the registered value
    */
+
+  public Holder(Identifier id, @Nullable T value) {
+    this.id = id;
+    this.value = value;
+  }
+
+  /**
+   * Creates an unresolved holder; {@link #resolve(Object)} must be called
+   * before the value is read.
+   *
+   * @param id the identifier the value is registered under
+   */
+
   public Holder(Identifier id) {
     this.id = id;
   }
 
   /**
-   * Resolves the held value.
+   * Makes the given value available to readers of this holder.
    *
-   * @param value value to set
+   * @param value the value to store
    */
   public void resolve(T value) {
     this.value = value;
-    this.present = true;
   }
 
   /**
-   * Returns the identifier this object will be (or was) registered under.
+   * Returns the identifier this holder's value is registered under.
    *
    * @return the identifier
    */
@@ -79,23 +91,11 @@ public class Holder<T> implements Supplier<T> {
    * Returns the registered value.
    *
    * @return the value
-   * @throws IllegalStateException if registration has not completed
+   * @throws NullPointerException if the value has not been resolved yet
    */
   @Override
   public T get() {
-    if (!present || value == null) {
-      throw new IllegalStateException("Holder not yet registered: " + id);
-    }
-    return value;
-  }
-
-  /**
-   * Returns whether the value has been registered.
-   *
-   * @return {@code true} if the value is available
-   */
-  public boolean isPresent() {
-    return present;
+    return Objects.requireNonNull(value);
   }
 
   @Override

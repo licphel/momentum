@@ -25,12 +25,7 @@
 package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.pipe.*;
-import net.fmhi.gfx.shader.VertexAttributeType;
-import net.fmhi.gfx.shader.VertexLayout;
 import net.fmhi.util.InternalApi;
-
-import java.util.LinkedHashMap;
-import java.util.Map;
 
 import static org.lwjgl.opengl.GL33.*;
 
@@ -43,32 +38,17 @@ import static org.lwjgl.opengl.GL33.*;
  * bound via {@code glUseProgram}.
  *
  * <p><b>VAO caching:</b> OpenGL VAOs record buffer bindings at setup time,
- * so a unique VAO is required for each (VBO, instance-VBO, IBO) triple. This class maintains a cache keyed by the
- * combined handles so that repeated draws with the same buffer triple reuse the same VAO.
+ * so a unique VAO is required for each (layout, VBO, instance-VBO, IBO) triple. The VAOs are
+ * cached device-wide in {@link OpenGLDevice}'s {@link VaoRegistry} — a per-pipeline cache
+ * would thrash on the thousands of retained chunk sections.
  *
  * <p><b>Thread safety:</b> immutable after construction. {@link #apply} and
  * {@link #acquireVao} must be called on the render thread.
  */
 @InternalApi
 public final class OpenGLPipeline implements Pipeline {
-  private static final int MAX_VAO_CACHE = 16;
-
   private final OpenGLDevice ctx;
   private final PipelineDesc desc;
-  /**
-   * LRU VAO cache keyed by {@code VaoKey}. Evicts the least recently accessed VAO when
-   * over {@value #MAX_VAO_CACHE} entries.
-   */
-  private final Map<VaoKey, Integer> vaoCache = new LinkedHashMap<>(MAX_VAO_CACHE, 0.75F, true) {
-    @Override
-    protected boolean removeEldestEntry(Map.Entry<VaoKey, Integer> eldest) {
-      if (size() > MAX_VAO_CACHE) {
-        glDeleteVertexArrays(eldest.getValue());
-        return true;
-      }
-      return false;
-    }
-  };
 
   /**
    * Creates a new GL render pipeline.
@@ -125,13 +105,6 @@ public final class OpenGLPipeline implements Pipeline {
     cache.setDepthBias(r.depthBiasEnable(), r.depthBiasConstantFactor(), r.depthBiasSlopeFactor());
   }
 
-  private static boolean isIntType(VertexAttributeType type) {
-    return switch (type) {
-      case INT8, INT16, INT32, UINT8, UINT16, UINT32 -> true;
-      default -> false;
-    };
-  }
-
   /**
    * Applies all pipeline state to the GL context via the state cache.
    *
@@ -154,8 +127,10 @@ public final class OpenGLPipeline implements Pipeline {
   /**
    * Returns a configured VAO for the given buffer triple, creating one if necessary.
    *
-   * <p>Must be called on the render thread. The VAO encodes the vertex
-   * attribute pointers for the given VBO and instance VBO, using the vertex layout from the pipeline descriptor.
+   * <p>Must be called on the render thread. VAOs are cached device-wide in
+   * {@link OpenGLDevice}'s {@link VaoRegistry} and keyed by the layout and
+   * buffer handles, so retained geometry (e.g. chunk meshes) reuses its VAO
+   * across frames.
    *
    * @param vboHandle         the GL vertex buffer handle (must be non-zero)
    * @param instanceVboHandle the GL instance-data buffer handle (0 if not instanced)
@@ -164,64 +139,7 @@ public final class OpenGLPipeline implements Pipeline {
    * @return a GL VAO handle configured for this (VBO, instance-VBO, IBO) triple
    */
   public int acquireVao(int vboHandle, int instanceVboHandle, int eboHandle, int instanceBase) {
-    boolean useCache = instanceBase == 0;
-    VaoKey key = new VaoKey(vboHandle, instanceVboHandle, eboHandle);
-    if (useCache) {
-      Integer cached = vaoCache.get(key);
-      if (cached != null) {
-        return cached;
-      }
-    }
-
-    int vao = glGenVertexArrays();
-    ctx.cache.bindVao(vao);
-
-    VertexLayout layout = desc.vertexLayout();
-    int instanceByteOffset = instanceBase * layout.instanceStride;
-
-    // Set up per-instance attributes (from instance VBO, divisor > 0)
-    if (instanceVboHandle != 0 && layout.instanceStride > 0) {
-      ctx.cache.bindBufferForce(GL_ARRAY_BUFFER, instanceVboHandle);
-      for (VertexLayout.Attr attr : layout.attrs) {
-        if (attr.divisor() > 0) {
-          glEnableVertexAttribArray(attr.location());
-          int glType = OpenGLUtils.vertexAttribType(attr.type());
-          if (isIntType(attr.type()) && !attr.normalized()) {
-            glVertexAttribIPointer(attr.location(), attr.components(), glType, layout.instanceStride,
-                attr.offset() + instanceByteOffset);
-          } else {
-            glVertexAttribPointer(attr.location(), attr.components(), glType, attr.normalized(), layout.instanceStride,
-                attr.offset() + instanceByteOffset);
-          }
-          glVertexAttribDivisor(attr.location(), attr.divisor());
-        }
-      }
-    }
-
-    // Set up per-vertex attributes (from main VBO, divisor = 0)
-    ctx.cache.bindBufferForce(GL_ARRAY_BUFFER, vboHandle);
-    for (VertexLayout.Attr attr : layout.attrs) {
-      if (attr.divisor() == 0) {
-        glEnableVertexAttribArray(attr.location());
-        int glType = OpenGLUtils.vertexAttribType(attr.type());
-        if (isIntType(attr.type()) && !attr.normalized()) {
-          glVertexAttribIPointer(attr.location(), attr.components(), glType, layout.stride, attr.offset());
-        } else {
-          glVertexAttribPointer(attr.location(), attr.components(), glType, attr.normalized(), layout.stride,
-              attr.offset());
-        }
-      }
-    }
-
-    if (eboHandle != 0) {
-      ctx.cache.bindBufferForce(GL_ELEMENT_ARRAY_BUFFER, eboHandle);
-    }
-
-    ctx.cache.bindVao(0);
-    if (useCache) {
-      vaoCache.put(key, vao);
-    }
-    return vao;
+    return ctx.vaos.acquire(desc.vertexLayout(), vboHandle, instanceVboHandle, eboHandle, instanceBase);
   }
 
   @Override
@@ -230,23 +148,10 @@ public final class OpenGLPipeline implements Pipeline {
   }
 
   /**
-   * Releases all cached VAOs.
-   *
-   * <p>Must be called on the render thread (via {@link OpenGLDevice#submit}).
+   * No-op: cached VAOs are owned by the device-wide {@link VaoRegistry} and
+   * released when their buffers are destroyed or the device closes.
    */
   @Override
   public void close() {
-    ctx.submit(() -> {
-      for (int vao : vaoCache.values()) {
-        glDeleteVertexArrays(vao);
-      }
-      vaoCache.clear();
-    });
-  }
-
-  /**
-   * Key for the VAO cache combining vertex, instance, and index buffer handles.
-   */
-  private record VaoKey(int vbo, int instanceVbo, int ebo) {
   }
 }
