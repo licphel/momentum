@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.network.*;
 import net.fmhi.network.packet.Packet;
 import net.fmhi.network.packet.PacketRegistry;
@@ -172,12 +172,12 @@ public class TestNetwork {
     }
 
     @Override
-    public void read(Buf buf) {
+    public void read(CursorBuffer buf) {
       message = buf.readUTF8();
     }
 
     @Override
-    public void write(Buf buf) {
+    public void write(CursorBuffer buf) {
       buf.writeUTF8(message);
     }
 

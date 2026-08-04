@@ -34,7 +34,7 @@ import net.fmhi.world.block.BlockState;
 import net.fmhi.world.block.Shape;
 import net.fmhi.world.item.Item;
 import net.fmhi.world.light.Beam;
-import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.light.Channel;
 import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
@@ -94,29 +94,37 @@ public final class Registries {
 
   /** A wall block that emits warm torchlight. */
   public static final Block WALL = registerBlock("wall", new Block() {
-    @Override public boolean getLight(BlockState state, LightBuffer buf) {
-      buf.r(1.0F); buf.g(0.7F); buf.b(0.3F); return true;
+    @Override public float emitAmbient(BlockState state, int x, int y, byte channel) {
+      return switch (channel) {
+        case Channel.RED -> 1.0F;
+        case Channel.GREEN -> 0.7F;
+        default -> 0.3F;
+      };
     }
   });
 
-  /** A pole that emits cool blue light. */
+  /** A pole that emits cool blue light and three rotating beams. */
   public static final Block COLORFUL = registerBlock("pole", new Block() {
-    @Override public boolean getLight(BlockState state, LightBuffer buf) {
+    @Override public float emitAmbient(BlockState state, int x, int y, byte channel) {
       double fm = System.currentTimeMillis();
-      buf.r((float) Math.sin(fm / 1000.0) * 0.25F + 0.5F);
-      buf.g((float) Math.sin(fm / 1000.0 + 1) * 0.25F + 0.5F);
-      buf.b((float) Math.sin(fm / 1000.0 + 2) * 0.25F + 0.5F);
-      return true;
+      return switch (channel) {
+        case Channel.RED -> (float) Math.sin(fm / 1000.0) * 0.25F + 0.5F;
+        case Channel.GREEN -> (float) Math.sin(fm / 1000.0 + 1) * 0.25F + 0.5F;
+        default -> (float) Math.sin(fm / 1000.0 + 2) * 0.25F + 0.5F;
+      };
     }
 
     @Override
-    public Beam[] getBeam(BlockState state) {
+    public java.util.Collection<Beam> emitBeams(BlockState state, int x, int y) {
       float f = (float) (System.currentTimeMillis() % 1000000) / 1000.0F;
-      return new Beam[]{
-          new Beam(1, 0.2F, 0.2F, (float) -Math.PI / 2 + f, 0.5F, 0.0F, 15.0F, 1.0F),
-          new Beam(0.2f, 1F, 0.2F, (float) -Math.PI / 2 + 2 + f * 2, 0.5F, 0.0F, 15.0F, 1.0F),
-          new Beam(0.2f, 0.2F, 1F, (float) -Math.PI / 2 + 0.3F + f * 3, 0.5F, 0.0F, 15.0F, 1.0F),
-      };
+      return List.of(
+          Beam.pooled().set(x + 0.5F, y + 0.5F, 1, 0.2F, 0.2F,
+              (float) -Math.PI / 2 + f, 0.5F, 0.0F, 15.0F, 2.0F),
+          Beam.pooled().set(x + 0.5F, y + 0.5F, 0.2F, 1F, 0.2F,
+              (float) -Math.PI / 2 + 2 + f * 2, 0.5F, 0.0F, 15.0F, 2.0F),
+          Beam.pooled().set(x + 0.5F, y + 0.5F, 0.2F, 0.2F, 1F,
+              (float) -Math.PI / 2 + 0.3F + f * 3, 0.5F, 0.0F, 15.0F, 2.0F)
+      );
     }
   });
 

@@ -66,7 +66,7 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
    * @param data   the staging area receiving vertices and indices
    * @param device the GPU device
    */
-  public MeshGraphics2D(VertexData data, Device device) {
+  public MeshGraphics2D(VertexStore data, Device device) {
     super(data, device);
   }
 
@@ -78,11 +78,11 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
    */
   @Override
   public void flush(boolean force) {
-    if (data.vertexCount() <= 0 && data.indexCount() <= 0) {
+    if (!force && data.vertexCount() <= 0 && data.indexCount() <= 0) {
       return;
     }
-    byte[] vertices = data.vertices().copiedArray();
-    byte[] indices = data.indices().copiedArray();
+    byte[] vertices = data.recordVertices();
+    byte[] indices = data.recordIndices();
     data.clear();
     drafts.add(new SectionDraft(vertices, indices,
         currentPrimitive, currentTexture, sampler == null ? defSampler : sampler,
@@ -96,6 +96,7 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
    */
   @Override
   public void begin(RenderPass pass) {
+    drafts.clear();
   }
 
   /**
@@ -104,7 +105,6 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
   @Override
   public void end() {
     flush(true);
-    drafts.clear();
   }
 
   /**

@@ -39,7 +39,6 @@ import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
 import net.fmhi.math.Box2D;
-import net.fmhi.math.Matrix4x4;
 import net.fmhi.util.ResourceProvider;
 
 /**
@@ -76,7 +75,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
    * @param data   the staging area receiving vertices and indices
    * @param device the GPU device
    */
-  public BatchedGraphics2D(VertexData data, Device device) {
+  public BatchedGraphics2D(VertexStore data, Device device) {
     super(data, device.getTransformHandler());
 
     ResourceProvider rp = ResourceProvider.classpath(BatchedGraphics2D.class);
@@ -134,7 +133,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
       return;
     }
 
-    mesh.uploadVP(camera.viewProjectionMatrix());
+    MatrixUtil.writeViewProjection(camera.viewProjectionMatrix(), mesh.ubo());
 
     encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),
         (int) viewport.width(), (int) viewport.height());
@@ -154,7 +153,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
    */
   @Override
   public void flush(boolean force) {
-    if (!force && data.vertices().writerIndex() == 0) {
+    if (!force && data.vertices().readableBytes() == 0) {
       return;
     }
     submitBatch();
@@ -203,16 +202,6 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   }
 
   /**
-   * Sets the view-projection matrix, uploading it to the uniform buffer.
-   *
-   * @param vpm the view-projection matrix
-   */
-  @Override
-  public void setViewProjection(Matrix4x4 vpm) {
-    uploadVP(vpm);
-  }
-
-  /**
    * Uploads the recorded vertex and index data and issues a draw with the current render
    * state.
    *
@@ -225,21 +214,18 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
 
     int vc = data.vertexCount();
     int ic = data.indexCount();
-
     int vr = data.vertices().readerIndex();
     int vw = data.vertices().writerIndex();
     int ir = data.indices().readerIndex();
     int iw = data.indices().writerIndex();
-    byte[] rawV = data.vertices().backingArray();
-    byte[] rawI = data.indices().backingArray();
+    byte[] rawV = data.recordVertices();
+    byte[] rawI = data.recordIndices();
 
-    if (rawV == null || rawI == null) {
-      throw new NullPointerException("Vertex buf or index buf has no backing array. Heap buf expected");
-    }
-
+    // This won't actually clear array data
+    // we've set volatile = true.
     data.clear();
 
-    uploadVP(camera.viewProjectionMatrix());
+    MatrixUtil.writeViewProjection(camera.viewProjectionMatrix(), ubo);
     vbo.submit(rawV, vr, vw - vr);
     if (ic > 0 && currentPrimitive.isIndexed()) {
       ibo.submit(rawI, ir, iw - ir);
@@ -322,19 +308,5 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     pipeColor.close();
     pipeTexture.close();
     defSampler.close();
-  }
-
-  private void uploadVP(Matrix4x4 vpm) {
-    float[] m = vpm.toFloatArray();
-    byte[] bytes = new byte[64];
-    for (int i = 0; i < 16; i++) {
-      int bits = Float.floatToRawIntBits(m[i]);
-      int off = i * 4;
-      bytes[off] = (byte) bits;
-      bytes[off + 1] = (byte) (bits >> 8);
-      bytes[off + 2] = (byte) (bits >> 16);
-      bytes[off + 3] = (byte) (bits >> 24);
-    }
-    ubo.submit(bytes, 0, bytes.length);
   }
 }

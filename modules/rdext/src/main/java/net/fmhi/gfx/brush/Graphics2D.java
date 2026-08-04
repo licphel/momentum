@@ -57,7 +57,7 @@ public abstract class Graphics2D extends VertexBuilder2D implements AutoCloseabl
    * @param data              the staging area receiving vertices and indices
    * @param transformHandler  the backend-specific transform handler
    */
-  public Graphics2D(VertexData data, TransformHandler transformHandler) {
+  public Graphics2D(VertexStore data, TransformHandler transformHandler) {
     super(data, transformHandler);
   }
 
@@ -194,13 +194,6 @@ public abstract class Graphics2D extends VertexBuilder2D implements AutoCloseabl
    * @return the active resource set, or {@code null}
    */
   public abstract @Nullable ResourceSet currentResourceSet();
-
-  /**
-   * Sets the view-projection matrix, flushing pending draws first.
-   *
-   * @param vpm the view-projection matrix
-   */
-  public abstract void setViewProjection(Matrix4x4 vpm);
 
   /**
    * Releases any GPU resources held by this graphics context.

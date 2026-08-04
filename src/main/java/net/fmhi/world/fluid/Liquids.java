@@ -3,7 +3,7 @@ package net.fmhi.world.fluid;
 import net.fmhi.Registries;
 import net.fmhi.math.Color;
 import net.fmhi.world.level.Level;
-import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.light.Channel;
 import net.fmhi.world.util.BlockPos;
 import org.jspecify.annotations.NullMarked;
 
@@ -80,11 +80,12 @@ public final class Liquids {
     }
 
     @Override
-    public boolean getLight(LightBuffer buf) {
-      buf.r(0.99F);
-      buf.g(0.5F);
-      buf.b(0.5F);
-      return true;
+    public float emitAmbient(int x, int y, int amount, byte channel) {
+      return switch (channel) {
+        case Channel.RED -> 0.99F;
+        case Channel.GREEN -> 0.5F;
+        default -> 0.5F;
+      };
     }
 
     @Override

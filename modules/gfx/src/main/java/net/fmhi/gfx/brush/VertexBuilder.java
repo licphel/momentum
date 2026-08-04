@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.brush;
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.gfx.brush.tint.Gradient;
 import net.fmhi.gfx.brush.tint.SimpleGradient;
 import net.fmhi.gfx.math.TransformHandler;
@@ -40,12 +40,12 @@ import net.fmhi.math.MatrixStack;
  * vertex and index counts. Not thread-safe; each instance must be confined to a single thread.
  */
 public class VertexBuilder {
-  protected static final ThreadLocal<float[]> TCACHE = ThreadLocal.withInitial(() -> new float[3]);
+  protected final float[] trCache = new float[3];
   protected final TransformHandler transformHandler;
   protected final MatrixStack matrixStack = new MatrixStack();
   protected Gradient gradient = new SimpleGradient(Color.WHITE.pack());
   protected int flags = 0;
-  protected VertexData data;
+  protected VertexStore data;
 
   /**
    * Creates a new {@code VertexBuilder} writing into the given staging area.
@@ -53,7 +53,7 @@ public class VertexBuilder {
    * @param data              the staging area receiving vertices and indices
    * @param transformHandler  the transform handler used for coordinate conversion
    */
-  public VertexBuilder(VertexData data, TransformHandler transformHandler) {
+  public VertexBuilder(VertexStore data, TransformHandler transformHandler) {
     this.data = data;
     this.transformHandler = transformHandler;
   }
@@ -117,7 +117,7 @@ public class VertexBuilder {
    *
    * @return the vertex data
    */
-  public VertexData data() {
+  public VertexStore data() {
     return data;
   }
 
@@ -133,8 +133,8 @@ public class VertexBuilder {
    * @param packedColor the packed gradient color
    */
   public void putPosColor(float x, float y, float z, long packedColor) {
-    Buf buf = data.vertices();
-    float[] arr = TCACHE.get();
+    CursorBuffer buf = data.vertices();
+    float[] arr = trCache;
     arr[0] = x;
     arr[1] = y;
     arr[2] = z;
@@ -159,8 +159,8 @@ public class VertexBuilder {
    * @param v           the texture V coordinate
    */
   public void putPosColorUv(float x, float y, float z, long packedColor, float u, float v) {
-    Buf buf = data.vertices();
-    float[] arr = TCACHE.get();
+    CursorBuffer buf = data.vertices();
+    float[] arr = trCache;
     arr[0] = x;
     arr[1] = y;
     arr[2] = z;
@@ -180,7 +180,7 @@ public class VertexBuilder {
    * vertices must be written before calling this method.
    */
   public void endQuad() {
-    Buf idx = data.indices();
+    CursorBuffer idx = data.indices();
     int baseVertex = data.vertexCount();
     idx.writeInt(baseVertex);
     idx.writeInt(baseVertex + 2);

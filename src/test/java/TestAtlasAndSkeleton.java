@@ -24,7 +24,7 @@
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
-import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.ZeroCopyVertexStore;
 import net.fmhi.gfx.glfw.GlfwView;
 import net.fmhi.gfx.io.ImageInfo;
 import net.fmhi.gfx.brush.BatchedGraphics2D;
@@ -67,7 +67,7 @@ public class TestAtlasAndSkeleton {
     FallbackFont.init(dev);
 
     Camera2D camera = new Camera2D(800, 450, dev.getTransformHandler());
-    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
+    BatchedGraphics2D g = new BatchedGraphics2D(new ZeroCopyVertexStore(), dev);
 
     // --- Atlas set up ---
     Random rng = new Random(SEED);

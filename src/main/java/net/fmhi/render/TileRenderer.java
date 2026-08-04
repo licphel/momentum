@@ -28,7 +28,7 @@ import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
 import net.fmhi.Registries;
 import net.fmhi.gfx.Device;
-import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.ZeroCopyVertexStore;
 import net.fmhi.gfx.math.Camera2D;
 import net.fmhi.gfx.brush.BatchedGraphics2D;
 import net.fmhi.gfx.mesh.Mesh;
@@ -43,9 +43,6 @@ import net.fmhi.world.level.Level;
 import net.fmhi.world.util.ChunkPos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
-
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * Tile renderer: block bodies from a 64x64 full-texture random sample,
@@ -97,7 +94,7 @@ public class TileRenderer {
     this.dev = dev;
     this.dirt = GlobalAtlas.get("dirt");
     this.stone = GlobalAtlas.get("stone");
-    meshG = new MeshGraphics2D(new VertexData(), dev);
+    meshG = new MeshGraphics2D(new ZeroCopyVertexStore(), dev);
   }
 
   /** Initializes the global atlas and creates the renderer. */
@@ -198,6 +195,8 @@ public class TileRenderer {
     int cs = ChunkPos.SIZE;
     g.setColor(Color.WHITE);
 
+    int k = 0;
+    int sc = 0;
     // pass 1: draw every chunk body (animated block bodies too)
     for (int cx = (int) Math.floor((cp.x() - vw / 2F) / cs); cx <= (int) Math.floor((cp.x() + vw / 2F) / cs); cx++)
       for (int cy = (int) Math.floor((cp.y() - vh / 2F) / cs); cy <= (int) Math.floor((cp.y() + vh / 2F) / cs); cy++) {
@@ -205,14 +204,18 @@ public class TileRenderer {
         Chunk ck = level.getOrLoadChunk(pos);
         ChunkMesh cm = ensureFrontMesh(level, pos);
         g.drawMesh(cm.body());
+        k++;
+        sc += cm.body().sections().size();
+
         for (int ly = 0; ly < cs; ly++)
           for (int lx = 0; lx < cs; lx++) {
             BlockState s = ck.getBlock(lx, ly);
-            if (s == null || s.block() == Registries.AIR || !s.isAnimatedRendering()) continue;
+            if (!s.isAnimatedRendering()) continue;
             Material m = materialOf(s.block());
             drawBody(g, level, cx * cs + lx, cy * cs + ly, m, isSlope(s));
           }
       }
+    System.out.println("Meshes: " + k + ", Sections: " + sc);
 
     // pass 2: all borders on top, so a neighbouring chunk's body never
     // occludes this chunk's border at chunk boundaries

@@ -26,6 +26,7 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.DeviceInfo;
+import net.fmhi.gfx.GfxStats;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
@@ -200,6 +201,7 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void submit(Runnable work) {
+    GfxStats.DCMDPT.increment();
     queue.add(work);
   }
 

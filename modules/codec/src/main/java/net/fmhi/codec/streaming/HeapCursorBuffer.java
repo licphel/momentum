@@ -29,15 +29,15 @@ import net.fmhi.util.InternalApi;
 import java.nio.ByteOrder;
 
 @InternalApi
-final class HeapBuf extends Buf {
+final class HeapCursorBuffer extends CursorBuffer {
   private byte[] data;
   private boolean bigEndian; // LE by default
 
-  public HeapBuf(int capacity) {
+  public HeapCursorBuffer(int capacity) {
     data = new byte[capacity];
   }
 
-  public HeapBuf(byte[] initial) {
+  public HeapCursorBuffer(byte[] initial) {
     data = initial;
     writerIndex = data.length;
   }
@@ -137,7 +137,7 @@ final class HeapBuf extends Buf {
   }
 
   @Override
-  public void writeBuf(Buf src, int length) {
+  public void writeBuf(CursorBuffer src, int length) {
     src.ensureReadable(length);
     ensureWritable(length);
     src.readBytes(data, writerIndex, length);
@@ -222,7 +222,7 @@ final class HeapBuf extends Buf {
   }
 
   @Override
-  public void readBuf(Buf dst, int length) {
+  public void readBuf(CursorBuffer dst, int length) {
     ensureReadable(length);
     dst.writeBytes(data, readerIndex, length);
     readerIndex += length;

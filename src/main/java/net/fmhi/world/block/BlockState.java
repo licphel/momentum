@@ -2,13 +2,15 @@ package net.fmhi.world.block;
 
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.world.light.Beam;
-import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.physics.SBPhyObj;
 import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.util.BlockPos;
 import org.jspecify.annotations.Nullable;
+
+import java.util.Collection;
+import java.util.List;
 
 /**
  * A concrete state of a block type, delegating behavior to its {@link Block}.
@@ -73,22 +75,23 @@ public final class BlockState extends BlockStateHolder {
   }
 
   /** Whether the tile lets light through (not a full {@link Shape#SOLID}). */
-  public void filterSkylight(LightBuffer l) {
-    block.filterSkylight(this, l);
+  public float filterSkylight(int x, int y, float in, byte channel) {
+    return block.filterSkylight(this, x, y, in, channel);
   }
 
   /** Filters incoming light through this state, per channel. */
-  public float filterLight(float in, byte channel) {
-    return block.filterLight(this, in, channel);
+  public float filterLight(int x, int y, float in, byte channel) {
+    return block.filterLight(this, x, y, in, channel);
   }
 
-  /** Writes light emission into {@code buf}; false if the block emits none. */
-  public boolean getLight(LightBuffer buf) {
-    return block.getLight(this, buf);
+  /** The ambient light emitted by this state on one channel, or {@code 0}. */
+  public float emitAmbient(int x, int y, byte channel) {
+    return block.emitAmbient(this, x, y, channel);
   }
 
-  /** The beams emitted by this state, or {@code null} if none. */
-  public Beam @Nullable [] getBeam() {
-    return block.getBeam(this);
+  /** The directional beams emitted by this state; the caller draws and
+   * recycles them. */
+  public Collection<Beam> emitBeams(int x, int y) {
+    return block.emitBeams(this, x, y);
   }
 }

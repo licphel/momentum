@@ -1,9 +1,10 @@
 package net.fmhi;
 
 import net.fmhi.gfx.Device;
+import net.fmhi.gfx.GfxStats;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.View;
-import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.ZeroCopyVertexStore;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.glfw.GlfwView;
@@ -47,7 +48,8 @@ import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.FlatTerrainGenerator;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.CelestialUtil;
-import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.light.Channel;
+import net.fmhi.world.light.LightMapRenderer;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
@@ -122,7 +124,7 @@ public class Main {
     List<ThrownItem> thrownItems = new ArrayList<>();
     boolean qWasDown = false;
 
-    var colorfulstate = defaultState(Registries.STONE);
+    var colorfulstate = defaultState(Registries.COLORFUL);
     var airState = defaultState(Registries.AIR);
 
     Camera2D camera = new Camera2D((float) WIN_W, (float) WIN_H, dev.getTransformHandler());
@@ -135,8 +137,9 @@ public class Main {
     colorRT = dev.getRenderTarget(RenderTargetDesc.offscreen(WIN_W, WIN_H));
     RenderTarget frontRT = dev.getRenderTarget(RenderTargetDesc.offscreen(WIN_W, WIN_H));
     var le = level.lightEngine();
-    le.initLightmaps(dev, 800, 450);
-    Sampler lmSampler = le.sampler();
+    var lightMapRenderer = new LightMapRenderer(level);
+    lightMapRenderer.init(dev, 800, 450);
+    Sampler lmSampler = lightMapRenderer.sampler();
 
     // -- compose pipeline (matches built-in vlTexture vertex layout) -------
     VertexLayout vlCompose = VertexLayout.bake(
@@ -181,7 +184,7 @@ public class Main {
       colorRT = dev.getRenderTarget(RenderTargetDesc.offscreen(e.width(), e.height()));
     });
 
-    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
+    BatchedGraphics2D g = new BatchedGraphics2D(new ZeroCopyVertexStore(true), dev);
     Key ML = view.snapshot().key(KeyCode.MOUSE_LEFT);
     Key MR = view.snapshot().key(KeyCode.MOUSE_RIGHT);
     Vector2[] oldCtRef = {Vector2.ZERO};
@@ -264,7 +267,7 @@ public class Main {
       level.setFocus(pc.xf(), pc.yf());
 
       // debug: hold F1 for the full-bright lightmap (isolates lightmap render cost)
-      level.lightEngine().fullBright = snap.isDown(KeyCode.F1);
+      lightMapRenderer.fullBright = snap.isDown(KeyCode.F1);
 
       level.tick(dt);
       // hold Ctrl to rush the day cycle (simulation keeps real-time pace)
@@ -284,9 +287,9 @@ public class Main {
       // sunlight is injected externally from the day phase (CelestialUtil); the
       // engine stays time-of-day agnostic
       Color sun = CelestialUtil.lightingSunlight(level);
-      level.lightEngine().sunlight.r(sun.red());
-      level.lightEngine().sunlight.g(sun.green());
-      level.lightEngine().sunlight.b(sun.blue());
+      level.lightEngine().sunlight[0] = sun.red();
+      level.lightEngine().sunlight[1] = sun.green();
+      level.lightEngine().sunlight[2] = sun.blue();
       var camBounds = cameraBounds(camera);
       level.lightEngine().tick(camBounds);
     }, () -> {
@@ -327,7 +330,7 @@ public class Main {
       // lightmaps (wall + front; front covers ALL tiles so entities
       // always have light — Enchant style)
       // ===================================================================
-      level.lightEngine().generateLightmaps(g, camera);
+      lightMapRenderer.render(g, camera, level.lightEngine());
       dev.getTransformHandler().flipY(true);
 
       // ===================================================================
@@ -345,7 +348,7 @@ public class Main {
         ResourceSet rsWall = dev.getResourceSet(rslCompose);
         rsWall.bindUniform(0, composeUbo, 64);
         if (wallTex != null) rsWall.bindTexture(1, wallTex, lmSampler);
-        rsWall.bindTexture(2, le.backLightmap().pin(), lmSampler);
+        rsWall.bindTexture(2, lightMapRenderer.backLightmap().pin(), lmSampler);
         g.setPipeline(pipeAlpha, rsWall);
         g.setColor(Color.WHITE);
         g.drawTexture(wallTex, 0, 0, WIN_W, WIN_H);
@@ -387,7 +390,7 @@ public class Main {
         ResourceSet rsFront = dev.getResourceSet(rslCompose);
         rsFront.bindUniform(0, composeUbo, 64);
         if (frontTex != null) rsFront.bindTexture(1, frontTex, lmSampler);
-        rsFront.bindTexture(2, le.frontLightmap().pin(), lmSampler);
+        rsFront.bindTexture(2, lightMapRenderer.frontLightmap().pin(), lmSampler);
         g.setPipeline(pipeAlpha, rsFront);
         g.setColor(Color.WHITE);
         g.drawTexture(frontTex, 0, 0, WIN_W, WIN_H);
@@ -399,6 +402,7 @@ public class Main {
 
       dev.submit(view::present);
       dev.execute();
+      GfxStats.profile();
 
       dev.pollEvents();
       snapRef[0].clearFrameState();
@@ -408,7 +412,7 @@ public class Main {
     pipeCompose.close();
     pipeAlpha.close();
     spCompose.close();
-    le.close();
+    lightMapRenderer.close();
     colorRT.close();
     frontRT.close();
     composeUbo.close();
@@ -519,20 +523,6 @@ public class Main {
     return c.getBlock(wx, wy - 1).shape() != Shape.SOLID;
   }
 
-  // -- VP upload -----------------------------------------------------------
-
-  private static void uploadVP(BufferObject ubo, net.fmhi.math.Matrix4x4 vpm) {
-    float[] m = vpm.toFloatArray();
-    byte[] b = new byte[64];
-    for (int i = 0; i < 16; i++) {
-      int bits = Float.floatToRawIntBits(m[i]);
-      int off = i * 4;
-      b[off] = (byte) bits; b[off + 1] = (byte) (bits >> 8);
-      b[off + 2] = (byte) (bits >> 16); b[off + 3] = (byte) (bits >> 24);
-    }
-    ubo.submit(b, 0, 64);
-  }
-
   // -- shared --------------------------------------------------------------
 
   private static void renderPlayer(BatchedGraphics2D g, Entity p) {
@@ -582,11 +572,12 @@ public class Main {
     }
 
     @Override
-    public boolean getLight(LightBuffer buf) {
-      buf.r(rgb[0]);
-      buf.g(rgb[1]);
-      buf.b(rgb[2]);
-      return true;
+    public float emitAmbient(byte channel) {
+      return switch (channel) {
+        case Channel.RED -> rgb[0];
+        case Channel.GREEN -> rgb[1];
+        default -> rgb[2];
+      };
     }
   }
 }

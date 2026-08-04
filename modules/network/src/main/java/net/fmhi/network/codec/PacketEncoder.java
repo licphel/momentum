@@ -27,7 +27,7 @@ package net.fmhi.network.codec;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.MessageToByteEncoder;
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.network.packet.Packet;
 import net.fmhi.network.packet.PacketRegistry;
 
@@ -72,7 +72,7 @@ public final class PacketEncoder extends MessageToByteEncoder<Packet> {
     }
     ByteBuf content = ctx.alloc().buffer();
     try {
-      Buf buf = new NettyBuf(content);
+      CursorBuffer buf = new NettyCursorBuffer(content);
       buf.writeInt(packetId);
       msg.write(buf);
       // sync Netty cursors from Buf cursors

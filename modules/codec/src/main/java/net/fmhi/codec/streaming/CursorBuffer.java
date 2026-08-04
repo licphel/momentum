@@ -54,9 +54,9 @@ import java.util.UUID;
  *
  * <p>This class is <strong>not</strong> thread-safe.
  *
- * @see HeapBuf
+ * @see HeapCursorBuffer
  */
-public abstract class Buf implements AutoCloseable {
+public abstract class CursorBuffer implements AutoCloseable {
   /** Default initial capacity: {@value} bytes. */
   public static final int DEFAULT_CAPACITY = 128;
 
@@ -68,7 +68,7 @@ public abstract class Buf implements AutoCloseable {
   /**
    * Creates a buffer with both cursors at zero.
    */
-  protected Buf() {
+  protected CursorBuffer() {
     this.readerIndex = 0;
     this.writerIndex = 0;
   }
@@ -81,8 +81,8 @@ public abstract class Buf implements AutoCloseable {
    * @param capacity initial capacity in bytes
    * @return a new heap-backed buffer
    */
-  public static Buf heap(int capacity) {
-    return new HeapBuf(capacity);
+  public static CursorBuffer heap(int capacity) {
+    return new HeapCursorBuffer(capacity);
   }
 
   /**
@@ -92,8 +92,8 @@ public abstract class Buf implements AutoCloseable {
    *
    * @return a new heap-backed buffer
    */
-  public static Buf heap() {
-    return new HeapBuf(DEFAULT_CAPACITY);
+  public static CursorBuffer heap() {
+    return new HeapCursorBuffer(DEFAULT_CAPACITY);
   }
 
   /**
@@ -107,8 +107,8 @@ public abstract class Buf implements AutoCloseable {
    * @param data the byte array to wrap
    * @return a buffer backed by the given data
    */
-  public static Buf wrap(byte[] data) {
-    return new HeapBuf(data);
+  public static CursorBuffer wrap(byte[] data) {
+    return new HeapCursorBuffer(data);
   }
 
   /**
@@ -369,7 +369,7 @@ public abstract class Buf implements AutoCloseable {
    *                                   readable bytes or this buffer has insufficient
    *                                   writable space
    */
-  public abstract void writeBuf(Buf src, int length);
+  public abstract void writeBuf(CursorBuffer src, int length);
 
   /**
    * Encodes a string using the given charset and writes it with a 4-byte
@@ -593,7 +593,7 @@ public abstract class Buf implements AutoCloseable {
    *                                   readable bytes or {@code dst} has insufficient
    *                                   writable space
    */
-  public abstract void readBuf(Buf dst, int length);
+  public abstract void readBuf(CursorBuffer dst, int length);
 
   /**
    * Reads a length-prefixed string from the current read-cursor position.

@@ -25,15 +25,18 @@
 package net.fmhi.world.entity;
 
 import net.fmhi.math.Box2D;
-import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.Beam;
-import net.fmhi.world.light.LightBuffer;
+import net.fmhi.world.light.Channel;
 import net.fmhi.world.physics.SBPhyObj;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 
 @NullMarked
 public class Entity extends SBPhyObj {
@@ -73,22 +76,26 @@ public class Entity extends SBPhyObj {
     level.getOrLoadChunk(chunkPos).addEntity(this);
   }
 
-  public boolean getLight(LightBuffer buf) { return false; }
+  /** The ambient light emitted by this entity on one channel, or {@code 0}. */
+  public float emitAmbient(byte channel) {
+    return 0F;
+  }
 
-  public Beam @Nullable [] getBeam() { return null; }
+  /** The directional beams emitted by this entity; the caller draws and
+   * recycles them. */
+  public Collection<Beam> emitBeams() {
+    return Collections.emptySet();
+  }
 
   public static Entity player(PrecisePos pos) {
     var e = new Entity(1.4F, 2.65F) {
-      @Override public Beam[] getBeam() {
-        return null;
-      }
-
       @Override
-      public boolean getLight(LightBuffer buf) {
-        buf.r(1);
-        buf.g(0.9F);
-        buf.b(0.8F);
-        return true;
+      public float emitAmbient(byte channel) {
+        return switch (channel) {
+          case Channel.RED -> 1F;
+          case Channel.GREEN -> 0.9F;
+          default -> 0.8F;
+        };
       }
     };
     e.setPosition(pos);

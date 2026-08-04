@@ -25,19 +25,19 @@
 package net.fmhi.network.codec;
 
 import io.netty.buffer.ByteBuf;
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteOrder;
 
 /**
- * A {@link Buf} that wraps a Netty {@link ByteBuf}.
+ * A {@link CursorBuffer} that wraps a Netty {@link ByteBuf}.
  *
  * <p>Read and write cursors are mapped to the Netty buffer's reader and writer indices.
  */
 @InternalApi
-final class NettyBuf extends Buf {
+final class NettyCursorBuffer extends CursorBuffer {
   private final ByteBuf buffer;
   private boolean bigEndian;
 
@@ -46,7 +46,7 @@ final class NettyBuf extends Buf {
    *
    * @param buffer the Netty buffer to wrap
    */
-  NettyBuf(ByteBuf buffer) {
+  NettyCursorBuffer(ByteBuf buffer) {
     this.buffer = buffer;
     this.bigEndian = true; // Network buffers are often big endian
     this.readerIndex = buffer.readerIndex();
@@ -166,7 +166,7 @@ final class NettyBuf extends Buf {
   }
 
   @Override
-  public void writeBuf(Buf src, int length) {
+  public void writeBuf(CursorBuffer src, int length) {
     ensureWritable(length);
     buffer.writeBytes(src.readBytes(length));
     writerIndex = buffer.writerIndex();
@@ -228,7 +228,7 @@ final class NettyBuf extends Buf {
   }
 
   @Override
-  public void readBuf(Buf dst, int length) {
+  public void readBuf(CursorBuffer dst, int length) {
     ensureReadable(length);
     dst.writeBytes(readBytes(length)); // A copy here is nearly inevitable.
     readerIndex = buffer.readerIndex();

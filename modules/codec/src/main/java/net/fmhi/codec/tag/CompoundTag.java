@@ -24,7 +24,7 @@
 
 package net.fmhi.codec.tag;
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -99,7 +99,7 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    * @return the deserialized compound
    * @throws IndexOutOfBoundsException if {@code buffer} has insufficient readable bytes
    */
-  public static CompoundTag deserialize(Buf buffer) {
+  public static CompoundTag deserialize(CursorBuffer buffer) {
     CompoundTag compound = new CompoundTag();
 
     while (true) {
@@ -126,7 +126,7 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    * @param value  the value to write, may be {@code null}
    * @throws IllegalArgumentException if the value's type is not a supported NBT type
    */
-  public static void writeValue(Buf buffer, @Nullable Object value) {
+  public static void writeValue(CursorBuffer buffer, @Nullable Object value) {
     if (value == null) {
       return;
     }
@@ -160,7 +160,7 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    * @param tagType the NBT tag type that identifies how to decode the value
    * @return the decoded value, or {@code null} if the tag carries no data
    */
-  public static @Nullable Object readValue(Buf buffer, TagMark tagType) {
+  public static @Nullable Object readValue(CursorBuffer buffer, TagMark tagType) {
     return switch (tagType) {
       case BYTE -> buffer.read();
       case BOOLEAN -> buffer.read() != 0;
@@ -727,7 +727,7 @@ public final class CompoundTag implements Iterable<Map.Entry<String, @Nullable O
    *
    * @param buffer the destination buffer
    */
-  public void serialize(Buf buffer) {
+  public void serialize(CursorBuffer buffer) {
     for (Map.Entry<String, Object> entry : map.entrySet()) {
       String key = entry.getKey();
       Object value = entry.getValue();

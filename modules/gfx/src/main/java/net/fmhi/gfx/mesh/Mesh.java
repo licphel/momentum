@@ -26,7 +26,6 @@ package net.fmhi.gfx.mesh;
 
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.cmd.Encoder;
-import net.fmhi.math.Matrix4x4;
 
 import java.util.List;
 
@@ -59,22 +58,21 @@ public final class Mesh implements AutoCloseable {
   }
 
   /**
+   * Returns the ubo of this mesh.
+   *
+   * @return the mesh ubo
+   */
+  public BufferObject ubo() {
+    return ubo;
+  }
+
+  /**
    * Returns the sections of this mesh.
    *
    * @return the list of sections
    */
   public List<Section> sections() {
     return sections;
-  }
-
-  /**
-   * Uploads a view-projection matrix to the uniform buffer.
-   *
-   * @param vpm the view-projection matrix to upload
-   */
-  public void uploadVP(Matrix4x4 vpm) {
-    byte[] bytes = Matrix4x4.pack(vpm);
-    ubo.submit(bytes, 0, bytes.length);
   }
 
   /**

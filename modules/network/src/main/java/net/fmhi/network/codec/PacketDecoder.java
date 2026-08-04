@@ -27,7 +27,7 @@ package net.fmhi.network.codec;
 import io.netty.buffer.ByteBuf;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.handler.codec.ByteToMessageDecoder;
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.network.NetworkException;
 import net.fmhi.network.packet.Packet;
 import net.fmhi.network.packet.PacketRegistry;
@@ -78,7 +78,7 @@ public final class PacketDecoder extends ByteToMessageDecoder {
     if (in.readableBytes() < 4) {
       return;
     }
-    Buf buf = new NettyBuf(in);
+    CursorBuffer buf = new NettyCursorBuffer(in);
     int packetId = buf.readInt();
     Packet packet = PacketRegistry.create(packetId);
     if (packet == null) {
@@ -102,7 +102,7 @@ public final class PacketDecoder extends ByteToMessageDecoder {
         in.resetReaderIndex();
         return;
       }
-      Buf buf = new NettyBuf(in);
+      CursorBuffer buf = new NettyCursorBuffer(in);
       int packetId = buf.readInt();
       Packet packet = PacketRegistry.create(packetId);
       if (packet == null) {
@@ -133,7 +133,7 @@ public final class PacketDecoder extends ByteToMessageDecoder {
         throw new NetworkException("Failed to decompress packet", e);
       }
 
-      Buf buf = Buf.wrap(decompressed);
+      CursorBuffer buf = CursorBuffer.wrap(decompressed);
       int packetId = buf.readInt();
       Packet packet = PacketRegistry.create(packetId);
       if (packet == null) {

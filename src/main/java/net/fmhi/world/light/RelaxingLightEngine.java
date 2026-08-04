@@ -2,41 +2,38 @@ package net.fmhi.world.light;
 
 import net.fmhi.math.Box2D;
 import net.fmhi.util.Profiler;
-import net.fmhi.world.block.BlockState;
 import net.fmhi.world.entity.Entity;
-import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 
 import java.util.Arrays;
-import java.util.function.Consumer;
+import java.util.concurrent.Future;
 
 /**
- * Light engine that recomputes its whole window on a background virtual
- * thread, spreading light with four relaxation passes in alternating
- * directions.
+ * Light engine that recomputes its full window on a background virtual thread, spreading
+ * light with four relaxation passes in alternating directions.
  *
- * <p>The window size adapts to the camera (see {@link LightEngine}); resizes
- * copy the overlapping region so the renderer never sees a blank window. The
- * computed buffer is swapped into the front only once finished, so the
- * renderer always reads a complete, consistent frame.
+ * <p>The window size adapts to the camera (see {@link LightEngine}); resizes copy the
+ * overlapping region so the renderer never sees a blank window. The computed buffer is
+ * swapped into the front only once finished, so the renderer always reads a complete,
+ * consistent frame.
  *
  * @see LightEngine
  */
-public class ScanLightEngine extends LightEngine {
+public class RelaxingLightEngine extends LightEngine {
   /**
-   * Creates a light engine for the given level.
+   * Creates a relaxing light engine for the given level.
    *
    * @param level the level to light
    */
-  public ScanLightEngine(Level level) {
+  public RelaxingLightEngine(Level level) {
     super(level);
   }
 
   /**
-   * Computes the next frame: seeds block and entity light, spreads it with
-   * four alternating passes, then populates the per-vertex values.
+   * Computes the next frame into the back buffer: seeds block and entity light, spreads
+   * it with four alternating passes, then populates the per-vertex values.
    *
    * @param cam the camera bounds to compute light for
    */
@@ -57,13 +54,13 @@ public class ScanLightEngine extends LightEngine {
     // leftover values from the previous frame otherwise
     Arrays.fill(back, 0F);
 
-    cc = new ChunkCache(level, x0 - 1, y0 - 1, x1 + 1, y1 + 1);
+    cc.checkLoss(x0 - 1, y0 - 1, x1 + 1, y1 + 1);
 
     // Phase 1: seed
     try (Profiler.Scope _ = Profiler.scope("lighting:seed_block")) {
       for (int x = x0 - 1; x <= x1 + 1; x++) {
         for (int y = y0 - 1; y <= y1 + 1; y++) {
-          seed(cc, sunlight, x, y);
+          seed(cc, x, y);
         }
       }
     }
@@ -105,7 +102,7 @@ public class ScanLightEngine extends LightEngine {
 
     // Beam light: max-blend into raw channels after spread (spread is
     // isotropic and would wash out the cone if the beam went through it)
-    mergeBeam();
+    Future<?> future = executor.submit(this::mergeBeam);
 
     // Phase 4: populate vertex lights
     try (Profiler.Scope _ = Profiler.scope("lighting:populate")) {
@@ -134,7 +131,7 @@ public class ScanLightEngine extends LightEngine {
   }
 
   /**
-   * Relaxes the light of a tile toward the brightest of its four neighbors.
+   * Relaxes a tile's light toward the brightest of its four neighbors.
    */
   private void spread(int x, int y, byte channel) {
     if (!cc.isLoaded(x, y)) {
@@ -148,9 +145,9 @@ public class ScanLightEngine extends LightEngine {
   }
 
   /**
-   * Relaxes one channel of a tile toward the brightest of its four neighbors,
-   * applying the block's light filter; values at or below
-   * {@link #DARK_LUMINANCE} are stored as darkness.
+   * Relaxes one channel of a tile toward the brightest of its four neighbors, applying
+   * the tile's light filter; values at or below {@link #DARK_LUMINANCE} are stored as
+   * darkness.
    *
    * @param o       the working buffer offset of the tile
    * @param channel the gradient channel to spread
@@ -158,31 +155,15 @@ public class ScanLightEngine extends LightEngine {
    * @param y       the tile Y coordinate
    */
   private void spreadOnChannel(int o, byte channel, int x, int y) {
-    BlockState state = cc.getBlock(x, y);
     float l1 = getChannelValue(x - 1, y, channel);
     float l2 = getChannelValue(x + 1, y, channel);
     float l3 = getChannelValue(x, y - 1, channel);
     float l4 = getChannelValue(x, y + 1, channel);
     float max = Math.max(l1, Math.max(l2, Math.max(l3, l4)));
-    float f = formula.blend(back[o + channel], max);
-    f = filter(cc, channel, x, y, f);
+    // only light traveling in from a neighbor is filtered; an already
+    // converged tile keeps its value, otherwise the open-sky seed would be
+    // dimmed by the filter on every pass (the passes iterate)
+    float f = Math.max(back[o + channel], filter(cc, channel, x, y, max));
     back[o + channel] = f <= DARK_LUMINANCE ? 0F : f;
-  }
-
-  private void channelDispatch(Consumer<Byte> fn) {
-    Thread[] threads = new Thread[Channel.CHANNELS.length];
-    for (int i = 0; i < threads.length; i++) {
-      byte channel = Channel.CHANNELS[i];
-      threads[i] = Thread.startVirtualThread(() -> fn.accept(channel));
-    }
-
-    for (Thread t : threads) {
-      try {
-        t.join();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-    }
   }
 }

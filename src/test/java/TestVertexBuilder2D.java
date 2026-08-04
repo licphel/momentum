@@ -33,7 +33,7 @@ import net.fmhi.codec.tag.CompoundTag;
 import net.fmhi.fml.resource.ResourceFinder;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
-import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.ZeroCopyVertexStore;
 import net.fmhi.gfx.brush.tint.SimpleGradient;
 import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
@@ -350,9 +350,10 @@ public class TestVertexBuilder2D {
        */
       dev.getTransformHandler().flipY(true);
 
-      MeshGraphics2D g = new MeshGraphics2D(new VertexData(), dev);
+      MeshGraphics2D g = new MeshGraphics2D(new ZeroCopyVertexStore(), dev);
       g.begin(RenderPass.DEFAULT);
       g.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
+      g.setColor(Color.WHITE);
       MutableText cns = new MutableText().justify(true).flipY(true).maxWidth(260);
       cns.newline();
       cns.append(Literal.of("多语言测试多语言测试多语言测试多语言测试多语言测试",
@@ -430,12 +431,13 @@ public class TestVertexBuilder2D {
 
       g.end();
 
-      BatchedGraphics2D bg = new BatchedGraphics2D(new VertexData(), dev);
+      BatchedGraphics2D bg = new BatchedGraphics2D(new ZeroCopyVertexStore(), dev);
       Mesh mesh = g.bake(dev);
 
       bg.begin();
       bg.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
       bg.drawMesh(mesh);
+      bg.drawTexture(texture, 0, 0, texture.width(), texture.height());
       bg.drawRectangleFrame(0, 0, 200, 200);
       bg.drawPolygonFrame(new Vector2(0, 0), new Vector2(200, 200), new Vector2(200, 400), new Vector2(20, 400));
       bg.drawOvalFrame(100, 100, 50, 30);
@@ -503,9 +505,7 @@ public class TestVertexBuilder2D {
 
   private static byte[] matrixToBytes(Matrix4x4 m) {
     ByteBuffer bb = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    for (float f : m.toFloatArray()) {
-      bb.putFloat(f);
-    }
+    MatrixUtil.writeViewProjection(m, bb);
     return bb.array();
   }
 

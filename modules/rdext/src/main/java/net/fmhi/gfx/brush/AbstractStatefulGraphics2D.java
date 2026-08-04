@@ -64,7 +64,7 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
    * @param data              the staging area receiving vertices and indices
    * @param transformHandler  the backend-specific transform handler
    */
-  public AbstractStatefulGraphics2D(VertexData data, TransformHandler transformHandler) {
+  public AbstractStatefulGraphics2D(VertexStore data, TransformHandler transformHandler) {
     super(data, transformHandler);
   }
 

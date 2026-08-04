@@ -249,31 +249,6 @@ public record Matrix4x4(float m00, float m10, float m20, float m30, float m01, f
         a.m33 * it + b.m33 * t);
   }
 
-  private static Matrix4x4 fromFloatArray(float[] m) {
-    return new Matrix4x4(m[0], m[1], m[2], m[3], m[4], m[5], m[6], m[7], m[8], m[9], m[10], m[11], m[12], m[13],
-        m[14], m[15]);
-  }
-
-  /**
-   * Packs the matrix to a byte array.
-   *
-   * @param vpm input matrix
-   * @return the matrix data in byte[64]
-   */
-  public static byte[] pack(Matrix4x4 vpm) {
-    float[] m = vpm.toFloatArray();
-    byte[] bytes = new byte[64];
-    for (int i = 0; i < 16; i++) {
-      int bits = Float.floatToRawIntBits(m[i]);
-      int off = i * 4;
-      bytes[off] = (byte) bits;
-      bytes[off + 1] = (byte) (bits >> 8);
-      bytes[off + 2] = (byte) (bits >> 16);
-      bytes[off + 3] = (byte) (bits >> 24);
-    }
-    return bytes;
-  }
-
   /**
    * Returns the matrix product {@code this * b}.
    *
@@ -383,85 +358,25 @@ public record Matrix4x4(float m00, float m10, float m20, float m30, float m01, f
       return IDENTITY;
     }
 
-    float[] m = toFloatArray();
-    float[] inv = new float[16];
-
-    inv[0] =
-        m[5] * m[10] * m[15] - m[5] * m[11] * m[14] - m[9] * m[6] * m[15] + m[9] * m[7] * m[14] + m[13] * m[6] * m[11] - m[13] * m[7] * m[10];
-    inv[4] =
-        -m[4] * m[10] * m[15] + m[4] * m[11] * m[14] + m[8] * m[6] * m[15] - m[8] * m[7] * m[14] - m[12] * m[6] * m[11] + m[12] * m[7] * m[10];
-    inv[8] =
-        m[4] * m[9] * m[15] - m[4] * m[11] * m[13] - m[8] * m[5] * m[15] + m[8] * m[7] * m[13] + m[12] * m[5] * m[11] - m[12] * m[7] * m[9];
-    inv[12] =
-        -m[4] * m[9] * m[14] + m[4] * m[10] * m[13] + m[8] * m[5] * m[14] - m[8] * m[6] * m[13] - m[12] * m[5] * m[10] + m[12] * m[6] * m[9];
-
-    inv[1] =
-        -m[1] * m[10] * m[15] + m[1] * m[11] * m[14] + m[9] * m[2] * m[15] - m[9] * m[3] * m[14] - m[13] * m[2] * m[11] + m[13] * m[3] * m[10];
-    inv[5] =
-        m[0] * m[10] * m[15] - m[0] * m[11] * m[14] - m[8] * m[2] * m[15] + m[8] * m[3] * m[14] + m[12] * m[2] * m[11] - m[12] * m[3] * m[10];
-    inv[9] =
-        -m[0] * m[9] * m[15] + m[0] * m[11] * m[13] + m[8] * m[1] * m[15] - m[8] * m[3] * m[13] - m[12] * m[1] * m[11] + m[12] * m[3] * m[9];
-    inv[13] =
-        m[0] * m[9] * m[14] - m[0] * m[10] * m[13] - m[8] * m[1] * m[14] + m[8] * m[2] * m[13] + m[12] * m[1] * m[10] - m[12] * m[2] * m[9];
-
-    inv[2] =
-        m[1] * m[6] * m[15] - m[1] * m[7] * m[14] - m[5] * m[2] * m[15] + m[5] * m[3] * m[14] + m[13] * m[2] * m[7] - m[13] * m[3] * m[6];
-    inv[6] =
-        -m[0] * m[6] * m[15] + m[0] * m[7] * m[14] + m[4] * m[2] * m[15] - m[4] * m[3] * m[14] - m[12] * m[2] * m[7] + m[12] * m[3] * m[6];
-    inv[10] =
-        m[0] * m[5] * m[15] - m[0] * m[7] * m[13] - m[4] * m[1] * m[15] + m[4] * m[3] * m[13] + m[12] * m[1] * m[7] - m[12] * m[3] * m[5];
-    inv[14] =
-        -m[0] * m[5] * m[14] + m[0] * m[6] * m[13] + m[4] * m[1] * m[14] - m[4] * m[2] * m[13] - m[12] * m[1] * m[6] + m[12] * m[2] * m[5];
-
-    inv[3] =
-        -m[1] * m[6] * m[11] + m[1] * m[7] * m[10] + m[5] * m[2] * m[11] - m[5] * m[3] * m[10] - m[9] * m[2] * m[7] + m[9] * m[3] * m[6];
-    inv[7] =
-        m[0] * m[6] * m[11] - m[0] * m[7] * m[10] - m[4] * m[2] * m[11] + m[4] * m[3] * m[10] + m[8] * m[2] * m[7] - m[8] * m[3] * m[6];
-    inv[11] =
-        -m[0] * m[5] * m[11] + m[0] * m[7] * m[9] + m[4] * m[1] * m[11] - m[4] * m[3] * m[9] - m[8] * m[1] * m[7] + m[8] * m[3] * m[5];
-    inv[15] =
-        m[0] * m[5] * m[10] - m[0] * m[6] * m[9] - m[4] * m[1] * m[10] + m[4] * m[2] * m[9] + m[8] * m[1] * m[6] - m[8] * m[2] * m[5];
-
     float invDet = 1.0F / det;
-    for (int i = 0; i < 16; i++) {
-      inv[i] *= invDet;
-    }
-    return fromFloatArray(inv);
-  }
-
-  /**
-   * Returns a column-major {@code float[16]} suitable for OpenGL uniforms.
-   *
-   * @return column-major array
-   */
-  public float[] toFloatArray() {
-    return new float[] {m00, m10, m20, m30, m01, m11, m21, m31, m02, m12, m22, m32, m03, m13, m23, m33};
-  }
-
-  /**
-   * Writes column-major data into an existing array at offset.
-   *
-   * @param dst    destination array
-   * @param offset starting offset
-   * @throws IndexOutOfBoundsException if array is too small
-   */
-  public void toFloatArray(float[] dst, int offset) {
-    dst[offset] = m00;
-    dst[offset + 1] = m10;
-    dst[offset + 2] = m20;
-    dst[offset + 3] = m30;
-    dst[offset + 4] = m01;
-    dst[offset + 5] = m11;
-    dst[offset + 6] = m21;
-    dst[offset + 7] = m31;
-    dst[offset + 8] = m02;
-    dst[offset + 9] = m12;
-    dst[offset + 10] = m22;
-    dst[offset + 11] = m32;
-    dst[offset + 12] = m03;
-    dst[offset + 13] = m13;
-    dst[offset + 14] = m23;
-    dst[offset + 15] = m33;
+    return new Matrix4x4(
+        (m11 * m22 * m33 - m11 * m32 * m23 - m12 * m21 * m33 + m12 * m31 * m23 + m13 * m21 * m32 - m13 * m31 * m22) * invDet,
+        (-m10 * m22 * m33 + m10 * m32 * m23 + m12 * m20 * m33 - m12 * m30 * m23 - m13 * m20 * m32 + m13 * m30 * m22) * invDet,
+        (m10 * m21 * m33 - m10 * m31 * m23 - m11 * m20 * m33 + m11 * m30 * m23 + m13 * m20 * m31 - m13 * m30 * m21) * invDet,
+        (-m10 * m21 * m32 + m10 * m31 * m22 + m11 * m20 * m32 - m11 * m30 * m22 - m12 * m20 * m31 + m12 * m30 * m21) * invDet,
+        (-m01 * m22 * m33 + m01 * m32 * m23 + m02 * m21 * m33 - m02 * m31 * m23 - m03 * m21 * m32 + m03 * m31 * m22) * invDet,
+        (m00 * m22 * m33 - m00 * m32 * m23 - m02 * m20 * m33 + m02 * m30 * m23 + m03 * m20 * m32 - m03 * m30 * m22) * invDet,
+        (-m00 * m21 * m33 + m00 * m31 * m23 + m01 * m20 * m33 - m01 * m30 * m23 - m03 * m20 * m31 + m03 * m30 * m21) * invDet,
+        (m00 * m21 * m32 - m00 * m31 * m22 - m01 * m20 * m32 + m01 * m30 * m22 + m02 * m20 * m31 - m02 * m30 * m21) * invDet,
+        (m01 * m12 * m33 - m01 * m32 * m13 - m02 * m11 * m33 + m02 * m31 * m13 + m03 * m11 * m32 - m03 * m31 * m12) * invDet,
+        (-m00 * m12 * m33 + m00 * m32 * m13 + m02 * m10 * m33 - m02 * m30 * m13 - m03 * m10 * m32 + m03 * m30 * m12) * invDet,
+        (m00 * m11 * m33 - m00 * m31 * m13 - m01 * m10 * m33 + m01 * m30 * m13 + m03 * m10 * m31 - m03 * m30 * m11) * invDet,
+        (-m00 * m11 * m32 + m00 * m31 * m12 + m01 * m10 * m32 - m01 * m30 * m12 - m02 * m10 * m31 + m02 * m30 * m11) * invDet,
+        (-m01 * m12 * m23 + m01 * m22 * m13 + m02 * m11 * m23 - m02 * m21 * m13 - m03 * m11 * m22 + m03 * m21 * m12) * invDet,
+        (m00 * m12 * m23 - m00 * m22 * m13 - m02 * m10 * m23 + m02 * m20 * m13 + m03 * m10 * m22 - m03 * m20 * m12) * invDet,
+        (-m00 * m11 * m23 + m00 * m21 * m13 + m01 * m10 * m23 - m01 * m20 * m13 - m03 * m10 * m21 + m03 * m20 * m11) * invDet,
+        (m00 * m11 * m22 - m00 * m21 * m12 - m01 * m10 * m22 + m01 * m20 * m12 + m02 * m10 * m21 - m02 * m20 * m11) * invDet
+    );
   }
 
   /**

@@ -6,8 +6,6 @@ import net.fmhi.world.fluid.LiquidStack;
 import net.fmhi.world.fluid.Liquids;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.Channel;
-import net.fmhi.world.light.LightBuffer;
-import net.fmhi.world.light.SimpleLightBuffer;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
@@ -198,10 +196,9 @@ public class TestFluid {
     assert Liquids.LAVA.density() > Liquids.WATER.density();
     assert Liquids.LAVA.temperature() > Liquids.WATER.temperature();
     assert Liquids.LAVA.viscosity() >= Liquids.WATER.viscosity();
-    LightBuffer lb = new SimpleLightBuffer();
-    assert Liquids.LAVA.getLight(lb) && lb.r() > 0F : "lava does not glow";
-    assert !Liquids.WATER.getLight(new SimpleLightBuffer()) : "water glows";
-    assert Liquids.WATER.filterLight(1F, Channel.RED, 255) < 1F : "water does not absorb light";
+    assert Liquids.LAVA.emitAmbient(0, 0, 255, Channel.RED) > 0F : "lava does not glow";
+    assert Liquids.WATER.emitAmbient(0, 0, 255, Channel.RED) == 0F : "water glows";
+    assert Liquids.WATER.filterLight(0, 0, 255, 1F, Channel.RED) < 1F : "water does not absorb light";
     System.out.println("testLiquidProperties OK");
   }
 

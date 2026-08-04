@@ -2,15 +2,17 @@ package net.fmhi.world.fluid;
 
 import net.fmhi.math.Color;
 import net.fmhi.world.level.Level;
-import net.fmhi.world.light.LightBuffer;
-import org.jspecify.annotations.NullMarked;
+import net.fmhi.world.light.Beam;
+import net.fmhi.world.light.LightEmitter;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A liquid type. Liquids live in a layer separate from blocks and walls:
  * every tile stores a liquid id and a level (see {@link LiquidMap}).
  */
-@NullMarked
-public abstract class Liquid {
+public abstract class Liquid implements LightEmitter.Liquid {
 
   private final byte id;
 
@@ -40,16 +42,22 @@ public abstract class Liquid {
 
   // -- light --------------------------------------------------------------
 
-  /** How much light the liquid lets through at the given level. Like a
-   * block's filter, but liquids never emit beams. */
-  public float filterLight(float in, byte channel, int level) {
-    // thicker liquid absorbs a bit more
-    return in * 0.98F - level / (float) FluidEngine.FULL * 0.01F;
+  @Override
+  public float filterLight(int x, int y, int amount, float in, byte channel) {
+    return in * 0.98F - amount / (float) FluidEngine.FULL * 0.01F;
   }
 
-  /** Light emission; false = none (liquids never emit beams). */
-  public boolean getLight(LightBuffer buf) {
-    return false;
+  /** The ambient light emitted by this liquid on one channel, or {@code 0}. */
+  @Override
+  public float emitAmbient(int x, int y, int amount, byte channel) {
+    return 0F;
+  }
+
+  /** The directional beams emitted by this liquid; the caller draws and
+   * recycles them. */
+  @Override
+  public java.util.Collection<Beam> emitBeams(int x, int y, int amount) {
+    return Collections.emptySet();
   }
 
   // -- physics ------------------------------------------------------------

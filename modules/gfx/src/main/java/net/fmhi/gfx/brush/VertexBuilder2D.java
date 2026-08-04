@@ -36,7 +36,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param data              the staging area receiving vertices and indices
    * @param transformHandler  the transform handler used for coordinate conversion
    */
-  public VertexBuilder2D(VertexData data, TransformHandler transformHandler) {
+  public VertexBuilder2D(VertexStore data, TransformHandler transformHandler) {
     super(data, transformHandler);
   }
 

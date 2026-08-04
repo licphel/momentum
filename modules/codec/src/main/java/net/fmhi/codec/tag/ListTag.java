@@ -24,7 +24,7 @@
 
 package net.fmhi.codec.tag;
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -67,7 +67,7 @@ public final class ListTag implements Iterable<@Nullable Object> {
    * @return a new list containing the deserialized elements
    * @throws IndexOutOfBoundsException if {@code buffer} has insufficient readable bytes
    */
-  public static ListTag deserialize(Buf buffer) {
+  public static ListTag deserialize(CursorBuffer buffer) {
     ListTag list = new ListTag();
 
     int size = buffer.readInt();
@@ -548,7 +548,7 @@ public final class ListTag implements Iterable<@Nullable Object> {
    *
    * @param buffer the destination buffer
    */
-  public void serialize(Buf buffer) {
+  public void serialize(CursorBuffer buffer) {
     if (isEmpty()) {
       buffer.writeInt(0);
       return;

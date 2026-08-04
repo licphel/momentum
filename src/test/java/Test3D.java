@@ -247,9 +247,7 @@ public class Test3D {
 
   static byte[] mat4ToBytes(Matrix4x4 m) {
     ByteBuffer bb = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    for (float f : m.toFloatArray()) {
-      bb.putFloat(f);
-    }
+    MatrixUtil.writeViewProjection(m, bb);
     return bb.array();
   }
 }

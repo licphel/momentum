@@ -52,7 +52,6 @@ import java.util.Comparator;
  * themselves.
  */
 public final class ParticleSystem2D {
-  private static final int VP_UBO_SIZE = 64;
   private static final int INSTANCE_STRIDE = 36;
   private static final Comparator<Particle2D> TEXTURE_COMPARATOR =
       Comparator.comparingInt(p -> {
@@ -72,7 +71,6 @@ public final class ParticleSystem2D {
   private final BufferObject ubo;
   private final Sampler sampler;
   private final ResourceSetLayout rsl;
-  private final byte[] vpBytes = new byte[VP_UBO_SIZE];
   private final float[] mVp = new float[16];
   private final Particle2D[] pool;
   private final int maxParticles;
@@ -183,16 +181,7 @@ public final class ParticleSystem2D {
     Arrays.sort(pool, 0, size, TEXTURE_COMPARATOR);
 
     // upload VP matrix
-    vp.toFloatArray(mVp, 0);
-    for (int j = 0; j < 16; j++) {
-      int bits = Float.floatToRawIntBits(mVp[j]);
-      int off = j * 4;
-      vpBytes[off] = (byte) bits;
-      vpBytes[off + 1] = (byte) (bits >> 8);
-      vpBytes[off + 2] = (byte) (bits >> 16);
-      vpBytes[off + 3] = (byte) (bits >> 24);
-    }
-    ubo.submit(vpBytes, 0, VP_UBO_SIZE);
+    MatrixUtil.writeViewProjection(vp, ubo);
 
     // upload all instance data at once (sorted)
     uploadAllInstanceData();
@@ -224,7 +213,7 @@ public final class ParticleSystem2D {
 
       if (batchSrc != null) {
         ResourceSet rs = device.getResourceSet(rsl);
-        rs.bindUniform(0, ubo, VP_UBO_SIZE);
+        rs.bindUniform(0, ubo, 64);
         rs.bindTexture(1, batchSrc, sampler);
 
         encoder.setInstanceBase(groupStart);

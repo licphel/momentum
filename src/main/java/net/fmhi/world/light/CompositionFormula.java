@@ -1,17 +1,18 @@
 package net.fmhi.world.light;
 
 /**
- * Per-channel composition of two light values: {@code src} is the light
- * already in the tile, {@code dst} is the incoming light.
+ * Blends an existing light value with an incoming one, per color channel.
  *
+ * <p>{@code src} is the light already in the tile, {@code dst} the incoming light. The
+ * choice of formula trades color fidelity against brightness control:
  * <ul>
- *   <li>{@link #MAX} — per-channel maximum. Fastest; a bright white light
- *       washes out colored light entirely (its high green/blue channels win).</li>
- *   <li>{@link #ADDITIVE} — unbounded addition. Colored light keeps its hue,
- *       but overlapping strong lights blow out to white.</li>
+ *   <li>{@link #MAX} — per-channel maximum. Fastest; a bright white light washes out
+ *       colored light entirely (its high green/blue channels win).</li>
+ *   <li>{@link #ADDITIVE} — unbounded addition. Colored light keeps its hue, but
+ *       overlapping strong lights blow out to white.</li>
  *   <li>{@link #ADDITIVE_CAP} — additive with a luminance-aware cap:
- *       {@code src + dst * (1 - src/cap)}. Dark areas add fully (hue kept),
- *       bright areas asymptotically accept no more light (no whiteout).</li>
+ *       {@code src + dst * (1 - src/cap)}. Dark areas add fully (hue kept), bright
+ *       areas asymptotically accept no more light (no whiteout).</li>
  * </ul>
  */
 @FunctionalInterface

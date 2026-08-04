@@ -24,7 +24,7 @@
 
 package net.fmhi.network.packet;
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.network.NetConfig;
 import net.fmhi.network.Session;
 
@@ -40,12 +40,12 @@ import net.fmhi.network.Session;
  */
 public final class HeartbeatPacket extends Packet {
   @Override
-  public void read(Buf buf) {
+  public void read(CursorBuffer buf) {
     // Heartbeat carries no payload.
   }
 
   @Override
-  public void write(Buf buf) {
+  public void write(CursorBuffer buf) {
     // Heartbeat carries no payload.
   }
 

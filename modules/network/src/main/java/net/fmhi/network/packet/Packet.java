@@ -24,7 +24,7 @@
 
 package net.fmhi.network.packet;
 
-import net.fmhi.codec.streaming.Buf;
+import net.fmhi.codec.streaming.CursorBuffer;
 import net.fmhi.network.Session;
 
 /**
@@ -35,8 +35,8 @@ import net.fmhi.network.Session;
  *
  * <h3>Threading contract</h3>
  * <ul>
- *   <li>{@link #read(Buf)} — called on the I/O event loop during decode</li>
- *   <li>{@link #write(Buf)} — called on whichever thread sends the packet</li>
+ *   <li>{@link #read(CursorBuffer)} — called on the I/O event loop during decode</li>
+ *   <li>{@link #write(CursorBuffer)} — called on whichever thread sends the packet</li>
  *   <li>{@link #handle(Session)} — called on the main thread during the processing tick</li>
  * </ul>
  *
@@ -61,7 +61,7 @@ public abstract class Packet {
    *
    * @param buf the buffer containing the packet payload
    */
-  public abstract void read(Buf buf);
+  public abstract void read(CursorBuffer buf);
 
   /**
    * Writes this packet's fields into the given buffer for wire transmission.
@@ -71,7 +71,7 @@ public abstract class Packet {
    *
    * @param buf the target buffer to write into
    */
-  public abstract void write(Buf buf);
+  public abstract void write(CursorBuffer buf);
 
   /**
    * Executes this packet's logic on the main thread.

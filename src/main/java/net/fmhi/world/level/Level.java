@@ -32,8 +32,9 @@ import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.fluid.LiquidStack;
 import net.fmhi.world.fluid.Liquids;
+import net.fmhi.world.light.BFSLightEngine;
 import net.fmhi.world.light.LightEngine;
-import net.fmhi.world.light.ScanLightEngine;
+import net.fmhi.world.light.RelaxingLightEngine;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
@@ -68,7 +69,7 @@ public class Level {
   private final ChunkGenerator generator;
   private final long seed;
   private final Long2ObjectMap<Chunk> chunks = new Long2ObjectOpenHashMap<>();
-  private final LightEngine lightEngine = new ScanLightEngine(this);
+  private final LightEngine lightEngine = new RelaxingLightEngine(this);
   private final FluidEngine fluidEngine = new FluidEngine(this);
   /** Focus in world block coordinates; chunks farther than
    * {@link #UNLOAD_RADIUS_CHUNKS} are unloaded every tick. */

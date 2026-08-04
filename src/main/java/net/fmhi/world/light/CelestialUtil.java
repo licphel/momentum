@@ -65,8 +65,8 @@ public final class CelestialUtil {
   }
 
   /**
-   * Returns how far into space the given world Y is: 0 at or below the
-   * surface line, rising linearly to 1 far above it.
+   * Returns how far into space the given world Y is: 0 at or below the surface line,
+   * rising linearly to 1 far above it.
    *
    * @param level the level
    * @param y     the world Y of the tile
@@ -97,9 +97,8 @@ public final class CelestialUtil {
   }
 
   /**
-   * Returns the sunlight gradient seeding sky illumination: warm-tinted near
-   * the horizon, bluish high in the sky, never reaching full black at
-   * night.
+   * Returns the sunlight gradient seeding sky illumination: warm-tinted near the horizon,
+   * bluish high in the sky, never reaching full black at night.
    *
    * @param level the level whose day phase to use
    * @return the sunlight gradient
@@ -109,8 +108,8 @@ public final class CelestialUtil {
   }
 
   /**
-   * Returns the sunlight gradient with an extra dimming factor, e.g. for
-   * walls that receive less sun.
+   * Returns the sunlight gradient with an extra dimming factor, e.g. for walls that
+   * receive less sun.
    *
    * @param level the level whose day phase to use
    * @param hard  extra dimming applied toward night
@@ -126,9 +125,9 @@ public final class CelestialUtil {
   }
 
   /**
-   * Returns the ambient background light at the given height, used to draw
-   * the sky and clouds. A {@code 0.15} floor keeps the night background
-   * visible; the alpha fades with depth into space.
+   * Returns the ambient background light at the given height, used to draw the sky and
+   * clouds. A {@code 0.15} floor keeps the night background visible; the alpha fades
+   * with depth into space.
    *
    * @param level the level whose day phase to use
    * @param y     the world Y to light
@@ -146,8 +145,8 @@ public final class CelestialUtil {
   }
 
   /**
-   * Returns the sky gradient at the given height for a given day phase. The
-   * biome temperature is fixed to temperate until biomes are implemented.
+   * Returns the sky gradient at the given height for a given day phase. The biome
+   * temperature is fixed to temperate until biomes are implemented.
    *
    * @param level the level whose day phase to use
    * @param y     the world Y of the sky
@@ -164,10 +163,9 @@ public final class CelestialUtil {
   }
 
   /**
-   * Fills the four corner colors of the background sky gradient, in quad
-   * vertex order: the lower corners get the warm dusk/dawn tint, the upper
-   * corners a cool blue tint (Enchant's {@code RecolorDuskAndDawn} mapped
-   * to our vertex order).
+   * Fills the four corner colors of the background sky gradient, in quad vertex order:
+   * the lower corners get the warm dusk/dawn tint, the upper corners a cool blue tint
+   * (Enchant's {@code RecolorDuskAndDawn} mapped to our vertex order).
    *
    * @param level the level whose day phase to use
    * @param y     the world Y of the sky
@@ -178,8 +176,11 @@ public final class CelestialUtil {
     float day = sin(level);
     float i = Math.abs(day - 0.45F);
     final float len = 0.4F;
-    if (i >= len) i = 0F;
-    else i = len - i;
+    if (i >= len) {
+      i = 0F;
+    } else {
+      i = len - i;
+    }
     float per = i / len * 2F;
     Color warm = base.multiply(new Color(1F, 1F - per * 0.45F, 1F - per * 0.2F));
     Color cool = base.multiply(new Color(0.85F, 0.9F, 1F));

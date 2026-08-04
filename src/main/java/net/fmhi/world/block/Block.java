@@ -29,7 +29,6 @@ import net.fmhi.fml.registry.RegistryEntry;
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.property.PropertyDef;
 import net.fmhi.world.light.Beam;
-import net.fmhi.world.light.LightBuffer;
 import net.fmhi.world.light.LightEngine;
 import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.SBPhyObj;
@@ -113,18 +112,15 @@ public class Block implements ItemLike, RegistryEntry<Block> {
   /** How this block fills its tile (collision, light and liquid rules). */
   public Shape shape(BlockState state) { return Shape.SOLID; }
 
-  public void filterSkylight(BlockState state, LightBuffer l) {
+  public float filterSkylight(BlockState state, int x, int y, float in, byte channel) {
     if (shape(state) == Shape.SOLID) {
-      l.r(0);
-      l.g(0);
-      l.b(0);
+      return 0.0F;
     }
+    return in;
   }
-  /**
-   * Filter incoming light through this block in-place.
-   * Default: solid blocks zero the light, non-solid pass through.
-   */
-  public float filterLight(BlockState state, float in, byte channel) {
+
+  /** Filters incoming light through this state, per channel. */
+  public float filterLight(BlockState state, int x, int y, float in, byte channel) {
     if (shape(state) == Shape.SOLID) {
       return in * 0.92F - LightEngine.UNIT;
     } else {
@@ -132,13 +128,15 @@ public class Block implements ItemLike, RegistryEntry<Block> {
     }
   }
 
-  /** Write RGB light emission into {@code buf}. Returns false if no light. */
-  public boolean getLight(BlockState state, LightBuffer buf) {
-    return false;
+  /** The ambient light emitted by this state on one channel, or {@code 0}. */
+  public float emitAmbient(BlockState state, int x, int y, byte channel) {
+    return 0F;
   }
 
-  public Beam @Nullable [] getBeam(BlockState state) {
-    return null;
+  /** The directional beams emitted by this state; the caller draws and
+   * recycles them. */
+  public java.util.Collection<Beam> emitBeams(BlockState state, int x, int y) {
+    return List.of();
   }
 
   public BlockState defaultState() {

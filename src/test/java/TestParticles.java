@@ -24,7 +24,7 @@
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
-import net.fmhi.gfx.brush.VertexData;
+import net.fmhi.gfx.brush.ZeroCopyVertexStore;
 import net.fmhi.gfx.cmd.Encoder;
 import net.fmhi.gfx.cmd.EncoderDesc;
 import net.fmhi.gfx.glfw.GlfwView;
@@ -104,7 +104,7 @@ public class TestParticles {
         .build();
 
     RandomGenerator rng = RandomGenerator.DEFAULT;
-    BatchedGraphics2D g = new BatchedGraphics2D(new VertexData(), dev);
+    BatchedGraphics2D g = new BatchedGraphics2D(new ZeroCopyVertexStore(), dev);
     List<MyParticle> myParticles = new ArrayList<>();
 
     long lastNanos = System.nanoTime();

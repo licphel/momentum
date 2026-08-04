@@ -24,6 +24,7 @@
 
 package net.fmhi.gfx.opengl;
 
+import net.fmhi.gfx.DirectBufferPool;
 import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
@@ -35,7 +36,6 @@ import org.jspecify.annotations.Nullable;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
@@ -110,12 +110,12 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
       OpenGLCache cache = ctx.cache;
       cache.bindBuffer(target, handle);
       if (data != null && data.length == cap) {
-        ByteBuffer bb = memAlloc(cap);
+        ByteBuffer bb = DirectBufferPool.acquire(cap);
         try {
           bb.put(data).flip();
           glBufferData(target, bb, hint);
         } finally {
-          memFree(bb);
+          DirectBufferPool.release(bb);
         }
       } else {
         glBufferData(target, cap, hint);
@@ -134,7 +134,10 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
      * However, this is essential, if we want a pure asynchronous submission.
      */
     int size = memory.remaining();
-    ByteBuffer bb = memAlloc(size);
+    if (size == 0) {
+      return;
+    }
+    ByteBuffer bb = DirectBufferPool.acquire(size);
     bb.put(memory).flip();
 
     ctx.submit(() -> {
@@ -154,7 +157,7 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
       }
 
       glBufferSubData(target, offset, bb);
-      memFree(bb);
+      DirectBufferPool.release(bb);
     });
   }
 

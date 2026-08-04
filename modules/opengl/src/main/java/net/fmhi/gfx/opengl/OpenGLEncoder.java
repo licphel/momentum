@@ -24,6 +24,7 @@
 
 package net.fmhi.gfx.opengl;
 
+import net.fmhi.gfx.GfxStats;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.cmd.Encoder;
@@ -115,6 +116,8 @@ public final class OpenGLEncoder implements Encoder {
   public void queuedExecute() {
     List<Runnable> snapshot = new ArrayList<>(commands);
     queryReset = true;
+    GfxStats.ECMDPT.add(snapshot.size());
+
     ctx.submit(() -> {
       for (Runnable cmd : snapshot) {
         cmd.run();
@@ -125,6 +128,7 @@ public final class OpenGLEncoder implements Encoder {
   @Override
   public void beginPass(RenderPass desc) {
     warnIfNotReset();
+
     commands.add(() -> {
       currentTarget = desc.target() == null ? ctx.getSwapchain() : desc.target();
 
@@ -264,6 +268,7 @@ public final class OpenGLEncoder implements Encoder {
 
       int vao = currentPipe.acquireVao(currentVbo.handle, 0, 0, currentInstanceBase);
       ctx.cache.bindVao(vao);
+      GfxStats.DCPT.increment();
       glDrawArrays(topology, firstVertex, vertexCount);
       ctx.cache.bindVao(0);
     });
@@ -294,6 +299,7 @@ public final class OpenGLEncoder implements Encoder {
 
       int vao = currentPipe.acquireVao(currentVbo.handle, 0, currentEbo.handle, currentInstanceBase);
       ctx.cache.bindVao(vao);
+      GfxStats.DCPT.increment();
       glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
       ctx.cache.bindVao(0);
     });
@@ -314,6 +320,7 @@ public final class OpenGLEncoder implements Encoder {
       int instHandle = currentInstanceVbo != null ? currentInstanceVbo.handle : 0;
       int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, 0, currentInstanceBase);
       ctx.cache.bindVao(vao);
+      GfxStats.DCPT.increment();
       glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
       ctx.cache.bindVao(0);
     });
@@ -337,6 +344,7 @@ public final class OpenGLEncoder implements Encoder {
       int instHandle = currentInstanceVbo != null ? currentInstanceVbo.handle : 0;
       int vao = currentPipe.acquireVao(currentVbo.handle, instHandle, currentEbo.handle, currentInstanceBase);
       ctx.cache.bindVao(vao);
+      GfxStats.DCPT.increment();
       glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
       ctx.cache.bindVao(0);
     });
@@ -349,7 +357,10 @@ public final class OpenGLEncoder implements Encoder {
    */
   @Override
   public void dispatch(int x, int y, int z) {
-    commands.add(() -> glDispatchCompute(x, y, z));
+    commands.add(() -> {
+      GfxStats.DCPT.increment();
+      glDispatchCompute(x, y, z);
+    });
   }
 
   @Override
