@@ -89,6 +89,7 @@ public class Main {
     view.setTitle("fmhi — lightmap compose");
     view.setSize(new Vector2(WIN_W, WIN_H));
     view.initialize();
+    view.setVsync(false);
 
     Device dev = new OpenGLDevice();
     dev.load(view);
@@ -149,7 +150,7 @@ public class Main {
     );
 
     ResourceSetLayout rslCompose = ResourceSetLayout.bake(
-        new Slot(1, "T", ShaderType.VERTEX_BIT, ResourceType.UNIFORM_BUFFER),
+        new Slot(0, "T", ShaderType.VERTEX_BIT, ResourceType.UNIFORM_BUFFER),
         new Slot(1, "u_albedo", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE),
         new Slot(1, "u_lightmap", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE));
 
@@ -345,6 +346,9 @@ public class Main {
         g.setCamera(orthoCam);
 
         Texture wallTex = colorRT.pin();
+        // the compose shader reads its uniform block from binding 0; upload the
+        // screen-space matrix explicitly — nothing else writes this ubo
+        MatrixUtil.writeViewProjection(orthoCam.viewProjectionMatrix(), composeUbo);
         ResourceSet rsWall = dev.getResourceSet(rslCompose);
         rsWall.bindUniform(0, composeUbo, 64);
         if (wallTex != null) rsWall.bindTexture(1, wallTex, lmSampler);
@@ -387,6 +391,7 @@ public class Main {
         g.begin(RenderPass.NOT_CLEAR);
         g.setCamera(orthoCam);
         Texture frontTex = frontRT.pin();
+        MatrixUtil.writeViewProjection(orthoCam.viewProjectionMatrix(), composeUbo);
         ResourceSet rsFront = dev.getResourceSet(rslCompose);
         rsFront.bindUniform(0, composeUbo, 64);
         if (frontTex != null) rsFront.bindTexture(1, frontTex, lmSampler);
@@ -401,11 +406,15 @@ public class Main {
       }
 
       dev.submit(view::present);
-      dev.execute();
+      try (Profiler.Scope _ = Profiler.scope("rendering:execute")) {
+        dev.execute();
+      }
       GfxStats.profile();
 
       dev.pollEvents();
       snapRef[0].clearFrameState();
+
+      view.setTitle("FPS: " + Util.fps());
     });
 
     g.close();

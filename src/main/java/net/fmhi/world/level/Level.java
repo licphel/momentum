@@ -54,7 +54,6 @@ import java.util.function.Consumer;
  * <p>Chunks are generated on demand via {@link ChunkGenerator}. The
  * level owns all chunks and provides tile and collision queries.
  */
-@NullMarked
 public class Level {
   /** Length of a full day in game ticks (60 Hz, 20 s per game minute, 24 h). */
   public static final long TICKS_PER_DAY = 60L * 20 * 24;

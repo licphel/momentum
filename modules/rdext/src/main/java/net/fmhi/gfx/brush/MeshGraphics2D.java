@@ -123,14 +123,11 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
     flush(true);
     List<Section> sections = new ArrayList<>();
 
-    BufferObject meshUbo = device.getBuffer(BufferObjectDesc.uniform());
-    meshUbo.allocate(64, null);
     for (SectionDraft d : drafts) {
       if (d.primitive() == null) {
         continue;
       }
       ResourceSet rs = device.getResourceSet(d.rsl);
-      rs.bindUniform(0, meshUbo, 64);
       boolean tex = d.primitive().isTextured();
       if (tex && d.texture() != null && d.sampler() != null) {
         rs.bindTexture(1, d.texture(), d.sampler());
@@ -149,7 +146,7 @@ public final class MeshGraphics2D extends BatchedGraphics2D {
       sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount, top));
     }
 
-    return new Mesh(meshUbo, List.copyOf(sections));
+    return new Mesh(List.copyOf(sections));
   }
 
   private record SectionDraft(byte[] vertices,

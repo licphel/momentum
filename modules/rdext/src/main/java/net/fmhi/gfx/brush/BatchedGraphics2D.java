@@ -39,6 +39,7 @@ import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
 import net.fmhi.math.Box2D;
+import net.fmhi.math.Matrix4x4;
 import net.fmhi.util.ResourceProvider;
 
 /**
@@ -129,17 +130,14 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
   public void drawMesh(Mesh mesh) {
     flush();
 
-    if (camera == null || mesh.sections().isEmpty()) {
+    if (mesh.sections().isEmpty()) {
       return;
     }
 
-    MatrixUtil.writeViewProjection(camera.viewProjectionMatrix(), mesh.ubo());
-
-    encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),
-        (int) viewport.width(), (int) viewport.height());
+    encoder.setViewport((int) viewport.minX(), (int) viewport.minY(), (int) viewport.width(), (int) viewport.height());
     encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
 
-    mesh.draw(encoder, 0);
+    mesh.submit(encoder, 0, ubo);
   }
 
   /**
@@ -201,6 +199,11 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     begun = false;
   }
 
+  @Override
+  protected void onCameraChanged() {
+    MatrixUtil.writeViewProjection(camera == null ? Matrix4x4.IDENTITY : camera.viewProjectionMatrix(), ubo);
+  }
+
   /**
    * Uploads the recorded vertex and index data and issues a draw with the current render
    * state.
@@ -208,7 +211,7 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
    * <p>Does nothing if no primitive has been selected or no camera is set.
    */
   private void submitBatch() {
-    if (currentPrimitive == null || camera == null) {
+    if (currentPrimitive == null) {
       return;
     }
 
@@ -225,7 +228,6 @@ public class BatchedGraphics2D extends AbstractStatefulGraphics2D {
     // we've set volatile = true.
     data.clear();
 
-    MatrixUtil.writeViewProjection(camera.viewProjectionMatrix(), ubo);
     vbo.submit(rawV, vr, vw - vr);
     if (ic > 0 && currentPrimitive.isIndexed()) {
       ibo.submit(rawI, ir, iw - ir);

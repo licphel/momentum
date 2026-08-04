@@ -241,9 +241,8 @@ public final class LightMapRenderer implements AutoCloseable {
         lmMeshG.drawRectangle(x, y, 1, 1);
       }
     }
-    Mesh m = lmMeshG.bake(dev);
-    lmMeshG.end(); // end() clears the drafts — bake must consume them first
-    return m;
+    lmMeshG.end();
+    return lmMeshG.bake(dev);
   }
 
   @Override

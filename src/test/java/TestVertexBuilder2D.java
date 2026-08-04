@@ -333,8 +333,6 @@ public class TestVertexBuilder2D {
       Matrix4x4 mvp = projection.multiply(view).multiply(model);
       Matrix3x3 normalMatrix = model.invert().transpose().toMatrix3x3();
 
-      updateMatricesUbo(uboMatrices, mvp, model, normalMatrix);
-      updateLightingUbo(uboLighting, lightPos, lightColor, ambient, camera.getPosition());
 
       /*
       dev.getSwapchain().acquire(clearDesc);
@@ -437,7 +435,6 @@ public class TestVertexBuilder2D {
       bg.begin();
       bg.setCamera(new Camera2D(800, 450, dev.getTransformHandler()));
       bg.drawMesh(mesh);
-      bg.drawTexture(texture, 0, 0, texture.width(), texture.height());
       bg.drawRectangleFrame(0, 0, 200, 200);
       bg.drawPolygonFrame(new Vector2(0, 0), new Vector2(200, 200), new Vector2(200, 400), new Vector2(20, 400));
       bg.drawOvalFrame(100, 100, 50, 30);
@@ -490,23 +487,11 @@ public class TestVertexBuilder2D {
     return bb.array();
   }
 
-  private static void updateMatricesUbo(BufferObject ubo, Matrix4x4 mvp, Matrix4x4 model, Matrix3x3 normal) {
-    ubo.submit(matrixToBytes(mvp), 0);
-    ubo.submit(matrixToBytes(model), 64);
-    ubo.submit(matrix3ToBytes(normal), 128);
-  }
-
   private static void updateLightingUbo(BufferObject ubo, Vector3 lp, Vector3 lc, Vector3 amb, Vector3 vp) {
     ubo.submit(vec3ToBytes16(lp), 0);
     ubo.submit(vec3ToBytes16(lc), 16);
     ubo.submit(vec3ToBytes16(amb), 32);
     ubo.submit(vec3ToBytes16(vp), 48);
-  }
-
-  private static byte[] matrixToBytes(Matrix4x4 m) {
-    ByteBuffer bb = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    MatrixUtil.writeViewProjection(m, bb);
-    return bb.array();
   }
 
   private static byte[] matrix3ToBytes(Matrix3x3 m) {

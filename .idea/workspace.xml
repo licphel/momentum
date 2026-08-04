@@ -4,59 +4,23 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="feat: vao global cache, textured tile rendering">
-      <change afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/DirectBufferPool.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexStore.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/ZeroCopyVertexStore.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/shader/MatrixUtil.java" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEmitter.java" afterDir="false" />
+    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="feat: backup before compact op">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/streaming/Buf.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/streaming/CursorBuffer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/streaming/HeapBuf.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/streaming/HeapCursorBuffer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/tag/CompoundTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/tag/CompoundTag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/tag/ListTag.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/codec/src/main/java/net/fmhi/codec/tag/ListTag.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/math/Matrix4x4.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/math/Matrix4x4.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexBuilder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexBuilder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexBuilder2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexBuilder2D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/brush/VertexData.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Util.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Util.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/mesh/Mesh.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/mesh/Mesh.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/NettyBuf.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/NettyCursorBuffer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/PacketDecoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/PacketDecoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/PacketEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/codec/PacketEncoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/packet/HeartbeatPacket.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/packet/HeartbeatPacket.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/packet/Packet.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/network/src/main/java/net/fmhi/network/packet/Packet.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLBufferObject.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLBufferObject.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/glfw/src/main/java/net/fmhi/gfx/glfw/GlfwView.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/glfw/src/main/java/net/fmhi/gfx/glfw/GlfwView.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/AbstractStatefulGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/AbstractStatefulGraphics2D.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/BatchedGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/BatchedGraphics2D.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/Graphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/Graphics2D.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/MeshGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/MeshGraphics2D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/particle/ParticleSystem2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/particle/ParticleSystem2D.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/Registries.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/Registries.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/Block.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/Block.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/BlockState.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/BlockState.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/entity/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/entity/Entity.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquid.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquid.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquids.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquids.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/ChunkCache.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/ChunkCache.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Beam.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CelestialUtil.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CelestialUtil.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Channel.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Channel.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CompositionFormula.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CompositionFormula.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightBuffer.java" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/ScanLightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/SimpleLightBuffer.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/test/java/Test3D.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/Test3D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/TestAtlasAndSkeleton.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestAtlasAndSkeleton.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/TestFluid.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestFluid.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/TestNetwork.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestNetwork.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/TestParticles.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestParticles.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/test/java/TestVertexBuilder2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestVertexBuilder2D.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -287,9 +251,9 @@
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Gradle.fmhi [jar]" />
         <item itemvalue="应用程序.Main" />
         <item itemvalue="应用程序.TestParticles" />
-        <item itemvalue="Gradle.fmhi [jar]" />
         <item itemvalue="应用程序.TestVertexBuilder2D" />
         <item itemvalue="应用程序.Test3D" />
       </list>
@@ -367,7 +331,15 @@
       <option name="project" value="LOCAL" />
       <updated>1785760054640</updated>
     </task>
-    <option name="localTasksCounter" value="9" />
+    <task id="LOCAL-00009" summary="feat: backup before compact op">
+      <option name="closed" value="true" />
+      <created>1785824242482</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1785824242482</updated>
+    </task>
+    <option name="localTasksCounter" value="10" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -391,6 +363,7 @@
     <MESSAGE value="feat: beam (directional light), liquid system" />
     <MESSAGE value="feat: fix texture submission V-flip, clean up" />
     <MESSAGE value="feat: vao global cache, textured tile rendering" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: vao global cache, textured tile rendering" />
+    <MESSAGE value="feat: backup before compact op" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: backup before compact op" />
   </component>
 </project>

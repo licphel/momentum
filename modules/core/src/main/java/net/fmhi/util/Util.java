@@ -17,6 +17,8 @@ public final class Util {
   private static float partialTicks;
   private static float tickTime;
   private static float frameTime;
+  private static volatile int currentFps;
+  private static volatile int currentTps;
 
   private Util() {
   }
@@ -34,10 +36,17 @@ public final class Util {
    * @param draw   the render pass, invoked once per frame
    */
   public static void launch(int maxTps, Runnable tick, Runnable draw) {
-    Util.maxTps = maxTps;
     double tickLength = 1_000_000_000.0 / maxTps;
     double nextTick = System.nanoTime();
+
+    Util.maxTps = maxTps;
     stopped = false;
+    long frameCounter = 0;
+    long tickCounterSnapshot = 0;
+    long lastStatsNano = System.nanoTime();
+    currentFps = 0;
+    currentTps = 0;
+
     while (!stopped) {
       int loops = 0;
       hasTicked = false;
@@ -60,6 +69,25 @@ public final class Util {
       partialTicks = (float) ((System.nanoTime() + tickLength - nextTick) / tickLength);
       frameTime = tickTime + partialTicks * delta;
       draw.run();
+
+      frameCounter++;
+
+      long nowNano = System.nanoTime();
+      long elapsedNano = nowNano - lastStatsNano;
+
+      if (elapsedNano >= 500_000_000) {
+        double elapsedSeconds = elapsedNano / 1_000_000_000.0;
+
+        currentFps = (int) (frameCounter / elapsedSeconds);
+
+        long currentTickCount = tickCount;
+        long ticksSinceLastUpdate = currentTickCount - tickCounterSnapshot;
+        currentTps = (int) (ticksSinceLastUpdate / elapsedSeconds);
+
+        frameCounter = 0;
+        tickCounterSnapshot = currentTickCount;
+        lastStatsNano = nowNano;
+      }
     }
   }
 
@@ -129,6 +157,24 @@ public final class Util {
    */
   public static boolean hasTicked() {
     return hasTicked;
+  }
+
+  /**
+   * Returns the current frames per second (updated every 0.5 seconds).
+   *
+   * @return the current FPS
+   */
+  public static int fps() {
+    return currentFps;
+  }
+
+  /**
+   * Returns the current ticks per second (updated every 0.5 seconds).
+   *
+   * @return the current TPS
+   */
+  public static int tps() {
+    return currentTps;
   }
 
   /**

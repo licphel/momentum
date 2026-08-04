@@ -33,7 +33,6 @@ import net.fmhi.gfx.pipe.Pipeline;
 import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.math.Box2D;
-import net.fmhi.math.Matrix4x4;
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -201,13 +201,13 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void submit(Runnable work) {
-    GfxStats.DCMDPT.increment();
     queue.add(work);
   }
 
   @Override
   public void execute() {
     Runnable task;
+    GfxStats.DCMDPT.add(queue.size());
     try {
       while ((task = queue.poll()) != null) {
         task.run();

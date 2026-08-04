@@ -80,7 +80,12 @@ abstract class AbstractStatefulGraphics2D extends Graphics2D {
 
   @Override
   public void setCamera(Camera2D c) {
+    flush();
     camera = c;
+    onCameraChanged();
+  }
+
+  protected void onCameraChanged() {
   }
 
   @Override

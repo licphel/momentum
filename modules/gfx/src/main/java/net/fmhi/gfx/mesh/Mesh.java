@@ -43,27 +43,15 @@ import java.util.List;
  * @see Material
  */
 public final class Mesh implements AutoCloseable {
-  private final BufferObject ubo;
   private final List<Section> sections;
 
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
    *
-   * @param ubo      the uniform buffer for view-projection data
    * @param sections the list of geometry sections
    */
-  public Mesh(BufferObject ubo, List<Section> sections) {
-    this.ubo = ubo;
+  public Mesh(List<Section> sections) {
     this.sections = sections;
-  }
-
-  /**
-   * Returns the ubo of this mesh.
-   *
-   * @return the mesh ubo
-   */
-  public BufferObject ubo() {
-    return ubo;
   }
 
   /**
@@ -83,9 +71,15 @@ public final class Mesh implements AutoCloseable {
    *
    * @param encoder the encoder to record draw commands into
    * @param slot    the resource binding slot for the material
+   * @param ubo     the view-projection uniform buffer object
    */
-  public void draw(Encoder encoder, int slot) {
+  public void submit(Encoder encoder, int slot, BufferObject ubo) {
     for (Section s : sections) {
+      if (s.vertexCount() == 0) {
+        continue;
+      }
+
+      s.material().resourceSet().bindUniform(0, ubo, 64);
       s.material().apply(encoder, slot);
       encoder.setVertexBuffer(s.vbo());
       encoder.setTopology(s.topology());
@@ -104,7 +98,6 @@ public final class Mesh implements AutoCloseable {
    */
   @Override
   public void close() {
-    ubo.close();
     for (Section s : sections) {
       s.close();
     }

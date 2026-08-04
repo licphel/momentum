@@ -209,7 +209,7 @@ public class Test3D {
         enc.setViewport(0, 0, view.width(), view.height());
 
         Matrix4x4 mvp = vp.multiply(Matrix4x4.IDENTITY);
-        ubo.submit(mat4ToBytes(mvp));
+        MatrixUtil.writeViewProjection(mvp, ubo);
         rs.bindUniform(0, ubo, 64);
         rs.bindTexture(1, tp.src(), sampler);
         enc.setResource(0, rs);
@@ -242,12 +242,6 @@ public class Test3D {
     for (int i : a) {
       bb.putInt(i);
     }
-    return bb.array();
-  }
-
-  static byte[] mat4ToBytes(Matrix4x4 m) {
-    ByteBuffer bb = ByteBuffer.allocate(64).order(ByteOrder.LITTLE_ENDIAN);
-    MatrixUtil.writeViewProjection(m, bb);
     return bb.array();
   }
 }

@@ -209,6 +209,7 @@ public final class GlfwView extends View {
   /** Holds strong references to GLFW callback objects to prevent GC. */
   private final Object[] callbacks = new Object[CB_COUNT];
   private long handle;
+  private boolean hasContext;
   private long cursorHandle;
   private boolean closeRequested;
 
@@ -253,8 +254,10 @@ public final class GlfwView extends View {
     long h = handle;
     return (Runnable) () -> {
       glfwMakeContextCurrent(h);
-      applyPlatformVsync(vsync);
       glfwShowWindow(h);
+
+      hasContext = true;
+      applyPlatformVsync(vsync);
     };
   }
 
@@ -285,6 +288,7 @@ public final class GlfwView extends View {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
     glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
+    glfwWindowHint(GLFW_REFRESH_RATE, 60); // Fix: on Vsync mode, sometimes fps drops to ~30
 
     handle = glfwCreateWindow(width, height, title, NULL, NULL);
 
@@ -502,7 +506,7 @@ public final class GlfwView extends View {
 
   @Override
   protected void applyPlatformVsync(boolean vsync) {
-    if (handle != NULL) {
+    if (handle != NULL && hasContext) {
       glfwSwapInterval(vsync ? 1 : 0);
     }
   }
