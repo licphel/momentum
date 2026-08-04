@@ -4,24 +4,18 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="feat: backup before compact op">
+    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="feat: opengl gfx ringbuffer and other optimizations">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Util.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Util.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/mesh/Mesh.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/mesh/Mesh.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/glfw/src/main/java/net/fmhi/gfx/glfw/GlfwView.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/glfw/src/main/java/net/fmhi/gfx/glfw/GlfwView.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxMetrics.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/AbstractStatefulGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/AbstractStatefulGraphics2D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/BatchedGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/BatchedGraphics2D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/Graphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/Graphics2D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/MeshGraphics2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/rdext/src/main/java/net/fmhi/gfx/brush/MeshGraphics2D.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/ChunkMesh.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/ChunkMesh.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/BFSLightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/BFSLightEngine.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Beam.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Beam.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/Test3D.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/Test3D.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/test/java/TestVertexBuilder2D.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/test/java/TestVertexBuilder2D.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -339,7 +333,15 @@
       <option name="project" value="LOCAL" />
       <updated>1785824242482</updated>
     </task>
-    <option name="localTasksCounter" value="10" />
+    <task id="LOCAL-00010" summary="feat: opengl gfx ringbuffer and other optimizations">
+      <option name="closed" value="true" />
+      <created>1785830823806</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1785830823806</updated>
+    </task>
+    <option name="localTasksCounter" value="11" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -364,6 +366,7 @@
     <MESSAGE value="feat: fix texture submission V-flip, clean up" />
     <MESSAGE value="feat: vao global cache, textured tile rendering" />
     <MESSAGE value="feat: backup before compact op" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: backup before compact op" />
+    <MESSAGE value="feat: opengl gfx ringbuffer and other optimizations" />
+    <option name="LAST_COMMIT_MESSAGE" value="feat: opengl gfx ringbuffer and other optimizations" />
   </component>
 </project>

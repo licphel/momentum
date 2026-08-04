@@ -1,7 +1,7 @@
 package net.fmhi;
 
 import net.fmhi.gfx.Device;
-import net.fmhi.gfx.GfxStats;
+import net.fmhi.gfx.GfxMetrics;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.brush.ZeroCopyVertexStore;
@@ -409,7 +409,7 @@ public class Main {
       try (Profiler.Scope _ = Profiler.scope("rendering:execute")) {
         dev.execute();
       }
-      GfxStats.profile();
+      GfxMetrics.next();
 
       dev.pollEvents();
       snapRef[0].clearFrameState();
@@ -429,6 +429,7 @@ public class Main {
     view.close();
     GlfwView.terminate();
     Profiler.dump();
+    GfxMetrics.dump();
   }
 
   // -- PASS 1 --------------------------------------------------------------

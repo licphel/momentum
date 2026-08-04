@@ -26,7 +26,7 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.DeviceInfo;
-import net.fmhi.gfx.GfxStats;
+import net.fmhi.gfx.GfxMetrics;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
@@ -207,7 +207,7 @@ public final class OpenGLDevice implements Device {
   @Override
   public void execute() {
     Runnable task;
-    GfxStats.DCMDPT.add(queue.size());
+    GfxMetrics.DCMDPT.add(queue.size());
     try {
       while ((task = queue.poll()) != null) {
         task.run();

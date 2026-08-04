@@ -24,8 +24,7 @@
 
 package net.fmhi.world.light;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
 /**
  * A mutable descriptor of a directional beam light, passed between the light engine and
@@ -36,7 +35,7 @@ import java.util.Queue;
  * computation is done.
  */
 public final class Beam {
-  private static final ThreadLocal<Queue<Beam>> POOL = ThreadLocal.withInitial(ArrayDeque::new);
+  private static final ConcurrentLinkedQueue<Beam> POOL = new ConcurrentLinkedQueue<>();
   /** The X coordinate of the light source. */
   public float x;
   /** The Y coordinate of the light source. */
@@ -69,8 +68,7 @@ public final class Beam {
    * @return a pooled light
    */
   public static Beam pooled() {
-    Queue<Beam> pool = POOL.get();
-    Beam src = pool.poll();
+    Beam src = POOL.poll();
     if (src == null) {
       src = new Beam();
     }
@@ -101,10 +99,10 @@ public final class Beam {
    * Returns this light to the pool for reuse.
    *
    * <p>Must be called once the surrounding computation is done; the light must not be
-   * used afterwards.
+   * used afterward.
    */
   public void recycle() {
-    POOL.get().offer(this);
+    POOL.offer(this);
   }
 
   /**

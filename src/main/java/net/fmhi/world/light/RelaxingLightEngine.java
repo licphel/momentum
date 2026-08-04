@@ -4,7 +4,6 @@ import net.fmhi.math.Box2D;
 import net.fmhi.util.Profiler;
 import net.fmhi.world.entity.Entity;
 import net.fmhi.world.level.Chunk;
-import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 
 import java.util.Arrays;
@@ -22,6 +21,7 @@ import java.util.concurrent.Future;
  * @see LightEngine
  */
 public class RelaxingLightEngine extends LightEngine {
+  protected boolean ultraQuality;
   /**
    * Creates a relaxing light engine for the given level.
    *
@@ -87,14 +87,16 @@ public class RelaxingLightEngine extends LightEngine {
             spread(x, y, channel);
           }
         }
-        for (int x = x0; x <= x1; x++) {
-          for (int y = y1; y >= y0; y--) {
-            spread(x, y, channel);
+        if (ultraQuality) { // Ping-pong relaxation is basically enough, but if you want more...
+          for (int x = x0; x <= x1; x++) {
+            for (int y = y1; y >= y0; y--) {
+              spread(x, y, channel);
+            }
           }
-        }
-        for (int x = x1; x >= x0; x--) {
-          for (int y = y0; y <= y1; y++) {
-            spread(x, y, channel);
+          for (int x = x1; x >= x0; x--) {
+            for (int y = y0; y <= y1; y++) {
+              spread(x, y, channel);
+            }
           }
         }
       });
@@ -109,9 +111,7 @@ public class RelaxingLightEngine extends LightEngine {
       for (int y = y0; y <= y1; y++) {
         for (int x = x0; x <= x1; x++) {
           int o = backBufferIndex(x, y);
-          if (o < 0) {
-            continue;
-          }
+          
           populateAO(o, cc, x, y);
         }
       }
@@ -120,9 +120,6 @@ public class RelaxingLightEngine extends LightEngine {
         for (int y = y0; y <= y1; y++) {
           for (int x = x0; x <= x1; x++) {
             int o = backBufferIndex(x, y);
-            if (o < 0) {
-              continue;
-            }
             populateSmoothedLightVerticesByChannel(o, channel, x, y);
           }
         }
@@ -138,9 +135,6 @@ public class RelaxingLightEngine extends LightEngine {
       return;
     }
     int o = backBufferIndex(x, y);
-    if (o < 0) {
-      return;
-    }
     spreadOnChannel(o, channel, x, y);
   }
 

@@ -503,9 +503,7 @@ public abstract class LightEngine implements AutoCloseable {
       return;
     }
     int o = backBufferIndex(x, y);
-    if (o >= 0) {
-      blendWrite(o, r, g, b);
-    }
+    blendWrite(o, r, g, b);
   }
 
   /**
@@ -597,9 +595,7 @@ public abstract class LightEngine implements AutoCloseable {
         float factor = remaining / maxIntensity;
 
         int o = backBufferIndex(tx, ty);
-        if (o < 0) {
-          continue;
-        }
+        
         beamLayer[o] = formula.blend(beamLayer[o], r * factor * AMPLIFIER);
         beamLayer[o + 1] = formula.blend(beamLayer[o + 1], g * factor * AMPLIFIER);
         beamLayer[o + 2] = formula.blend(beamLayer[o + 2], b * factor * AMPLIFIER);
@@ -814,9 +810,6 @@ public abstract class LightEngine implements AutoCloseable {
   public int bufferIndex(int x, int y) {
     x -= frontOriX;
     y -= frontOriY;
-    if (x < 0 || x >= sizeX || y < 0 || y >= sizeY) {
-      return -1;
-    }
     return (x + y * sizeX) * STRIDE;
   }
 
@@ -830,9 +823,6 @@ public abstract class LightEngine implements AutoCloseable {
   protected int backBufferIndex(int x, int y) {
     x -= oriX;
     y -= oriY;
-    if (x < 0 || x >= sizeX || y < 0 || y >= sizeY) {
-      return -1;
-    }
     return (x + y * sizeX) * STRIDE;
   }
 

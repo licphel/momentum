@@ -167,9 +167,7 @@ public class BFSLightEngine extends LightEngine {
       for (int y = y0; y <= y1; y++) {
         for (int x = x0; x <= x1; x++) {
           int o = backBufferIndex(x, y);
-          if (o < 0) {
-            continue;
-          }
+          
           populateAO(o, cc, x, y);
         }
       }
@@ -177,9 +175,6 @@ public class BFSLightEngine extends LightEngine {
         for (int y = y0; y <= y1; y++) {
           for (int x = x0; x <= x1; x++) {
             int o = backBufferIndex(x, y);
-            if (o < 0) {
-              continue;
-            }
             populateSmoothedLightVerticesByChannel(o, channel, x, y);
           }
         }
@@ -222,9 +217,6 @@ public class BFSLightEngine extends LightEngine {
       head++;
 
       int o = backBufferIndex(x, y);
-      if (o < 0) {
-        continue;
-      }
       // per-channel max write: a stronger light that arrived after this
       // entry must not be rolled back — but the wave keeps spreading either
       // way, the carried value is exactly this entry's light

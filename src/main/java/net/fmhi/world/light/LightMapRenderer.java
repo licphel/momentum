@@ -223,9 +223,7 @@ public final class LightMapRenderer implements AutoCloseable {
     for (int y = engine.frontOriginY(); y < engine.frontOriginY() + engine.sizeY(); y++) {
       for (int x = engine.frontOriginX(); x < engine.frontOriginX() + engine.sizeX(); x++) {
         int o = engine.bufferIndex(x, y);
-        if (o < 0) {
-          continue;
-        }
+        
         float m = 1F;
         if (wall) {
           // the wall lightmap bakes in WALL_MULTIPLIER only on wall tiles

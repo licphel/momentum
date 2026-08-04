@@ -33,7 +33,6 @@ import org.jspecify.annotations.NullMarked;
  * drawn after (and cover) the bodies. Used for both the block layer and
  * the wall layer, rebuilt when the layer changes.
  */
-@NullMarked
 public final class ChunkMesh implements AutoCloseable {
   private final Mesh body;
   private final Mesh border;
