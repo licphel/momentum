@@ -32,13 +32,13 @@ import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.fluid.LiquidStack;
 import net.fmhi.world.fluid.Liquids;
-import net.fmhi.world.light.BFSLightEngine;
 import net.fmhi.world.light.LightEngine;
-import net.fmhi.world.light.RelaxingLightEngine;
+import net.fmhi.world.light.RelaxationLightEngine;
+import net.fmhi.world.object.ObjectConfig;
+import net.fmhi.world.object.WorldObject;
 import net.fmhi.world.physics.Polygon;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
-import org.jspecify.annotations.NullMarked;
 import org.jspecify.annotations.Nullable;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
@@ -57,8 +57,10 @@ import java.util.function.Consumer;
 public class Level {
   /** Length of a full day in game ticks (60 Hz, 20 s per game minute, 24 h). */
   public static final long TICKS_PER_DAY = 60L * 20 * 24;
-  /** Chunks farther than this (in chunk units) from the focus are unloaded. */
-  public static final int UNLOAD_RADIUS_CHUNKS = 32;
+  /** Chunks farther than this (in chunk units) from the focus are unloaded.
+   * 41×41 chunks cover the widest light window (512 tiles = 32 chunks) plus
+   * margin; was 32 → 4225 chunks resident. */
+  public static final int UNLOAD_RADIUS_CHUNKS = 20;
 
   private long ticks;
   /** Game time within the current day, advanced at the day clock's pace. */
@@ -68,7 +70,7 @@ public class Level {
   private final ChunkGenerator generator;
   private final long seed;
   private final Long2ObjectMap<Chunk> chunks = new Long2ObjectOpenHashMap<>();
-  private final LightEngine lightEngine = new RelaxingLightEngine(this);
+  private final LightEngine lightEngine = new RelaxationLightEngine(this);
   private final FluidEngine fluidEngine = new FluidEngine(this);
   /** Focus in world block coordinates; chunks farther than
    * {@link #UNLOAD_RADIUS_CHUNKS} are unloaded every tick. */
@@ -230,6 +232,40 @@ public class Level {
     return getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(x, y)).getBlock(x, y);
   }
 
+  /**
+   * Places a multi-tile world object at the given main tile (Starbound style: the
+   * object is an entity floating above the tile grid — its spaces must be empty and,
+   * when {@code rooting}, its anchors must be solid).
+   *
+   * @param config the object definition
+   * @param x      the main tile X
+   * @param y      the main tile Y
+   * @return the placed object, or {@code null} if the placement was invalid
+   */
+  public @Nullable WorldObject placeObject(ObjectConfig config, int x, int y) {
+    for (BlockPos s : config.spaces()) {
+      if (getBlock(x + s.x(), y + s.y()).shape() == Shape.SOLID) {
+        return null; // a space is occupied
+      }
+    }
+    if (config.rooting()) {
+      boolean anyValid = false;
+      for (BlockPos a : config.anchors()) {
+        if (getBlock(x + a.x(), y + a.y()).shape() == Shape.SOLID) {
+          anyValid = true;
+        } else if (!config.anchorAny()) {
+          return null; // an anchor has no support
+        }
+      }
+      if (config.anchorAny() && !anyValid) {
+        return null;
+      }
+    }
+    WorldObject obj = new WorldObject(config, x, y);
+    obj.enterChunk(this);
+    return obj;
+  }
+
   public BlockState getWall(int x, int y) {
     Chunk chunk = getChunkByKey(ChunkPos.packBlockPosAsLong(x, y));
     return chunk != null ? chunk.getWall(x, y) : BlockState.EMPTY;
@@ -246,14 +282,12 @@ public class Level {
       chunk.setLiquid(pos.x(), pos.y(), Liquids.EMPTY, 0);
     }
     markDirtyNeighbours(pos.x(), pos.y(), true);
-    lightEngine.requestRecalc();
   }
 
   public void setWall(BlockPos pos, BlockState state) {
     Chunk chunk = getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(pos.x(), pos.y()));
     chunk.setWall(pos.x(), pos.y(), state);
     markDirtyNeighbours(pos.x(), pos.y(), false);
-    lightEngine.requestRecalc();
   }
 
   /**
@@ -310,9 +344,6 @@ public class Level {
   public void setLiquid(int x, int y, Liquid liquid, int level) {
     getOrLoadChunkByKey(ChunkPos.packBlockPosAsLong(x, y)).setLiquid(x, y, liquid, level);
     if (level > 0) fluidEngine.join(x, y);
-    // only liquid edits from gameplay mark the light stale; the fluid
-    // simulation's per-tick writes stay cheap
-    lightEngine.requestRecalc();
   }
 
   /**

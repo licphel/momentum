@@ -6,7 +6,6 @@ package net.fmhi.world.physics;
 
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;
-import net.fmhi.world.block.BlockState;
 import net.fmhi.world.fluid.FluidEngine;
 import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.fluid.Liquids;
@@ -25,10 +24,10 @@ import org.jspecify.annotations.NullMarked;
  * Liquid buoyancy, drag and swimming are applied on top.
  */
 @NullMarked
-public abstract class SBPhyObj {
+public abstract class DynamicObject {
 
   private static final float MAX_SPEED = 64F;
-  private static final float TOLERANCE = 0.001F;
+  private static final float TOLERANCE = 0.005F;
 
   // -- state -------------------------------------------------------------
 
@@ -141,6 +140,16 @@ public abstract class SBPhyObj {
   /** Call when the "down" key is held. */
   public void ignorePlatformTemporarily() {
     fallThroughSustain = FALL_THROUGH_FRAMES;
+  }
+
+  /**
+   * Consumes the current jump-press state (e.g. after a ground jump), so the
+   * swimming burst of {@link #liquidJump} is not triggered on the next frame:
+   * a body that just jumped out of water must not get the swim burst stacked
+   * on top of the jump velocity.
+   */
+  public void consumeJumpPress() {
+    lastControlJump = true;
   }
 
   // -- tick --------------------------------------------------------------
@@ -256,46 +265,7 @@ public abstract class SBPhyObj {
       float keep = 1F - groundFriction * d;
       velocity = new Vector2(velocity.x() * keep, velocity.y());
     }
-
-    // step-down: follow a slope surface below the feet, so walking
-    // downhill does not leave the slope and float off its edge
-    stepDown(level);
   }
-
-  /**
-   * Pulls the feet onto a slope outline below them (walking downhill).
-   * Platforms are dropped through normally; solid tiles are handled by
-   * the fall clip.
-   */
-  private void stepDown(Level level) {
-    if (velocity.y() > 0F || fallThroughSustain > 0) return; // rising / dropping through
-    Box2D dest = bounds();
-    int minBX = (int) Math.floor(dest.minX());
-    int maxBX = (int) Math.floor(dest.maxX());
-    int footRow = (int) Math.floor(dest.minY() - TOLERANCE);
-    // solid ground under the body's center: no slope can pull the body
-    // down (a staircase below the floor must not yank the player through
-    // it). Only the center column counts — the body spans two tiles when
-    // crossing a slope, and the flat tile must not cancel the step
-    int centerCol = (int) Math.floor(dest.centralX());
-    if (voxelShape(centerCol, footRow, level) == VoxelClip.CUBE) return;
-    float best = Float.NaN;
-    for (int bx = minBX; bx <= maxBX; bx++) {
-      VoxelClip v = voxelShape(bx, footRow, level);
-      if (v == VoxelClip.EMPTY || v == VoxelClip.CUBE || v instanceof VoxelPlatform) continue;
-      float top = v.topAt(Math.max(dest.minX(), bx), Math.min(dest.maxX(), bx + 1F), bx, footRow);
-      if (Float.isNaN(top) || top >= dest.minY()) continue; // at or above the feet
-      best = Float.isNaN(best) ? top : Math.max(best, top);
-    }
-    if (Float.isNaN(best)) return;
-    float drop = dest.minY() - best;
-    if (drop <= 0F || drop > stepHeight) return;
-    position = new PrecisePos(position.xf(), best);
-    velocity = new Vector2(velocity.x(), 0F);
-    onGround = true;
-  }
-
-  // -- step-up ------------------------------------------------------------
 
   /**
    * The height to raise the body onto the tile in front, or

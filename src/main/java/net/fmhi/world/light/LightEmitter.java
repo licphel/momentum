@@ -1,6 +1,6 @@
 package net.fmhi.world.light;
 
-import java.util.Collection;
+import java.util.List;
 
 /**
  * Contract for objects that contribute light to the engine.
@@ -53,7 +53,7 @@ public interface LightEmitter {
      * @param y the tile Y coordinate
      * @return the emitted beams
      */
-    Collection<Beam> emitBeams(int x, int y);
+    List<Beam> emitBeams(int x, int y);
   }
 
   /**
@@ -91,7 +91,7 @@ public interface LightEmitter {
      * @param amount the liquid amount in the tile
      * @return the emitted beams
      */
-    Collection<Beam> emitBeams(int x, int y, int amount);
+    List<Beam> emitBeams(int x, int y, int amount);
   }
 
   /**
@@ -111,6 +111,6 @@ public interface LightEmitter {
      *
      * @return the emitted beams
      */
-    Collection<Beam> emitBeams();
+    List<Beam> emitBeams();
   }
 }

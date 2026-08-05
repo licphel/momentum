@@ -25,243 +25,270 @@
 package net.fmhi.world.light;
 
 import net.fmhi.gfx.Device;
-import net.fmhi.gfx.brush.BatchedGraphics2D;
-import net.fmhi.gfx.brush.MeshGraphics2D;
-import net.fmhi.gfx.brush.ZeroCopyVertexStore;
-import net.fmhi.gfx.brush.tint.QuadGradient;
-import net.fmhi.gfx.math.Camera2D;
-import net.fmhi.gfx.mesh.Mesh;
-import net.fmhi.gfx.pass.RenderPass;
-import net.fmhi.gfx.pass.RenderTarget;
-import net.fmhi.gfx.pass.RenderTargetDesc;
+import net.fmhi.gfx.DirectBufferPool;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
+import net.fmhi.gfx.texture.Texture;
+import net.fmhi.gfx.texture.TextureDesc;
 import net.fmhi.gfx.texture.TextureFilter;
+import net.fmhi.gfx.texture.TextureFormat;
 import net.fmhi.gfx.texture.TextureWrap;
-import net.fmhi.math.Color;
-import net.fmhi.math.Vector2;
+import net.fmhi.math.Box3D;
 import net.fmhi.util.Profiler;
 import net.fmhi.world.block.BlockState;
 import net.fmhi.world.level.Level;
 import org.jspecify.annotations.Nullable;
 
+import java.nio.ByteBuffer;
+
 /**
- * Renders the wall and front lightmaps of a {@link LightEngine} into two off-screen
- * render targets.
+ * Uploads a {@link LightEngine}'s raw RGB buffer to GPU as lightmap textures.
  *
- * <p>Each layer is a retained colored-quad mesh over the whole light window, rebuilt
- * only when the engine's light version changes (world edits, sunlight shifts, window
- * moves or resizes); a static frame is two draw calls with no per-tile work. The
- * renderer is decoupled from the engine: it only reads the completed front buffer via
- * the engine's public accessors.
+ * <p>Each tile becomes one RGBA16F texel of the front or wall lightmap (the wall layer
+ * bakes in {@link LightEngine#WALL_MULTIPLIER}). The textures match the engine window
+ * one-to-one, so the lightmap uv covers them completely and linear sampling never
+ * mixes in data outside the window. Ambient occlusion is not rendered here: the
+ * engine's obstacle light attenuation produces corner shadows in the light data itself.
+ *
+ * <p>The textures are re-uploaded when the engine's light version changes (a static
+ * frame costs nothing) and resized when the window resizes. The uploads are submitted
+ * on the render thread and executed by the frame-end {@code execute()} before the
+ * compose passes draw, so the compose always samples the content packed this frame;
+ * the uniform origin/size therefore reports the last successfully packed window.
  */
 public final class LightMapRenderer implements AutoCloseable {
+  /** Halves per RGBA16F texel. */
+  private static final int HALVES_PER_TEXEL = 4;
   private final Level level;
   /**
-   * Debug switch: when {@code true}, lightmaps are drawn as plain white
-   * rectangles, skipping the light computation to isolate rendering cost.
+   * Debug switch: when {@code true}, the lightmaps are packed as plain white
+   * rectangles, skipping the light values to isolate rendering cost.
    */
   public boolean fullBright;
   private @Nullable Device dev;
-  private RenderTarget wallLightRT;
-  private RenderTarget frontLightRT;
-  private Sampler lmSampler;
-  private @Nullable MeshGraphics2D lmMeshG;
-  private @Nullable Mesh frontLightMesh;
-  private @Nullable Mesh wallLightMesh;
+  private @Nullable Texture frontLightTex;
+  private @Nullable Texture wallLightTex;
+  private @Nullable Sampler lightSampler;
+  private int texW;
+  private int texH;
   private long lastVersion = -1;
+  /** Window origin/size of the last successfully packed window; the compose
+   * uniform must sample with these so it stays aligned with the texture
+   * contents even on frames where the upload was skipped (mid-resize). */
+  private int packedOriginX;
+  private int packedOriginY;
+  private int packedSizeX;
+  private int packedSizeY;
 
   /**
    * Creates a lightmap renderer for the given level.
    *
-   * @param level the level used to determine which tiles are walls
+   * @param level the level used to determine which tiles are walls and which are solid
    */
   public LightMapRenderer(Level level) {
     this.level = level;
   }
 
   /**
-   * Allocates the two lightmap render targets and the sampler used to sample them.
+   * Allocates the samplers used to sample the lightmaps; the textures themselves are
+   * created lazily on the first {@link #update(LightEngine)} once the engine window size
+   * is known.
    *
-   * @param dev    the graphics device
-   * @param width  the lightmap width in pixels
-   * @param height the lightmap height in pixels
+   * @param dev the graphics device
    */
-  public void init(Device dev, int width, int height) {
+  public void init(Device dev) {
     this.dev = dev;
-    wallLightRT = dev.getRenderTarget(RenderTargetDesc.offscreen(width, height));
-    frontLightRT = dev.getRenderTarget(RenderTargetDesc.offscreen(width, height));
-    lmSampler = dev.getSampler(new SamplerDesc.Builder()
-        .minFilter(TextureFilter.NEAREST)
-        .magFilter(TextureFilter.NEAREST)
+    lightSampler = dev.getSampler(new SamplerDesc.Builder()
+        .minFilter(TextureFilter.LINEAR)
+        .magFilter(TextureFilter.LINEAR)
         .wrapX(TextureWrap.CLAMP_TO_EDGE)
         .wrapY(TextureWrap.CLAMP_TO_EDGE)
         .build());
   }
 
   /**
-   * Returns the render target holding the wall lightmap.
+   * Returns the front-layer lightmap texture (1 texel per tile).
    *
-   * @return the wall lightmap target
+   * @return the front lightmap texture
    */
-  public RenderTarget backLightmap() {
-    return wallLightRT;
+  public @Nullable Texture frontLightTexture() {
+    return frontLightTex;
   }
 
   /**
-   * Returns the render target holding the front lightmap.
+   * Returns the wall-layer lightmap texture, dimmed on wall tiles.
    *
-   * @return the front lightmap target
+   * @return the wall lightmap texture
    */
-  public RenderTarget frontLightmap() {
-    return frontLightRT;
+  public @Nullable Texture wallLightTexture() {
+    return wallLightTex;
   }
 
   /**
-   * Returns the sampler used when sampling the lightmaps.
+   * Returns the linearly-filtered sampler for the lightmap textures.
    *
    * @return the lightmap sampler
    */
-  public Sampler sampler() {
-    return lmSampler;
+  public @Nullable Sampler lightSampler() {
+    return lightSampler;
   }
 
   /**
-   * Renders both lightmap layers into their targets.
+   * Returns the window origin the textures currently contain — the origin of the last
+   * successfully packed window. Sampling with this origin keeps the compose uv aligned
+   * with the texture contents even on frames where the upload was skipped.
    *
-   * <p>Must be called on the render thread after the engine's front buffer is complete.
-   * The retained meshes are rebuilt only when {@link LightEngine#lightVersion()}
-   * changed.
-   *
-   * @param g      the batched renderer to draw with
-   * @param cam    the camera defining the visible area
-   * @param engine the engine whose front buffer is rendered
+   * @return the X origin of the packed window
    */
-  public void render(BatchedGraphics2D g, Camera2D cam, LightEngine engine) {
-    try (Profiler.Scope _ = Profiler.scope("rendering:lightmap")) {
-      Vector2 cp = cam.center();
-      float vw = cam.width() / cam.zoom();
-      float vh = cam.height() / cam.zoom();
-
-      if (fullBright) {
-        // one full-view rectangle per lightmap: no per-tile work at all
-        g.begin(RenderPass.of(frontLightRT, Color.BLACK));
-        g.setCamera(cam);
-        g.setColor(Color.WHITE);
-        g.drawRectangle(cp.x() - vw / 2F, cp.y() - vh / 2F, vw, vh);
-        g.end();
-
-        g.begin(RenderPass.of(wallLightRT, Color.BLACK));
-        g.setCamera(cam);
-        g.setColor(Color.WHITE);
-        g.drawRectangle(cp.x() - vw / 2F, cp.y() - vh / 2F, vw, vh);
-        g.end();
-        return;
-      }
-
-      // the meshes are rebuilt only when the light data or the window
-      // changed; a static frame is two draw calls, zero per-tile work
-      long version = engine.lightVersion();
-      if (lastVersion != version && dev != null) {
-        rebuildLightMeshes(engine);
-        lastVersion = version;
-      }
-
-      // front lightmap: blocks, sky, entities — full brightness
-      g.begin(RenderPass.of(frontLightRT, Color.BLACK));
-      g.setCamera(cam);
-      if (frontLightMesh != null) {
-        g.drawMesh(frontLightMesh);
-      }
-      g.end();
-
-      // wall lightmap: every wall tile — baked WALL_MULTIPLIER
-      g.begin(RenderPass.of(wallLightRT, Color.BLACK));
-      g.setCamera(cam);
-      if (wallLightMesh != null) {
-        g.drawMesh(wallLightMesh);
-      }
-      g.end();
-    }
+  public int packedOriginX() {
+    return packedOriginX;
   }
 
   /**
-   * Rebuilds the retained lightmap meshes from the engine's front buffer.
+   * Returns the window origin the textures currently contain (see
+   * {@link #packedOriginX()}).
    *
-   * <p>The meshes cover the whole light window, so the camera can move inside it without
-   * redrawing; only a stale window (resize, recompute) triggers a rebuild.
+   * @return the Y origin of the packed window
    */
-  private void rebuildLightMeshes(LightEngine engine) {
-    assert dev != null;
-    if (lmMeshG == null) {
-      lmMeshG = new MeshGraphics2D(new ZeroCopyVertexStore(true), dev);
-    }
-    if (frontLightMesh != null) {
-      frontLightMesh.close();
-      frontLightMesh = null;
-    }
-    if (wallLightMesh != null) {
-      wallLightMesh.close();
-      wallLightMesh = null;
-    }
-    frontLightMesh = buildLightMesh(engine, false);
-    wallLightMesh = buildLightMesh(engine, true);
+  public int packedOriginY() {
+    return packedOriginY;
   }
 
   /**
-   * Builds one lightmap layer mesh (front or wall) from the front buffer, one colored
-   * quad per tile over the whole window.
+   * Returns the width of the texture contents (the window size when last packed).
+   *
+   * @return the packed window width in tiles
    */
-  private Mesh buildLightMesh(LightEngine engine, boolean wall) {
-    assert lmMeshG != null;
-    assert dev != null;
+  public int packedSizeX() {
+    return packedSizeX;
+  }
 
+  /**
+   * Returns the height of the texture contents (the window size when last packed).
+   *
+   * @return the packed window height in tiles
+   */
+  public int packedSizeY() {
+    return packedSizeY;
+  }
+
+  /**
+   * Re-uploads the lightmaps from the engine's front buffer when its light version
+   * changed; a static frame does nothing.
+   *
+   * @param engine the engine whose front buffer is uploaded
+   */
+  public void update(LightEngine engine) {
+    if (dev == null) {
+      return;
+    }
+    long version = engine.lightVersion();
+    if (version == lastVersion) {
+      return;
+    }
+    int w = engine.sizeX();
+    int h = engine.sizeY();
     float[] buf = engine.buffer();
-    QuadGradient tg = new QuadGradient();
-    lmMeshG.begin();
-    lmMeshG.setColor(Color.WHITE);
-    for (int y = engine.frontOriginY(); y < engine.frontOriginY() + engine.sizeY(); y++) {
-      for (int x = engine.frontOriginX(); x < engine.frontOriginX() + engine.sizeX(); x++) {
-        int o = engine.bufferIndex(x, y);
-        
-        float m = 1F;
-        if (wall) {
-          // the wall lightmap bakes in WALL_MULTIPLIER only on wall tiles
-          m = level.getWall(x, y) == BlockState.EMPTY ? 1F : LightEngine.WALL_MULTIPLIER;
+    // exact size match: a stale front (larger after a shrink, smaller after a
+    // grow) must not be packed — its stride would not match the window
+    if (buf == null || buf.length != w * h * LightEngine.STRIDE) {
+      return; // the worker is mid-resize — try again next frame (version unacked)
+    }
+
+    try (var _ = Profiler.scope("lighting:pack_lightmap")) {
+      lastVersion = version;
+      int ox = engine.frontOriginX();
+      int oy = engine.frontOriginY();
+      ensureTextures(w, h);
+      packedOriginX = ox;
+      packedOriginY = oy;
+      packedSizeX = w;
+      packedSizeY = h;
+
+      packLight(engine, buf, false, frontLightTex, w, h, ox, oy);
+      packLight(engine, buf, true, wallLightTex, w, h, ox, oy);
+    }
+  }
+
+  /** Creates or resizes the two lightmap textures to the current engine window. */
+  private void ensureTextures(int w, int h) {
+    assert dev != null;
+    if (frontLightTex != null && texW == w && texH == h) {
+      return;
+    }
+    if (frontLightTex != null) {
+      frontLightTex.close();
+    }
+    if (wallLightTex != null) {
+      wallLightTex.close();
+    }
+    texW = w;
+    texH = h;
+    frontLightTex = dev.getTexture(new TextureDesc.Builder()
+        .width(w).height(h).format(TextureFormat.RGBA16F).build());
+    wallLightTex = dev.getTexture(new TextureDesc.Builder()
+        .width(w).height(h).format(TextureFormat.RGBA16F).build());
+  }
+
+  /**
+   * Packs the engine's raw RGB values into one RGBA16F texel per tile and uploads them
+   * into the window-sized texture.
+   *
+   * @param engine the light engine
+   * @param buf    the engine's front buffer
+   * @param wall   whether to bake {@link LightEngine#WALL_MULTIPLIER} on wall tiles
+   * @param tex    the texture to upload into
+   * @param w      the engine window width in tiles
+   * @param h      the engine window height in tiles
+   * @param ox     the engine window origin X
+   * @param oy     the engine window origin Y
+   */
+  private void packLight(LightEngine engine, float[] buf, boolean wall, @Nullable Texture tex,
+                         int w, int h, int ox, int oy) {
+    if (tex == null) {
+      return;
+    }
+    ByteBuffer bb = DirectBufferPool.acquire(w * h * HALVES_PER_TEXEL * Short.BYTES);
+
+    for (int yy = 0; yy < h; yy++) {
+      int y = h - 1 - yy;
+      for (int x = 0; x < w; x++) {
+        int o = (x + y * w) * LightEngine.STRIDE;
+        float r = buf[o];
+        float g = buf[o + 1];
+        float b = buf[o + 2];
+        if (fullBright) {
+          r = 1F;
+          g = 1F;
+          b = 1F;
+        } else if (wall && level.getWall(ox + x, oy + y) != BlockState.EMPTY) {
+          r *= LightEngine.WALL_MULTIPLIER;
+          g *= LightEngine.WALL_MULTIPLIER;
+          b *= LightEngine.WALL_MULTIPLIER;
         }
-        tg.setColors(
-            Color.pack(engine.r(buf, o, 0) * m, engine.g(buf, o, 0) * m, engine.b(buf, o, 0) * m, 1F),
-            Color.pack(engine.r(buf, o, 1) * m, engine.g(buf, o, 1) * m, engine.b(buf, o, 1) * m, 1F),
-            Color.pack(engine.r(buf, o, 2) * m, engine.g(buf, o, 2) * m, engine.b(buf, o, 2) * m, 1F),
-            Color.pack(engine.r(buf, o, 3) * m, engine.g(buf, o, 3) * m, engine.b(buf, o, 3) * m, 1F)
-        );
-        lmMeshG.setGradient(tg);
-        lmMeshG.drawRectangle(x, y, 1, 1);
+        bb.putShort(Float.floatToFloat16(r));
+        bb.putShort(Float.floatToFloat16(g));
+        bb.putShort(Float.floatToFloat16(b));
+        bb.putShort(Float.floatToFloat16(1F));
       }
     }
-    lmMeshG.end();
-    return lmMeshG.bake(dev);
+    bb.flip();
+    // submit snapshots the data on this thread (see OpenGLTexture.submit), so
+    // the pooled buffer can be released right away
+    tex.submit(bb, Box3D.create(0, 0, 0, w, h, 1));
+    DirectBufferPool.release(bb);
   }
 
   @Override
   public void close() {
-    if (wallLightRT != null) {
-      wallLightRT.close();
+    if (frontLightTex != null) {
+      frontLightTex.close();
     }
-    if (frontLightRT != null) {
-      frontLightRT.close();
+    if (wallLightTex != null) {
+      wallLightTex.close();
     }
-    if (lmSampler != null) {
-      lmSampler.close();
-    }
-    if (frontLightMesh != null) {
-      frontLightMesh.close();
-    }
-    if (wallLightMesh != null) {
-      wallLightMesh.close();
-    }
-    if (lmMeshG != null) {
-      lmMeshG.close();
+    if (lightSampler != null) {
+      lightSampler.close();
     }
   }
 }

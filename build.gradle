@@ -126,7 +126,10 @@ dependencies {
   runtimeOnly "org.lwjgl:lwjgl-harfbuzz::${lwjglNatives}"
 }
 
-test { failOnNoDiscoveredTests = false }
+test {
+  useJUnitPlatform()
+  failOnNoDiscoveredTests = false
+}
 
 publishing {
   publications {

@@ -121,6 +121,7 @@ public final class Profiler {
           entry.minNs * NS_TO_MS, entry.maxNs * NS_TO_MS,
           entry.totalNs * NS_TO_MS / entry.count, entry.totalNs * NS_TO_MS);
     }
+    System.out.println();
   }
 
   /** Clears all accumulated data. */

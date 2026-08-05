@@ -53,11 +53,13 @@ public abstract class Liquid implements LightEmitter.Liquid {
     return 0F;
   }
 
-  /** The directional beams emitted by this liquid; the caller draws and
-   * recycles them. */
+  /**
+   * The directional beams emitted by this liquid; the caller draws and
+   * recycles them.
+   */
   @Override
-  public java.util.Collection<Beam> emitBeams(int x, int y, int amount) {
-    return Collections.emptySet();
+  public List<Beam> emitBeams(int x, int y, int amount) {
+    return Collections.emptyList();
   }
 
   // -- physics ------------------------------------------------------------

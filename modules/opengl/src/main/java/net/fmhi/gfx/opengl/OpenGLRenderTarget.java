@@ -24,6 +24,8 @@
 
 package net.fmhi.gfx.opengl;
 
+import net.fmhi.gfx.DirectBufferPool;
+import net.fmhi.gfx.io.ImageUtil;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureDesc;
@@ -170,32 +172,28 @@ public final class OpenGLRenderTarget implements RenderTarget {
     }
 
     @Override
-    public void submit(byte[] data, Box3D region) {
+    public void submit(ByteBuffer data, Box3D region) {
+      int x = (int) region.minX();
+      int y = (int) region.minY();
+      int w = (int) region.width();
+      int h = (int) region.height();
+      // snapshot + flip on the calling thread (same convention as
+      // OpenGLTexture.submit); the GL work runs later on the render thread
+      ByteBuffer flipped = ImageUtil.pooledFlip(data, w, h);
       OpenGLRenderTarget.this.ctx.submit(() -> {
         OpenGLCache c = OpenGLRenderTarget.this.ctx.cache;
-        c.setTexture(0, GL_TEXTURE_2D, colorTex);
-        int x = (int) region.minX();
-        int y = (int) region.minY();
-        int w = (int) region.width();
-        int h = (int) region.height();
-        // Same convention as OpenGLTexture.submit: API data is top-origin,
-        // flip to GL row order and flip the destination Y. A full-target
-        // upload (y=0, h=height) is unaffected.
-        byte[] flipped = flipVertically(data, w, h);
-        glTexSubImage2D(GL_TEXTURE_2D, 0, x, fboHeight - y - h, w, h, GL_RGBA,
-            GL_UNSIGNED_BYTE, ByteBuffer.wrap(flipped));
+        try {
+          c.setTexture(0, GL_TEXTURE_2D, colorTex);
+          // Same convention as OpenGLTexture.submit: API data is top-origin,
+          // flip to GL row order and flip the destination Y. A full-target
+          // upload (y=0, h=height) is unaffected.
+          glTexSubImage2D(GL_TEXTURE_2D, 0, x, fboHeight - y - h, w, h, GL_RGBA,
+              GL_UNSIGNED_BYTE, flipped);
+        } finally {
+          DirectBufferPool.release(flipped);
+        }
         c.setTexture(0, GL_TEXTURE_2D, 0);
       });
-    }
-
-    private static byte[] flipVertically(byte[] data, int width, int height) {
-      int bpp = data.length / (width * height);
-      int rowSize = width * bpp;
-      byte[] out = new byte[data.length];
-      for (int row = 0; row < height; row++) {
-        System.arraycopy(data, row * rowSize, out, (height - 1 - row) * rowSize, rowSize);
-      }
-      return out;
     }
 
     @Override

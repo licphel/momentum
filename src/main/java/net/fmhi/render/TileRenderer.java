@@ -88,6 +88,10 @@ public class TileRenderer {
   private final Long2ObjectMap<ChunkMesh> meshes = new Long2ObjectOpenHashMap<>();
   /** Per-chunk retained wall meshes, rebuilt when the wall layer is dirty. */
   private final Long2ObjectMap<ChunkMesh> wallMeshes = new Long2ObjectOpenHashMap<>();
+  /** Meshes built per frame; a moving camera can otherwise slam the render
+   * thread with a whole column of chunk builds in a single frame. */
+  private static final int MAX_BUILDS_PER_FRAME = 1;
+  private int buildsThisFrame;
   private final MeshGraphics2D meshG;
 
   private TileRenderer(Device dev) {
@@ -194,14 +198,27 @@ public class TileRenderer {
     float vh = cam.height() / cam.zoom();
     int cs = ChunkPos.SIZE;
     g.setColor(Color.WHITE);
+    buildsThisFrame = 0;
 
-    // pass 1: draw every chunk body (animated block bodies too)
-    for (int cx = (int) Math.floor((cp.x() - vw / 2F) / cs); cx <= (int) Math.floor((cp.x() + vw / 2F) / cs); cx++)
-      for (int cy = (int) Math.floor((cp.y() - vh / 2F) / cs); cy <= (int) Math.floor((cp.y() + vh / 2F) / cs); cy++) {
+    int minCx = (int) Math.floor((cp.x() - vw / 2F) / cs);
+    int maxCx = (int) Math.floor((cp.x() + vw / 2F) / cs);
+    int minCy = (int) Math.floor((cp.y() - vh / 2F) / cs);
+    int maxCy = (int) Math.floor((cp.y() + vh / 2F) / cs);
+
+    // pass 1: draw every chunk body (animated block bodies too); a chunk whose
+    // retained mesh is not built yet (build budget exhausted) falls back to
+    // immediate mode so the moving camera never hitches on a whole column of
+    // new chunks at once
+    for (int cx = minCx; cx <= maxCx; cx++)
+      for (int cy = minCy; cy <= maxCy; cy++) {
         ChunkPos pos = new ChunkPos(cx, cy);
         Chunk ck = level.getOrLoadChunk(pos);
         ChunkMesh cm = ensureFrontMesh(level, pos);
-        g.drawMesh(cm.body());
+        if (cm != null) {
+          g.drawMesh(cm.body());
+        } else {
+          drawChunkImmediate(g, level, ck, pos, false, false);
+        }
         for (int ly = 0; ly < cs; ly++)
           for (int lx = 0; lx < cs; lx++) {
             BlockState s = ck.getBlock(lx, ly);
@@ -213,13 +230,16 @@ public class TileRenderer {
 
     // pass 2: all borders on top, so a neighbouring chunk's body never
     // occludes this chunk's border at chunk boundaries
-    for (int cx = (int) Math.floor((cp.x() - vw / 2F) / cs); cx <= (int) Math.floor((cp.x() + vw / 2F) / cs); cx++)
-      for (int cy = (int) Math.floor((cp.y() - vh / 2F) / cs); cy <= (int) Math.floor((cp.y() + vh / 2F) / cs); cy++) {
+    for (int cx = minCx; cx <= maxCx; cx++)
+      for (int cy = minCy; cy <= maxCy; cy++) {
         ChunkPos pos = new ChunkPos(cx, cy);
         Chunk ck = level.getOrLoadChunk(pos);
         ChunkMesh cm = meshes.get(pos.asLong());
-        if (cm == null) continue;
-        g.drawMesh(cm.border());
+        if (cm != null) {
+          g.drawMesh(cm.border());
+        } else {
+          drawChunkImmediate(g, level, ck, pos, true, false);
+        }
         for (int ly = 0; ly < cs; ly++)
           for (int lx = 0; lx < cs; lx++) {
             BlockState s = ck.getBlock(lx, ly);
@@ -230,35 +250,85 @@ public class TileRenderer {
       }
   }
 
+  /**
+   * Immediate-mode fallback for a chunk whose retained mesh is not built yet
+   * (the per-frame build budget is exhausted): draws the chunk's tiles directly
+   * so it stays visible while the retained meshes catch up.
+   *
+   * @param g     the batched renderer
+   * @param level the level
+   * @param ck    the chunk
+   * @param pos   the chunk position
+   * @param edges whether to draw the tile edges (pass 2) or the bodies (pass 1)
+   * @param wall  whether to draw the wall layer instead of the block layer
+   */
+  private void drawChunkImmediate(BatchedGraphics2D g, Level level, Chunk ck, ChunkPos pos,
+                                  boolean edges, boolean wall) {
+    int cs = ChunkPos.SIZE;
+    int x0 = pos.x() * cs;
+    int y0 = pos.y() * cs;
+    for (int ly = 0; ly < cs; ly++)
+      for (int lx = 0; lx < cs; lx++) {
+        BlockState s = wall ? ck.getWall(lx, ly) : ck.getBlock(lx, ly);
+        if (s == null || s.block() == Registries.AIR) continue;
+        Material m = materialOf(s.block());
+        if (edges) {
+          drawEdges(g, level, x0 + lx, y0 + ly, m, false, wall ? Level::getWall : Level::getBlock);
+        } else {
+          drawBody(g, level, x0 + lx, y0 + ly, m, wall ? false : isSlope(s));
+        }
+      }
+  }
+
   private static boolean isSlope(BlockState s) {
     return s.block() == Registries.SLOPE_RIGHT || s.block() == Registries.SLOPE_LEFT;
   }
 
-  /** Returns the retained block mesh of a chunk, rebuilding it when the
-   * block layer is dirty. */
-  private ChunkMesh ensureFrontMesh(Level level, ChunkPos pos) {
+  /**
+   * Returns the retained block mesh of a chunk, rebuilding it when the block layer is
+   * dirty — or {@code null} when the per-frame build budget is exhausted, so the
+   * caller draws the chunk immediately and the mesh is built on a later frame.
+   */
+  private @Nullable ChunkMesh ensureFrontMesh(Level level, ChunkPos pos) {
     Chunk ck = level.getOrLoadChunk(pos);
     ChunkMesh cm = meshes.get(pos.asLong());
-    if (cm == null || ck.frontDirty) {
-      if (cm != null) cm.close();
-      cm = buildChunkMesh(level, pos);
-      meshes.put(pos.asLong(), cm);
-      ck.frontDirty = false;
+    if (cm != null && !ck.frontDirty) {
+      return cm;
     }
+    if (buildsThisFrame >= MAX_BUILDS_PER_FRAME) {
+      return null;
+    }
+    if (cm != null) {
+      cm.close();
+    }
+    cm = buildChunkMesh(level, pos);
+    meshes.put(pos.asLong(), cm);
+    ck.frontDirty = false;
+    buildsThisFrame++;
     return cm;
   }
 
-  /** Returns the retained wall mesh of a chunk, rebuilding it when the
-   * wall layer is dirty. */
-  private ChunkMesh ensureBackMesh(Level level, ChunkPos pos) {
+  /**
+   * Returns the retained wall mesh of a chunk, rebuilding it when the wall layer is
+   * dirty — or {@code null} when the per-frame build budget is exhausted (see
+   * {@link #ensureFrontMesh(Level, ChunkPos)}).
+   */
+  private @Nullable ChunkMesh ensureBackMesh(Level level, ChunkPos pos) {
     Chunk ck = level.getOrLoadChunk(pos);
     ChunkMesh cm = wallMeshes.get(pos.asLong());
-    if (cm == null || ck.backDirty) {
-      if (cm != null) cm.close();
-      cm = buildWallMesh(level, pos);
-      wallMeshes.put(pos.asLong(), cm);
-      ck.backDirty = false;
+    if (cm != null && !ck.backDirty) {
+      return cm;
     }
+    if (buildsThisFrame >= MAX_BUILDS_PER_FRAME) {
+      return null;
+    }
+    if (cm != null) {
+      cm.close();
+    }
+    cm = buildWallMesh(level, pos);
+    wallMeshes.put(pos.asLong(), cm);
+    ck.backDirty = false;
+    buildsThisFrame++;
     return cm;
   }
 
@@ -341,15 +411,32 @@ public class TileRenderer {
     float vh = cam.height() / cam.zoom();
     int cs = ChunkPos.SIZE;
     g.setColor(Color.WHITE);
-    for (int cx = (int) Math.floor((cp.x() - vw / 2F) / cs); cx <= (int) Math.floor((cp.x() + vw / 2F) / cs); cx++)
-      for (int cy = (int) Math.floor((cp.y() - vh / 2F) / cs); cy <= (int) Math.floor((cp.y() + vh / 2F) / cs); cy++) {
-        ChunkMesh cm = ensureBackMesh(level, new ChunkPos(cx, cy));
-        g.drawMesh(cm.body());
+    buildsThisFrame = 0;
+
+    int minCx = (int) Math.floor((cp.x() - vw / 2F) / cs);
+    int maxCx = (int) Math.floor((cp.x() + vw / 2F) / cs);
+    int minCy = (int) Math.floor((cp.y() - vh / 2F) / cs);
+    int maxCy = (int) Math.floor((cp.y() + vh / 2F) / cs);
+
+    for (int cx = minCx; cx <= maxCx; cx++)
+      for (int cy = minCy; cy <= maxCy; cy++) {
+        ChunkPos pos = new ChunkPos(cx, cy);
+        ChunkMesh cm = ensureBackMesh(level, pos);
+        if (cm != null) {
+          g.drawMesh(cm.body());
+        } else {
+          drawChunkImmediate(g, level, level.getOrLoadChunk(pos), pos, false, true);
+        }
       }
-    for (int cx = (int) Math.floor((cp.x() - vw / 2F) / cs); cx <= (int) Math.floor((cp.x() + vw / 2F) / cs); cx++)
-      for (int cy = (int) Math.floor((cp.y() - vh / 2F) / cs); cy <= (int) Math.floor((cp.y() + vh / 2F) / cs); cy++) {
-        ChunkMesh cm = wallMeshes.get(new ChunkPos(cx, cy).asLong());
-        if (cm != null) g.drawMesh(cm.border());
+    for (int cx = minCx; cx <= maxCx; cx++)
+      for (int cy = minCy; cy <= maxCy; cy++) {
+        ChunkPos pos = new ChunkPos(cx, cy);
+        ChunkMesh cm = wallMeshes.get(pos.asLong());
+        if (cm != null) {
+          g.drawMesh(cm.border());
+        } else {
+          drawChunkImmediate(g, level, level.getOrLoadChunk(pos), pos, true, true);
+        }
       }
   }
 

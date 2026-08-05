@@ -31,7 +31,7 @@ import net.fmhi.property.PropertyDef;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.LightEngine;
 import net.fmhi.world.physics.CollisionKind;
-import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.DynamicObject;
 import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.item.ItemLike;
@@ -72,7 +72,7 @@ public class Block implements ItemLike, RegistryEntry<Block> {
     defaultState = BlockStateHolder.BLOCK_STATE_PROPERTY_PALETTE.get(propertyDef.defaultMap().identity());
   }
 
-  public @Nullable Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
+  public @Nullable Polygon getPhysicsShape(BlockState state, BlockPos pos, DynamicObject obj) {
     return Polygon.CUBE;
   }
 
@@ -135,7 +135,7 @@ public class Block implements ItemLike, RegistryEntry<Block> {
 
   /** The directional beams emitted by this state; the caller draws and
    * recycles them. */
-  public java.util.Collection<Beam> emitBeams(BlockState state, int x, int y) {
+  public List<Beam> emitBeams(BlockState state, int x, int y) {
     return List.of();
   }
 

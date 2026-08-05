@@ -28,18 +28,17 @@ import net.fmhi.math.Box2D;
 import net.fmhi.world.level.Level;
 import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.Channel;
-import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.light.LightEmitter;
+import net.fmhi.world.physics.DynamicObject;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 import org.jspecify.annotations.NullMarked;
-import org.jspecify.annotations.Nullable;
 
-import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 
 @NullMarked
-public class Entity extends SBPhyObj {
+public class Entity extends DynamicObject implements LightEmitter.Dynamic {
 
   private final float w;
   private final float h;
@@ -61,7 +60,7 @@ public class Entity extends SBPhyObj {
 
   @Override
   protected float gravity() {
-    return 65F;
+    return 150F;
   }
 
   public void tick(double dt, Level level) {
@@ -81,10 +80,12 @@ public class Entity extends SBPhyObj {
     return 0F;
   }
 
-  /** The directional beams emitted by this entity; the caller draws and
-   * recycles them. */
-  public Collection<Beam> emitBeams() {
-    return Collections.emptySet();
+  /**
+   * The directional beams emitted by this entity; the caller draws and
+   * recycles them.
+   */
+  public List<Beam> emitBeams() {
+    return Collections.emptyList();
   }
 
   public static Entity player(PrecisePos pos) {

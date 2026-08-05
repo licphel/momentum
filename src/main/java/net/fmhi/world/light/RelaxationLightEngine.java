@@ -7,7 +7,6 @@ import net.fmhi.world.level.Chunk;
 import net.fmhi.world.level.Level;
 
 import java.util.Arrays;
-import java.util.concurrent.Future;
 
 /**
  * Light engine that recomputes its full window on a background virtual thread, spreading
@@ -20,14 +19,14 @@ import java.util.concurrent.Future;
  *
  * @see LightEngine
  */
-public class RelaxingLightEngine extends LightEngine {
-  protected boolean ultraQuality;
+public class RelaxationLightEngine extends LightEngine {
+  protected boolean ultraQuality = true;
   /**
    * Creates a relaxing light engine for the given level.
    *
    * @param level the level to light
    */
-  public RelaxingLightEngine(Level level) {
+  public RelaxationLightEngine(Level level) {
     super(level);
   }
 
@@ -39,11 +38,11 @@ public class RelaxingLightEngine extends LightEngine {
    */
   @Override
   protected void calculate(Box2D cam) {
-    float spd = MAX_VALUE_GENERAL / UNIT;
-    int x0 = (int) (cam.minX() - spd);
-    int y0 = (int) (cam.minY() - spd);
-    int x1 = (int) (cam.maxX() + spd);
-    int y1 = (int) (cam.maxY() + spd);
+    float margin = MAX_VALUE_GENERAL / UNIT - cam.width() / 128.0F;
+    int x0 = (int) (cam.minX() - margin);
+    int y0 = (int) (cam.minY() - margin);
+    int x1 = (int) (cam.maxX() + margin);
+    int y1 = (int) (cam.maxY() + margin);
 
     // guard: the window must contain the computation range
     if (x1 - x0 + 1 > sizeX || y1 - y0 + 1 > sizeY) {
@@ -87,7 +86,8 @@ public class RelaxingLightEngine extends LightEngine {
             spread(x, y, channel);
           }
         }
-        if (ultraQuality) { // Ping-pong relaxation is basically enough, but if you want more...
+        // Ping-pong relaxation is basically enough at large scale.
+        if (ultraQuality) {
           for (int x = x0; x <= x1; x++) {
             for (int y = y1; y >= y0; y--) {
               spread(x, y, channel);
@@ -104,27 +104,7 @@ public class RelaxingLightEngine extends LightEngine {
 
     // Beam light: max-blend into raw channels after spread (spread is
     // isotropic and would wash out the cone if the beam went through it)
-    Future<?> future = executor.submit(this::mergeBeam);
-
-    // Phase 4: populate vertex lights
-    try (Profiler.Scope _ = Profiler.scope("lighting:populate")) {
-      for (int y = y0; y <= y1; y++) {
-        for (int x = x0; x <= x1; x++) {
-          int o = backBufferIndex(x, y);
-          
-          populateAO(o, cc, x, y);
-        }
-      }
-
-      channelDispatch(channel -> {
-        for (int y = y0; y <= y1; y++) {
-          for (int x = x0; x <= x1; x++) {
-            int o = backBufferIndex(x, y);
-            populateSmoothedLightVerticesByChannel(o, channel, x, y);
-          }
-        }
-      });
-    }
+    mergeBeam();
   }
 
   /**
@@ -135,6 +115,9 @@ public class RelaxingLightEngine extends LightEngine {
       return;
     }
     int o = backBufferIndex(x, y);
+    if (o < 0) {
+      return;
+    }
     spreadOnChannel(o, channel, x, y);
   }
 

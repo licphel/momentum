@@ -37,7 +37,7 @@ import net.fmhi.world.light.Beam;
 import net.fmhi.world.light.Channel;
 import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.Polygon;
-import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.DynamicObject;
 import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.physics.VoxelPlatform;
 import net.fmhi.world.util.BlockPos;
@@ -68,7 +68,7 @@ public final class Registries {
 
   public static final Block AIR = registerBlock("air", new Block() {
     @Override
-    public @Nullable Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
+    public @Nullable Polygon getPhysicsShape(BlockState state, BlockPos pos, DynamicObject obj) {
       return null;
     }
 
@@ -115,7 +115,7 @@ public final class Registries {
     }
 
     @Override
-    public java.util.Collection<Beam> emitBeams(BlockState state, int x, int y) {
+    public List<Beam> emitBeams(BlockState state, int x, int y) {
       float f = (float) (System.currentTimeMillis() % 1000000) / 1000.0F;
       return List.of(
           Beam.pooled().set(x + 0.5F, y + 0.5F, 1, 0.2F, 0.2F,
@@ -146,7 +146,7 @@ public final class Registries {
 
   public static final Block SLOPE_RIGHT = registerBlock("slope_right", new Block() {
     @Override
-    public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
+    public Polygon getPhysicsShape(BlockState state, BlockPos pos, DynamicObject obj) {
       return SHAPE_SLOPE_RIGHT;
     }
 
@@ -168,7 +168,7 @@ public final class Registries {
 
   public static final Block SLOPE_LEFT = registerBlock("slope_left", new Block() {
     @Override
-    public Polygon getPhysicsShape(BlockState state, BlockPos pos, SBPhyObj obj) {
+    public Polygon getPhysicsShape(BlockState state, BlockPos pos, DynamicObject obj) {
       return SHAPE_SLOPE_LEFT;
     }
 

@@ -164,8 +164,7 @@ public final class CelestialUtil {
 
   /**
    * Fills the four corner colors of the background sky gradient, in quad vertex order:
-   * the lower corners get the warm dusk/dawn tint, the upper corners a cool blue tint
-   * (Enchant's {@code RecolorDuskAndDawn} mapped to our vertex order).
+   * the lower corners get the warm dusk/dawn tint, the upper corners a cool blue tint.
    *
    * @param level the level whose day phase to use
    * @param y     the world Y of the sky

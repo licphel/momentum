@@ -24,6 +24,8 @@
 
 package net.fmhi.gfx.opengl;
 
+import net.fmhi.gfx.DirectBufferPool;
+import net.fmhi.gfx.io.ImageUtil;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureDesc;
 import net.fmhi.gfx.texture.TextureType;
@@ -34,8 +36,6 @@ import net.fmhi.util.InternalApi;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.memAlloc;
-import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * OpenGL 1D/2D/3D texture implementation.
@@ -89,21 +89,22 @@ public final class OpenGLTexture implements Texture, Handle {
 
       ByteBuffer data = null;
       if (desc.initialBytes() != null) {
-        byte[] flipped = flipVertically(desc.initialBytes(), desc.width(), desc.height());
-        data = memAlloc(flipped.length);
-        data.put(flipped).flip();
+        data = ImageUtil.pooledFlip(ByteBuffer.wrap(desc.initialBytes()), desc.width(), desc.height());
       }
 
-      switch (desc.type()) {
-        case TextureType.TEXTURE_1D -> glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
-        case TextureType.TEXTURE_2D ->
-            glTexImage2D(target, 0, internal, desc.width(), desc.height(), 0, pixFmt, pixType, data);
-        case TextureType.TEXTURE_3D ->
-            glTexImage3D(target, 0, internal, desc.width(), desc.height(), desc.depth(), 0, pixFmt, pixType, data);
-      }
-
-      if (data != null) {
-        memFree(data);
+      try {
+        switch (desc.type()) {
+          case TextureType.TEXTURE_1D ->
+              glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
+          case TextureType.TEXTURE_2D ->
+              glTexImage2D(target, 0, internal, desc.width(), desc.height(), 0, pixFmt, pixType, data);
+          case TextureType.TEXTURE_3D ->
+              glTexImage3D(target, 0, internal, desc.width(), desc.height(), desc.depth(), 0, pixFmt, pixType, data);
+        }
+      } finally {
+        if (data != null) {
+          DirectBufferPool.release(data);
+        }
       }
 
       glTexParameteri(target, GL_TEXTURE_BASE_LEVEL, 0);
@@ -123,34 +124,38 @@ public final class OpenGLTexture implements Texture, Handle {
   }
 
   @Override
-  public void submit(byte[] bytes, Box3D region) {
+  public void submit(ByteBuffer bytes, Box3D region) {
+    int x = (int) region.minX();
+    int y = (int) region.minY();
+    int z = (int) region.minZ();
+    int w = (int) region.width();
+    int h = (int) region.height();
+    int d = (int) region.depth();
+
+    // snapshot + flip on the calling thread: the caller may reuse or release its
+    // buffer immediately; the GL work runs later on the render thread
+    ByteBuffer bb = ImageUtil.pooledFlip(bytes, w, h);
     ctx.submit(() -> {
       ctx.cache.setTexture(0, target, handle);
       int[] fmt = OpenGLUtils.textureFormat(desc.format());
       int pixFmt = fmt[1];
       int pixType = fmt[2];
-      int x = (int) region.minX();
-      int y = (int) region.minY();
-      int z = (int) region.minZ();
-      int w = (int) region.width();
-      int h = (int) region.height();
-      int d = (int) region.depth();
-
-      byte[] flipped = flipVertically(bytes, w, h);
-      ByteBuffer bb = memAlloc(flipped.length);
       try {
-        bb.put(flipped).flip();
         // The data block is flipped to GL row order (first row = bottom), so
         // its destination Y must flip too: the API Y is top-origin, GL Y is
         // bottom-origin. A full-texture upload (y=0, h=height) is unaffected.
         int glY = desc.height() - y - h;
+        // row alignment 1: single-channel rows (e.g. RED8 lightmaps) can have
+        // any width; the default 4-byte alignment would shift every row whose
+        // width is not a multiple of four
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
         switch (desc.type()) {
           case TextureType.TEXTURE_1D -> glTexSubImage1D(target, 0, x, w, pixFmt, pixType, bb);
           case TextureType.TEXTURE_2D -> glTexSubImage2D(target, 0, x, glY, w, h, pixFmt, pixType, bb);
           case TextureType.TEXTURE_3D -> glTexSubImage3D(target, 0, x, glY, z, w, h, d, pixFmt, pixType, bb);
         }
       } finally {
-        memFree(bb);
+        DirectBufferPool.release(bb);
       }
 
       if (desc.mipLevels() > 1) {
@@ -217,21 +222,5 @@ public final class OpenGLTexture implements Texture, Handle {
   @Override
   public int handle(int slot) {
     return slot == 0 ? handle : target;
-  }
-
-  /**
-   * Reverses row order so that the first row (top) maps to the last row (bottom) in the output.
-   *
-   * <p>This pre-flip compensates for OpenGL's bottom-left texture origin,
-   * resulting in an upright texture in GPU memory.
-   */
-  private static byte[] flipVertically(byte[] data, int width, int height) {
-    int bpp = data.length / (width * height);
-    int rowSize = width * bpp;
-    byte[] out = new byte[data.length];
-    for (int row = 0; row < height; row++) {
-      System.arraycopy(data, row * rowSize, out, (height - 1 - row) * rowSize, rowSize);
-    }
-    return out;
   }
 }

@@ -4,18 +4,37 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="feat: opengl gfx ringbuffer and other optimizations">
+    <list default="true" id="cc84a4b6-8796-44bb-82d0-ca09e1fa272f" name="更改" comment="backup: before refactor light engine to low-precision pixel">
+      <change afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxationLightEngine.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxStats.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/GfxMetrics.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLDevice.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build.gradle" beforeDir="false" afterPath="$PROJECT_DIR$/build.gradle" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Profiler.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/core/src/main/java/net/fmhi/util/Profiler.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/texture/Texture.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/gfx/src/main/java/net/fmhi/gfx/texture/Texture.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLEncoder.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLRenderTarget.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLRenderTarget.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLResourceSet.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLResourceSet.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLTexture.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/OpenGLTexture.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/VaoRegistry.java" beforeDir="false" afterPath="$PROJECT_DIR$/modules/opengl/src/main/java/net/fmhi/gfx/opengl/VaoRegistry.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/Main.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/ChunkMesh.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/ChunkMesh.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/Registries.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/Registries.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/LiquidRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/LiquidRenderer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/render/TileRenderer.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/Block.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/Block.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/BlockState.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/block/BlockState.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/entity/Entity.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/entity/Entity.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquid.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/fluid/Liquid.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/level/Level.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/BFSLightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/BFSLightEngine.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Beam.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/Beam.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CelestialUtil.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/CelestialUtil.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEmitter.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEmitter.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightEngine.java" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/LightMapRenderer.java" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/light/RelaxingLightEngine.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/physics/PhysicsObject.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/physics/SBPhyObj.java" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/java/net/fmhi/world/physics/DynamicObject.java" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/java/net/fmhi/world/physics/TRPhyObj.java" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/shaders/light_compose.frag.glsl" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/shaders/light_compose.frag.glsl" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/main/resources/shaders/light_compose.vert.glsl" beforeDir="false" afterPath="$PROJECT_DIR$/src/main/resources/shaders/light_compose.vert.glsl" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -98,55 +117,55 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Gradle.fmhi [:Main.main()].executor": "Debug",
-    "Gradle.fmhi [:Test3D.main()].executor": "Debug",
-    "Gradle.fmhi [:TestAtlasAndSkeleton.main()].executor": "Debug",
-    "Gradle.fmhi [:TestHLSLtoGLSL.main()].executor": "Debug",
-    "Gradle.fmhi [:TestParticles.main()].executor": "Debug",
-    "Gradle.fmhi [:TestPositionalComponentArray.main()].executor": "Debug",
-    "Gradle.fmhi [:TestProperty.main()].executor": "Debug",
-    "Gradle.fmhi [:TestPropertyApi.main()].executor": "Debug",
-    "Gradle.fmhi [:TestPropertyMap.main()].executor": "Debug",
-    "Gradle.fmhi [:TestStateDefinition.main()].executor": "Debug",
-    "Gradle.fmhi [:TestTags.main()].executor": "Debug",
-    "Gradle.fmhi [:TestVertexBuilder2D.main()].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:jar].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:net.fmhi.Main.main()].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:net.fmhi.Main3D.main()].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:net.fmhi.MainNet.main()].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:net.fmhi.NewMain.main()].executor": "Debug",
-    "Gradle.fmhi [:fmhi-test:run].executor": "Run",
-    "Gradle.fmhi [:net.fmhi.CPmain.main()].executor": "Debug",
-    "Gradle.fmhi [:net.fmhi.CustomPipeMain.main()].executor": "Debug",
-    "Gradle.fmhi [:net.fmhi.Main.main()].executor": "Debug",
-    "Gradle.fmhi [:net.fmhi.MainNet.main()].executor": "Debug",
-    "Gradle.fmhi [:net.fmhi.TestVertexBuilder2D.main()].executor": "Debug",
-    "Gradle.fmhi [buildDependents].executor": "Debug",
-    "Gradle.fmhi [buildNeeded].executor": "Run",
-    "Gradle.fmhi [build].executor": "Run",
-    "Gradle.fmhi [classes].executor": "Run",
-    "Gradle.fmhi [clean].executor": "Run",
-    "Gradle.fmhi [jar].executor": "Run",
-    "Gradle.fmhi [javadocJar].executor": "Run",
-    "Gradle.下载源代码.executor": "Run",
-    "Gradle.构建 fmhi.executor": "Run",
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "git-widget-placeholder": "main",
-    "ignore.virus.scanning.warn.message": "true",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "C:/Users/licph/Documents/myfiles/works/fmhi/src/main/java/net/fmhi/world/sky",
-    "project.structure.last.edited": "项目",
-    "project.structure.proportion": "0.15",
-    "project.structure.side.proportion": "0.2",
-    "settings.editor.selected.configurable": "preferences.editor",
-    "应用程序.Main.executor": "Debug"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Gradle.fmhi [:Main.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:Test3D.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestAtlasAndSkeleton.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestHLSLtoGLSL.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestParticles.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestPositionalComponentArray.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestProperty.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestPropertyApi.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestPropertyMap.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestStateDefinition.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestTags.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:TestVertexBuilder2D.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:jar].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:net.fmhi.Main.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:net.fmhi.Main3D.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:net.fmhi.MainNet.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:net.fmhi.NewMain.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:fmhi-test:run].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.fmhi [:net.fmhi.CPmain.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:net.fmhi.CustomPipeMain.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:net.fmhi.Main.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:net.fmhi.MainNet.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [:net.fmhi.TestVertexBuilder2D.main()].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [buildDependents].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [buildNeeded].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.fmhi [build].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.fmhi [classes].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.fmhi [clean].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.fmhi [jar].executor&quot;: &quot;Debug&quot;,
+    &quot;Gradle.fmhi [javadocJar].executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.下载源代码.executor&quot;: &quot;Run&quot;,
+    &quot;Gradle.构建 fmhi.executor&quot;: &quot;Run&quot;,
+    &quot;ModuleVcsDetector.initialDetectionPerformed&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.git.unshallow&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;main&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;kotlin-language-version-configured&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/licph/Documents/myfiles/works/fmhi/src/main/java/net/fmhi/world/sky&quot;,
+    &quot;project.structure.last.edited&quot;: &quot;项目&quot;,
+    &quot;project.structure.proportion&quot;: &quot;0.15&quot;,
+    &quot;project.structure.side.proportion&quot;: &quot;0.2&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.editor&quot;,
+    &quot;应用程序.Main.executor&quot;: &quot;Debug&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
       <recent name="C:\Users\licph\Documents\myfiles\works\fmhi\src\main\java\net\fmhi\world\sky" />
@@ -180,6 +199,7 @@
     <configuration name="Main" type="Application" factoryName="Application" temporary="true" nameIsGenerated="true">
       <option name="MAIN_CLASS_NAME" value="net.fmhi.Main" />
       <module name="fmhi.main" />
+      <option name="PROGRAM_PARAMETERS" value="-XX:+UseZGC -XX:+ZGenerational" />
       <extension name="coverage">
         <pattern>
           <option name="PATTERN" value="net.fmhi.*" />
@@ -341,7 +361,15 @@
       <option name="project" value="LOCAL" />
       <updated>1785830823806</updated>
     </task>
-    <option name="localTasksCounter" value="11" />
+    <task id="LOCAL-00011" summary="backup: before refactor light engine to low-precision pixel">
+      <option name="closed" value="true" />
+      <created>1785834470314</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1785834470314</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="Vcs.Log.Tabs.Properties">
@@ -367,6 +395,7 @@
     <MESSAGE value="feat: vao global cache, textured tile rendering" />
     <MESSAGE value="feat: backup before compact op" />
     <MESSAGE value="feat: opengl gfx ringbuffer and other optimizations" />
-    <option name="LAST_COMMIT_MESSAGE" value="feat: opengl gfx ringbuffer and other optimizations" />
+    <MESSAGE value="backup: before refactor light engine to low-precision pixel" />
+    <option name="LAST_COMMIT_MESSAGE" value="backup: before refactor light engine to low-precision pixel" />
   </component>
 </project>

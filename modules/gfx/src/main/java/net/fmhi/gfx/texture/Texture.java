@@ -35,6 +35,7 @@ import net.fmhi.util.ResourceProvider;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 
 /**
  * A GPU texture resource holding 1D, 2D, or 3D image data.
@@ -159,7 +160,23 @@ public interface Texture extends FragileTexture, AutoCloseable {
    * @param data   raw pixel bytes in the texture's format
    * @param region the target sub-region in texel coordinates (x, y, z, width, height, depth)
    */
-  void submit(byte[] data, Box3D region);
+  default void submit(byte[] data, Box3D region) {
+    submit(ByteBuffer.wrap(data), region);
+  }
+
+  /**
+   * Uploads pixel data to a sub-region of this texture.
+   *
+   * <p>The byte array must contain pixel data matching the texture's format
+   * and large enough to fill the specified region. The region is clamped to the texture's dimensions.
+   *
+   * <p>If mipmaps are enabled ({@link TextureDesc#mipLevels()} &gt; 1), they are
+   * regenerated after the upload.
+   *
+   * @param data   raw pixel bytes in the texture's format
+   * @param region the target sub-region in texel coordinates (x, y, z, width, height, depth)
+   */
+  void submit(ByteBuffer data, Box3D region);
 
   /**
    * Blits (copies) a rectangular region of this texture into another texture.

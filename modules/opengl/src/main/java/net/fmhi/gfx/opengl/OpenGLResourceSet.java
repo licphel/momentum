@@ -33,6 +33,8 @@ import net.fmhi.gfx.texture.Texture;
 import net.fmhi.util.Handle;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Arrays;
+
 /**
  * OpenGL resource set with a unified descriptor slot space.
  *
@@ -47,24 +49,16 @@ import org.jspecify.annotations.Nullable;
  * {@link #apply(OpenGLCache)} is called on the render thread.
  */
 public final class OpenGLResourceSet implements ResourceSet {
-  private static final int MAX_SLOTS = 16;
-
-  private static final byte NONE = 0;
   private static final byte TEXTURE = 1;
   private static final byte UNIFORM = 2;
 
-  private final byte[] types = new byte[MAX_SLOTS];
-
-  // Texture data (only valid when types[i] == TEXTURE)
-  private final Handle[] textures = new Handle[MAX_SLOTS];
-  private final Handle[] samplers = new Handle[MAX_SLOTS];
-
-  // UBO data (only valid when types[i] == UNIFORM)
-  private final Handle[] ubos = new Handle[MAX_SLOTS];
-  private final int[] uboSizes = new int[MAX_SLOTS];
-  private final int[] uboOffsets = new int[MAX_SLOTS];
-
   private final ResourceSetLayout layout;
+  /**
+   * Sparse list of bound slots, grown on demand. A set typically carries a handful
+   * of bindings, so a linear scan on bind and a compact array beat dense
+   * fixed-size arrays with mostly-empty entries (a set is created per draw batch).
+   */
+  private ResourceSlot[] slots = new ResourceSlot[2];
   private int slotCount = 0;
 
   OpenGLResourceSet(OpenGLDevice ctx, ResourceSetLayout layout) {
@@ -78,23 +72,34 @@ public final class OpenGLResourceSet implements ResourceSet {
 
   @Override
   public void bindTexture(int slot, Texture texture, Sampler sampler) {
-    types[slot] = TEXTURE;
-    textures[slot] = (Handle) texture;
-    samplers[slot] = (Handle) sampler;
-    if (slot >= slotCount) {
-      slotCount = slot + 1;
-    }
+    ResourceSlot s = findOrCreate(slot);
+    s.type = TEXTURE;
+    s.texture = (Handle) texture;
+    s.sampler = (Handle) sampler;
   }
 
   @Override
   public void bindUniform(int slot, BufferObject buffer, int size, int offset) {
-    types[slot] = UNIFORM;
-    ubos[slot] = (OpenGLBufferObject) buffer;
-    uboSizes[slot] = size;
-    uboOffsets[slot] = offset;
-    if (slot >= slotCount) {
-      slotCount = slot + 1;
+    ResourceSlot s = findOrCreate(slot);
+    s.type = UNIFORM;
+    s.ubo = (OpenGLBufferObject) buffer;
+    s.uboSize = size;
+    s.uboOffset = offset;
+  }
+
+  /** Returns the slot entry, updating an existing one or appending a new one. */
+  private ResourceSlot findOrCreate(int slot) {
+    for (int i = 0; i < slotCount; i++) {
+      if (slots[i].index == slot) {
+        return slots[i];
+      }
     }
+    if (slotCount == slots.length) {
+      slots = Arrays.copyOf(slots, slots.length * 2);
+    }
+    ResourceSlot s = new ResourceSlot(slot);
+    slots[slotCount++] = s;
+    return s;
   }
 
   @Override
@@ -108,14 +113,18 @@ public final class OpenGLResourceSet implements ResourceSet {
    */
   public void apply(OpenGLCache cache) {
     for (int i = 0; i < slotCount; i++) {
-      int binding = layout.slots[i].binding();
-      switch (types[i]) {
+      ResourceSlot s = slots[i];
+      int binding = layout.slots[s.index].binding();
+      switch (s.type) {
         case TEXTURE -> {
-          cache.setTexture(binding, textures[i].handle(1), textures[i].handle());
-          cache.setSampler(binding, samplers[i].handle());
+          assert s.texture != null;
+          assert s.sampler != null;
+          cache.setTexture(binding, s.texture.handle(1), s.texture.handle());
+          cache.setSampler(binding, s.sampler.handle());
         }
         case UNIFORM -> {
-          cache.setUniformBuffer(binding, ubos[i].handle(), uboOffsets[i], uboSizes[i]);
+          assert s.ubo != null;
+          cache.setUniformBuffer(binding, s.ubo.handle(), s.uboOffset, s.uboSize);
         }
       }
     }
@@ -129,6 +138,21 @@ public final class OpenGLResourceSet implements ResourceSet {
   void validate(@Nullable ResourceSetLayout pipelineLayout) {
     if (!layout.matches(pipelineLayout)) {
       throw new GraphicsException("Resource set layout does not match pipeline layout");
+    }
+  }
+
+  /** One bound slot: the set keeps a sparse list of these instead of dense arrays. */
+  private static final class ResourceSlot {
+    final int index;
+    byte type;
+    @Nullable Handle texture;
+    @Nullable Handle sampler;
+    @Nullable Handle ubo;
+    int uboSize;
+    int uboOffset;
+
+    ResourceSlot(int index) {
+      this.index = index;
     }
   }
 }

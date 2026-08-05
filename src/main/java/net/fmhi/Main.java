@@ -23,10 +23,12 @@ import net.fmhi.gfx.pass.RenderTargetDesc;
 import net.fmhi.gfx.pipe.*;
 import net.fmhi.gfx.shader.*;
 import net.fmhi.gfx.text.FallbackFont;
+import net.fmhi.gfx.DirectBufferPool;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.texture.*;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Color;
+import net.fmhi.math.Matrix4x4;
 import net.fmhi.math.Vector2;
 import net.fmhi.render.LiquidRenderer;
 import net.fmhi.render.SkyRenderer;
@@ -50,11 +52,15 @@ import net.fmhi.world.level.Level;
 import net.fmhi.world.light.CelestialUtil;
 import net.fmhi.world.light.Channel;
 import net.fmhi.world.light.LightMapRenderer;
+import net.fmhi.world.object.ObjectConfig;
+import net.fmhi.world.object.WorldObject;
 import net.fmhi.world.util.BlockPos;
 import net.fmhi.world.util.ChunkPos;
 import net.fmhi.world.util.PrecisePos;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -70,11 +76,23 @@ public class Main {
   private static final int WIN_W = 1280;
   private static final int WIN_H = 720;
   private static final float WALK_SPEED = 12F;
-  private static final float JUMP_SPEED = 22F;
+  private static final float JUMP_SPEED = 42F;
   private static final int GROUND_Y = 20;
-  private static final int WORLD_RADIUS = 16;
+  /** Initial chunk preload radius: the default view is 2 chunks wide, so a
+   * handful of chunks around spawn is plenty (was 16 → 1089 chunks upfront). */
+  private static final int WORLD_RADIUS = 6;
   /** Day clock multiplier while Ctrl is held (8 real minutes → 15 s per day). */
   private static final float FAST_TIME_SCALE = 32F;
+  /** Demo multi-tile object: a 2×3 tree anchored on the two tiles below it;
+   * mining either anchor breaks the whole tree (Starbound rooting). */
+  private static final ObjectConfig OBJECT_TREE = ObjectConfig.colored(
+      "tree",
+      List.of(new BlockPos(0, 0), new BlockPos(1, 0),
+          new BlockPos(0, 1), new BlockPos(1, 1),
+          new BlockPos(0, 2), new BlockPos(1, 2)),
+      List.of(new BlockPos(0, -1), new BlockPos(1, -1)),
+      true,
+      new Color(0.25F, 0.7F, 0.2F));
   private static TileRenderer tileRenderer;
   private static LiquidRenderer liquidRenderer;
   private static SkyRenderer skyRenderer;
@@ -106,6 +124,11 @@ public class Main {
     for (int x = -4; x <= 4; x++) level.setLiquid(x, GROUND_Y + 1, Liquids.WATER, FluidEngine.FULL);
     for (int x = 13; x <= 16; x++) level.setLiquid(x, GROUND_Y + 8, Liquids.LAVA, FluidEngine.FULL);
     level.setLiquid(12, GROUND_Y + 8, Liquids.WATER, FluidEngine.FULL);
+    // demo world objects: trees anchored on the ground (mining an anchor
+    // breaks the whole tree — Starbound rooting)
+    level.placeObject(OBJECT_TREE, -8, GROUND_Y + 1);
+    level.placeObject(OBJECT_TREE, 4, GROUND_Y + 1);
+    level.placeObject(OBJECT_TREE, 10, GROUND_Y + 1);
     try {
       texture = Texture.loadRGBA8(dev, new PngInputStream(ResourceProvider.classpath(Main.class).openStream("/img.png")).info());
     } catch (IOException e) {
@@ -139,8 +162,7 @@ public class Main {
     RenderTarget frontRT = dev.getRenderTarget(RenderTargetDesc.offscreen(WIN_W, WIN_H));
     var le = level.lightEngine();
     var lightMapRenderer = new LightMapRenderer(level);
-    lightMapRenderer.init(dev, 800, 450);
-    Sampler lmSampler = lightMapRenderer.sampler();
+    lightMapRenderer.init(dev);
 
     // -- compose pipeline (matches built-in vlTexture vertex layout) -------
     VertexLayout vlCompose = VertexLayout.bake(
@@ -152,7 +174,7 @@ public class Main {
     ResourceSetLayout rslCompose = ResourceSetLayout.bake(
         new Slot(0, "T", ShaderType.VERTEX_BIT, ResourceType.UNIFORM_BUFFER),
         new Slot(1, "u_albedo", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE),
-        new Slot(1, "u_lightmap", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE));
+        new Slot(2, "u_lightmap", ShaderType.FRAGMENT_BIT, ResourceType.TEXTURE));
 
     ResourceProvider rp = ResourceProvider.classpath(Main.class);
     ShaderProgram spCompose = ShaderProgram.load(dev,
@@ -178,8 +200,9 @@ public class Main {
         .resourceLayouts(rslCompose)
         .build());
 
+    // Transform block: u_vp (mat4) + u_invCamVP (mat4) + u_lightOrigin/u_lightSize (vec2×2)
     BufferObject composeUbo = dev.getBuffer(BufferObjectDesc.uniform());
-    composeUbo.allocate(64, null);
+    composeUbo.allocate(160, null);
 
     view.eventBus().register(ResizeEvent.class, (ctx, e) -> {
       colorRT = dev.getRenderTarget(RenderTargetDesc.offscreen(e.width(), e.height()));
@@ -216,9 +239,12 @@ public class Main {
       if (snap.isDown(KeyCode.A)) vx = -WALK_SPEED;
       if (snap.isDown(KeyCode.D)) vx = WALK_SPEED;
       boolean jump = snap.isDown(KeyCode.W) || snap.isDown(KeyCode.SPACE);
-      if (jump && player.onGround())
+      if (jump && player.onGround()) {
         player.setVelocity(vx, JUMP_SPEED); // Y-up: jumping is +Y
-      else if (jump) {
+        // consume the press so the swim burst is not stacked on the next
+        // frame while the body is still in water
+        player.consumeJumpPress();
+      } else if (jump) {
         // Starbound-style swimming: burst on press, smooth approach while
         // held, never launches out of the water
         player.setVelocity(vx, player.velocity().y());
@@ -239,6 +265,10 @@ public class Main {
           level.setBlock(bp, airState);
         else if (level.getBlock(bp).block() == Registries.AIR && MR.isDown())
           level.setBlock(bp, colorfulstate);
+      }
+
+      if (snap.isDown(KeyCode.LEFT_ALT)) {
+        player.setPosition(bp.toCenter());
       }
 
       // F1/F2: spawn water / lava at the cursor, breaking the block there
@@ -328,10 +358,10 @@ public class Main {
       g.end();
 
       // ===================================================================
-      // lightmaps (wall + front; front covers ALL tiles so entities
-      // always have light — Enchant style)
+      // lightmaps: upload the engine's front buffer as textures (only when
+      // the light version changed); the compose passes sample them directly
       // ===================================================================
-      lightMapRenderer.render(g, camera, level.lightEngine());
+      lightMapRenderer.update(level.lightEngine());
       dev.getTransformHandler().flipY(true);
 
       // ===================================================================
@@ -346,13 +376,19 @@ public class Main {
         g.setCamera(orthoCam);
 
         Texture wallTex = colorRT.pin();
-        // the compose shader reads its uniform block from binding 0; upload the
-        // screen-space matrix explicitly — nothing else writes this ubo
-        MatrixUtil.writeViewProjection(orthoCam.viewProjectionMatrix(), composeUbo);
+        // the compose shader reads its uniform block from binding 0: screen-space
+        // view-projection, its inverse (screen→world for the lightmap uv), and the
+        // lightmap window origin/size
+        writeComposeUniforms(composeUbo, orthoCam.viewProjectionMatrix(),
+            camera.viewProjectionMatrix().invert(),
+            lightMapRenderer.packedOriginX(), lightMapRenderer.packedOriginY(),
+            lightMapRenderer.packedSizeX(), lightMapRenderer.packedSizeY());
         ResourceSet rsWall = dev.getResourceSet(rslCompose);
-        rsWall.bindUniform(0, composeUbo, 64);
-        if (wallTex != null) rsWall.bindTexture(1, wallTex, lmSampler);
-        rsWall.bindTexture(2, lightMapRenderer.backLightmap().pin(), lmSampler);
+        rsWall.bindUniform(0, composeUbo, 160);
+        if (wallTex != null) rsWall.bindTexture(1, wallTex, lightMapRenderer.lightSampler());
+        if (lightMapRenderer.wallLightTexture() != null) {
+          rsWall.bindTexture(2, lightMapRenderer.wallLightTexture(), lightMapRenderer.lightSampler());
+        }
         g.setPipeline(pipeAlpha, rsWall);
         g.setColor(Color.WHITE);
         g.drawTexture(wallTex, 0, 0, WIN_W, WIN_H);
@@ -367,6 +403,21 @@ public class Main {
       g.begin(RenderPass.of(frontRT, new Color(0, 0, 0, 0)));
       g.setCamera(camera);
       try (Profiler.Scope _ = Profiler.scope("rendering:block")) {
+        // world objects float above the tile grid and render as entities
+        for (Chunk c : level.loadedChunks()) {
+          for (Entity e : c.entities()) {
+            if (e instanceof WorldObject obj) {
+              ObjectConfig cfg = obj.config();
+              Box2D bb = obj.spaceBounds();
+              if (cfg.texture() != null) {
+                g.drawTexture(cfg.texture(), bb.minX(), bb.minY(), bb.width(), bb.height());
+              } else if (cfg.color() != null) {
+                g.setColor(cfg.color());
+                g.drawRectangle(bb.minX(), bb.minY(), bb.width(), bb.height());
+              }
+            }
+          }
+        }
         renderPlayer(g, player);
         for (var item : thrownItems) {
           g.setColor(new Color(1F, 0.8F, 0F));
@@ -391,11 +442,16 @@ public class Main {
         g.begin(RenderPass.NOT_CLEAR);
         g.setCamera(orthoCam);
         Texture frontTex = frontRT.pin();
-        MatrixUtil.writeViewProjection(orthoCam.viewProjectionMatrix(), composeUbo);
+        writeComposeUniforms(composeUbo, orthoCam.viewProjectionMatrix(),
+            camera.viewProjectionMatrix().invert(),
+            lightMapRenderer.packedOriginX(), lightMapRenderer.packedOriginY(),
+            lightMapRenderer.packedSizeX(), lightMapRenderer.packedSizeY());
         ResourceSet rsFront = dev.getResourceSet(rslCompose);
-        rsFront.bindUniform(0, composeUbo, 64);
-        if (frontTex != null) rsFront.bindTexture(1, frontTex, lmSampler);
-        rsFront.bindTexture(2, lightMapRenderer.frontLightmap().pin(), lmSampler);
+        rsFront.bindUniform(0, composeUbo, 160);
+        if (frontTex != null) rsFront.bindTexture(1, frontTex, lightMapRenderer.lightSampler());
+        if (lightMapRenderer.frontLightTexture() != null) {
+          rsFront.bindTexture(2, lightMapRenderer.frontLightTexture(), lightMapRenderer.lightSampler());
+        }
         g.setPipeline(pipeAlpha, rsFront);
         g.setColor(Color.WHITE);
         g.drawTexture(frontTex, 0, 0, WIN_W, WIN_H);
@@ -565,6 +621,28 @@ public class Main {
   private static BlockState defaultState(net.fmhi.world.block.Block block) {
     int id = block.propertyDef().defaultMap().identity();
     return BlockStateHolder.BLOCK_STATE_PROPERTY_PALETTE.get(id);
+  }
+
+  /**
+   * Packs the compose Transform block: the quad's view-projection matrix, its
+   * inverse (NDC → world, used to derive the lightmap uv), and the lightmap
+   * window origin and size in tiles.
+   */
+  private static void writeComposeUniforms(BufferObject ubo, Matrix4x4 vp, Matrix4x4 invCamVp,
+                                           float ox, float oy, float sx, float sy) {
+    ByteBuffer out = ByteBuffer.wrap(new byte[160]).order(ByteOrder.LITTLE_ENDIAN);
+    putMat4(out, vp);
+    putMat4(out, invCamVp);
+    out.putFloat(ox).putFloat(oy).putFloat(sx).putFloat(sy);
+    ubo.submit(out.flip());
+  }
+
+  /** Writes one matrix in column-major order (std140 mat4). */
+  private static void putMat4(ByteBuffer out, Matrix4x4 m) {
+    out.putFloat(m.m00()).putFloat(m.m10()).putFloat(m.m20()).putFloat(m.m30());
+    out.putFloat(m.m01()).putFloat(m.m11()).putFloat(m.m21()).putFloat(m.m31());
+    out.putFloat(m.m02()).putFloat(m.m12()).putFloat(m.m22()).putFloat(m.m32());
+    out.putFloat(m.m03()).putFloat(m.m13()).putFloat(m.m23()).putFloat(m.m33());
   }
 
   static class ThrownItem extends Entity {

@@ -2,20 +2,20 @@ package net.fmhi.world.block;
 
 import net.fmhi.property.ImmutablePropertyMap;
 import net.fmhi.world.light.Beam;
+import net.fmhi.world.light.LightEmitter;
 import net.fmhi.world.physics.CollisionKind;
 import net.fmhi.world.physics.Polygon;
-import net.fmhi.world.physics.SBPhyObj;
+import net.fmhi.world.physics.DynamicObject;
 import net.fmhi.world.physics.VoxelClip;
 import net.fmhi.world.util.BlockPos;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Collection;
 import java.util.List;
 
 /**
  * A concrete state of a block type, delegating behavior to its {@link Block}.
  */
-public final class BlockState extends BlockStateHolder {
+public final class BlockState extends BlockStateHolder implements LightEmitter.Tile {
   public static BlockState EMPTY;
   private final Block block;
 
@@ -49,7 +49,7 @@ public final class BlockState extends BlockStateHolder {
   }
 
   /** The collision polygon of this state, or {@code null} if none. */
-  public @Nullable Polygon getPhysicsShape(BlockPos pos, SBPhyObj obj) {
+  public @Nullable Polygon getPhysicsShape(BlockPos pos, DynamicObject obj) {
     return block.getPhysicsShape(this, pos, obj);
   }
 
@@ -89,9 +89,11 @@ public final class BlockState extends BlockStateHolder {
     return block.emitAmbient(this, x, y, channel);
   }
 
-  /** The directional beams emitted by this state; the caller draws and
-   * recycles them. */
-  public Collection<Beam> emitBeams(int x, int y) {
+  /**
+   * The directional beams emitted by this state; the caller draws and
+   * recycles them.
+   */
+  public List<Beam> emitBeams(int x, int y) {
     return block.emitBeams(this, x, y);
   }
 }

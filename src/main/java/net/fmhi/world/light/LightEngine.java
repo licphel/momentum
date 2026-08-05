@@ -7,46 +7,45 @@ import net.fmhi.world.entity.Entity;
 import net.fmhi.world.fluid.Liquid;
 import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
+import org.jspecify.annotations.Nullable;
 
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.List;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
  * Base class for engines that maintain a sliding window of per-tile light data.
  *
- * <p>Each tile stores 19 floats: raw RGB, four ambient-occlusion factors, and twelve
- * per-vertex RGB values. The window is double-buffered so the renderer always reads a
- * complete frame while the next one is computed.
+ * <p>Each tile stores 3 floats: the raw RGB light value. The window covers the visible
+ * tiles plus a light-travel border and is recomputed every tick — it is small (a
+ * screen-sized area), so a full recompute is cheap. The window is
+ * double-buffered so the renderer always reads a complete frame while the next one is
+ * computed; resizing copies the overlap of the old buffers so the renderer never sees a
+ * blank window.
  *
- * <p>The window size adapts to the camera: it covers the visible tiles plus a light-travel
- * margin. Resizing copies the overlap of the old buffers into the new ones so the renderer
- * never sees a blank window.
- *
- * <p>Lightmaps (wall + front) are rendered from the front buffer; the wall lightmap bakes
- * in {@link #WALL_MULTIPLIER}.
+ * <p>The renderer uploads the raw RGB buffer as a lightmap texture; smooth per-tile
+ * gradients and ambient occlusion are derived on the GPU at sample time.
  */
 public abstract class LightEngine implements AutoCloseable {
   /** Scales light values when they are seeded and drawn. */
-  public static final float AMPLIFIER = 1.35F;
+  public static final float AMPLIFIER = 1.0F;
   /** Luminance threshold below which light counts as darkness. */
   public static final float DARK_LUMINANCE = 0.05F;
-  /** Floats per tile: raw RGB, AO factors, and per-vertex RGB. */
-  public static final int STRIDE = 19;
+  /** Floats per tile: raw RGB. */
+  public static final int STRIDE = 3;
   /** Factor by which light on walls is dimmed. */
   public static final float WALL_MULTIPLIER = 0.7F;
-  /** Darkening applied for each solid neighbor during ambient occlusion. */
-  public static final float AO_STRENGTH = 0.12F;
   /** Maximum normalized light value. */
   public static final float MAX_VALUE_GENERAL = 1F;
   /** Light level of one discrete step of {@link #MAX_VALUE_GENERAL}. */
   public static final float UNIT = MAX_VALUE_GENERAL / 16F;
   /** Window margin in tiles: light travel distance plus slack. */
-  protected static final int SPREAD_MARGIN = 40;
+  protected static final int SPREAD_MARGIN = 17;
   /** Smallest allowed window side, in tiles. */
-  protected static final int MIN_SIZE = 64;
+  protected static final int MIN_SIZE = 32;
   /** Largest allowed window side, in tiles. */
   protected static final int MAX_SIZE = 512;
 
@@ -54,14 +53,21 @@ public abstract class LightEngine implements AutoCloseable {
   public final float[] sunlight = new float[Channel.CHANNELS.length];
   protected final Level level;
   /**
+   * Whether to use async channel dispatch.
+   * This may increase performance but bring more pressure to CPU threads.
+   */
+  public boolean asyncDispatchRGB = false;
+  /**
+   * Light computation interval.
+   */
+  public int computeInterval = 1;
+  /**
    * Bumped whenever the front buffer changes (recompute or resize), so
    * consumers like {@link LightMapRenderer} can rebuild their caches.
    */
   private final AtomicLong version = new AtomicLong();
   /** Scratch space for one tile's merged ambient light; worker-thread only. */
   private final float[] ambientScratch = new float[3];
-  /** When {@code false}, lightmaps render full bright. */
-  public boolean enabled = true;
   /** The completed buffer, read by the renderer. */
   protected volatile float[] front;
   /** The buffer currently being computed. */
@@ -74,34 +80,19 @@ public abstract class LightEngine implements AutoCloseable {
   /** Window origin of the current front buffer. */
   protected volatile int frontOriX;
   protected volatile int frontOriY;
-  protected volatile boolean done;
-  protected Thread worker;
+  protected @Nullable ForkJoinTask<?> asyncComputation;
   protected ChunkCache cc;
   /**
    * How light values combine everywhere (seed, draw, beam merge, spread).
    * Must stay {@link CompositionFormula#MAX}: the iterative spread passes
    * blend every pass, and an additive formula would inflate the values.
    */
-  protected CompositionFormula formula = CompositionFormula.ADDITIVE_CAP;
+  protected CompositionFormula formula = CompositionFormula.MAX;
   /** Pending window resize, applied when the worker is idle. */
   private int pendingW = -1;
   private int pendingH = -1;
   /** Raw RGB per tile for beam light, merged into {@code back} after spreading. */
   private float[] beamLayer;
-  /**
-   * Set when world content changed since the last computation; the compute
-   * pass is skipped while clear.
-   */
-  private volatile boolean worldDirty = true;
-  /** The sunlight values the last computation was seeded with. */
-  private volatile float lastSunR;
-  private volatile float lastSunG;
-  private volatile float lastSunB;
-  /** Light worker pool. */
-  protected final ExecutorService executor = Executors.newFixedThreadPool(
-      Channel.CHANNELS.length,
-      Thread.ofVirtual().name("LightWorker-", 0).factory()
-  );
 
   /**
    * Creates a light engine for the given level, allocating its initial front, back, and
@@ -152,42 +143,6 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Returns the red component of a per-vertex light value in a raw tile buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the red value of the vertex
-   */
-  public float r(float[] data, int off, int c) {
-    return data[off + 7 + c * 3];
-  }
-
-  /**
-   * Returns the green component of a per-vertex light value in a raw tile buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the green value of the vertex
-   */
-  public float g(float[] data, int off, int c) {
-    return data[off + 8 + c * 3];
-  }
-
-  /**
-   * Returns the blue component of a per-vertex light value in a raw tile buffer.
-   *
-   * @param data the tile buffer
-   * @param off  the tile offset
-   * @param c    the vertex index in {@code 0..3}
-   * @return the blue value of the vertex
-   */
-  public float b(float[] data, int off, int c) {
-    return data[off + 9 + c * 3];
-  }
-
-  /**
    * Computes the merged ambient light of a tile: sky light filtered through the wall,
    * combined per channel with the ambient emission of the block, wall, and liquid via
    * the composition formula.
@@ -234,21 +189,30 @@ public abstract class LightEngine implements AutoCloseable {
    * @param y  the tile Y coordinate
    */
   protected void tileBeams(ChunkCache cc, int x, int y) {
-    for (Beam bm : cc.getBlock(x, y).emitBeams(x, y)) {
-      drawBeam(x + 0.5F, y + 0.5F, bm);
-      bm.recycle();
+    List<Beam> emitBeams = cc.getBlock(x, y).emitBeams(x, y);
+    if (!emitBeams.isEmpty()) {
+      for (Beam bm : emitBeams) {
+        drawBeam(x + 0.5F, y + 0.5F, bm);
+        bm.recycle();
+      }
     }
-    for (Beam bm : cc.getWall(x, y).emitBeams(x, y)) {
-      drawBeam(x + 0.5F, y + 0.5F, bm);
-      bm.recycle();
+    emitBeams = cc.getWall(x, y).emitBeams(x, y);
+    if (!emitBeams.isEmpty()) {
+      for (Beam bm : emitBeams) {
+        drawBeam(x + 0.5F, y + 0.5F, bm);
+        bm.recycle();
+      }
     }
     Liquid liq = cc.getLiquid(x, y);
     if (liq != null) {
       int liqAmt = cc.getLiquidAmount(x, y);
       if (liqAmt > 0) {
-        for (Beam bm : liq.emitBeams(x, y, liqAmt)) {
-          drawBeam(x + 0.5F, y + 0.5F, bm);
-          bm.recycle();
+        emitBeams = liq.emitBeams(x, y, liqAmt);
+        if (!emitBeams.isEmpty()) {
+          for (Beam bm : emitBeams) {
+            drawBeam(x + 0.5F, y + 0.5F, bm);
+            bm.recycle();
+          }
         }
       }
     }
@@ -317,45 +281,30 @@ public abstract class LightEngine implements AutoCloseable {
    * @param fn the per-channel work
    */
   protected void channelDispatch(Consumer<Byte> fn) {
-    CountDownLatch latch = new CountDownLatch(Channel.CHANNELS.length);
+    if (asyncDispatchRGB) {
+      final AtomicInteger remaining = new AtomicInteger(3);
+      ForkJoinPool pool = ForkJoinPool.commonPool();
 
-    for (byte channel : Channel.CHANNELS) {
-      executor.submit(() -> {
-        try {
-          fn.accept(channel);
-        } finally {
-          latch.countDown();
-        }
+      pool.execute(() -> {
+        fn.accept(Channel.RED);
+        remaining.decrementAndGet();
       });
-    }
+      pool.execute(() -> {
+        fn.accept(Channel.GREEN);
+        remaining.decrementAndGet();
+      });
+      pool.execute(() -> {
+        fn.accept(Channel.BLUE);
+        remaining.decrementAndGet();
+      });
 
-    try {
-      latch.await();
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-    }
-  }
-
-  /**
-   * Filters all three channels of an incoming light in one chunk-cache pass, in place
-   * (the spread hot path — a per-channel filter would triple the cache lookups).
-   *
-   * @param cc    the chunk cache
-   * @param x     the tile X coordinate
-   * @param y     the tile Y coordinate
-   * @param inout the three channel values to filter
-   */
-  protected void filter3(ChunkCache cc, int x, int y, float[] inout) {
-    BlockState block = cc.getBlock(x, y);
-    Liquid liq = cc.getLiquid(x, y);
-    int liqAmt = cc.getLiquidAmount(x, y);
-    inout[0] = block.filterLight(x, y, inout[0], Channel.RED);
-    inout[1] = block.filterLight(x, y, inout[1], Channel.GREEN);
-    inout[2] = block.filterLight(x, y, inout[2], Channel.BLUE);
-    if (liq != null) {
-      inout[0] = liq.filterLight(x, y, liqAmt, inout[0], Channel.RED);
-      inout[1] = liq.filterLight(x, y, liqAmt, inout[1], Channel.GREEN);
-      inout[2] = liq.filterLight(x, y, liqAmt, inout[2], Channel.BLUE);
+      while (remaining.get() > 0) {
+        Thread.onSpinWait();
+      }
+    } else {
+      fn.accept(Channel.RED);
+      fn.accept(Channel.GREEN);
+      fn.accept(Channel.BLUE);
     }
   }
 
@@ -423,8 +372,9 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Applies a pending resize, copying the overlapping region of the old buffers so no
-   * part of the visible window becomes blank.
+   * Applies a pending resize, allocating a new back buffer of the new size. The front
+   * buffer is left untouched: it is only replaced by {@link #swap()} once the worker
+   * finished the new window, so the renderer never sees a partially-filled buffer.
    *
    * @return {@code true} if a resize was applied
    */
@@ -432,59 +382,29 @@ public abstract class LightEngine implements AutoCloseable {
     if (pendingW <= 0) {
       return false;
     }
-    int oldW = sizeX;
-    int oldH = sizeY;
-    float[] oldFront = front;
-    float[] oldBack = back;
-    int oldFOX = frontOriX;
-    int oldFOY = frontOriY;
     sizeX = pendingW;
     sizeY = pendingH;
     pendingW = pendingH = -1;
-    front = new float[sizeX * sizeY * STRIDE];
     back = new float[sizeX * sizeY * STRIDE];
-    copyOverlap(oldFront, oldW, oldH, oldFOX, oldFOY, front, frontOriX, frontOriY);
-    copyOverlap(oldBack, oldW, oldH, oriX, oriY, back, oriX, oriY);
     return true;
   }
 
   /**
-   * Copies the region shared by two windows into the destination buffer.
-   *
-   * @param src the source buffer
-   * @param sw  the source window width in tiles
-   * @param sh  the source window height in tiles
-   * @param sox the source window origin X
-   * @param soy the source window origin Y
-   * @param dst the destination buffer
-   * @param dox the destination window origin X
-   * @param doy the destination window origin Y
-   */
-  private void copyOverlap(float[] src, int sw, int sh, int sox, int soy,
-                           float[] dst, int dox, int doy) {
-    int x0 = Math.max(sox, dox);
-    int x1 = Math.min(sox + sw, dox + sizeX);
-    int y0 = Math.max(soy, doy);
-    int y1 = Math.min(soy + sh, doy + sizeY);
-    int length = (x1 - x0) * STRIDE;
-    for (int y = y0; y < y1; y++) {
-      int sRow = ((y - soy) * sw + (x0 - sox)) * STRIDE;
-      int dRow = ((y - doy) * sizeX + (x0 - dox)) * STRIDE;
-      System.arraycopy(src, sRow, dst, dRow, length);
-    }
-  }
-
-  /**
    * Swaps the front and back buffers, publishing the freshly computed buffer and
-   * updating the front window origin.
+   * updating the front window origin. Called by the worker after a compute finishes
+   * (never while the renderer could read a half-filled buffer).
+   *
+   * <p>The back buffer stays sized to the current window: the swapped-out front is
+   * reused when its size still matches (the compute clears it anyway), otherwise a
+   * fresh buffer is allocated. No overlap is copied — the compute fills the whole
+   * window from seed each pass.
    */
   protected void swap() {
-    float[] tmp = front;
+    float[] oldFront = front;
     front = back;
-    back = tmp;
+    back = oldFront.length == sizeX * sizeY * STRIDE ? oldFront : new float[sizeX * sizeY * STRIDE];
     frontOriX = oriX;
     frontOriY = oriY;
-    done = false;
   }
 
   /**
@@ -503,6 +423,9 @@ public abstract class LightEngine implements AutoCloseable {
       return;
     }
     int o = backBufferIndex(x, y);
+    if (o < 0) {
+      return;
+    }
     blendWrite(o, r, g, b);
   }
 
@@ -595,7 +518,9 @@ public abstract class LightEngine implements AutoCloseable {
         float factor = remaining / maxIntensity;
 
         int o = backBufferIndex(tx, ty);
-        
+        if (o < 0) {
+          continue;
+        }
         beamLayer[o] = formula.blend(beamLayer[o], r * factor * AMPLIFIER);
         beamLayer[o + 1] = formula.blend(beamLayer[o + 1], g * factor * AMPLIFIER);
         beamLayer[o + 2] = formula.blend(beamLayer[o + 2], b * factor * AMPLIFIER);
@@ -605,8 +530,7 @@ public abstract class LightEngine implements AutoCloseable {
 
   /**
    * Blends the beam layer into the raw channels of {@code back} using the composition
-   * formula, then clears it for the next frame. Call after spreading, before populating
-   * vertices.
+   * formula, then clears it for the next frame. Call after spreading.
    */
   protected void mergeBeam() {
     if (beamLayer == null) {
@@ -622,145 +546,40 @@ public abstract class LightEngine implements AutoCloseable {
   }
 
   /**
-   * Computes the ambient-occlusion factors of a tile from the solidity of its neighbors
-   * and stores them in the tile's AO slots.
-   *
-   * @param o  the tile offset in the working buffer
-   * @param cc the chunk cache for neighbor lookups
-   * @param x  the tile X coordinate
-   * @param y  the tile Y coordinate
-   */
-  protected void populateAO(int o, ChunkCache cc, int x, int y) {
-    if (cc.isFrontSolid(x, y)) {
-      float v = 1F - AO_STRENGTH * 1.5F;
-      back[o + 3] = v;
-      back[o + 4] = v;
-      back[o + 5] = v;
-      back[o + 6] = v;
-    } else {
-      boolean s0 = cc.isFrontSolid(x - 1, y - 1);
-      boolean s1 = cc.isFrontSolid(x - 1, y);
-      boolean s2 = cc.isFrontSolid(x - 1, y + 1);
-      boolean s3 = cc.isFrontSolid(x, y - 1);
-      boolean s4 = cc.isFrontSolid(x, y + 1);
-      boolean s5 = cc.isFrontSolid(x + 1, y - 1);
-      boolean s6 = cc.isFrontSolid(x + 1, y);
-      boolean s7 = cc.isFrontSolid(x + 1, y + 1);
-      back[o + 3] = 1F - ((s0 ? 1 : 0) + (s1 ? 1 : 0) + (s3 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 4] = 1F - ((s1 ? 1 : 0) + (s2 ? 1 : 0) + (s4 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 5] = 1F - ((s4 ? 1 : 0) + (s6 ? 1 : 0) + (s7 ? 1 : 0)) * AO_STRENGTH;
-      back[o + 6] = 1F - ((s3 ? 1 : 0) + (s5 ? 1 : 0) + (s6 ? 1 : 0)) * AO_STRENGTH;
-    }
-  }
-
-  /**
-   * Smoothes one channel of a tile's light against its neighbors and writes the four
-   * per-vertex values, darkened by the tile's ambient occlusion.
-   *
-   * @param o       the tile offset in the working buffer
-   * @param channel the gradient channel to populate
-   * @param x       the tile X coordinate
-   * @param y       the tile Y coordinate
-   */
-  protected void populateSmoothedLightVerticesByChannel(int o, byte channel, int x, int y) {
-    if (!enabled) {
-      back[o + channel + 7] = 1;
-      back[o + channel + 10] = 1;
-      back[o + channel + 13] = 1;
-      back[o + channel + 16] = 1;
-      return;
-    }
-
-    float l1 = getChannelValue(x - 1, y, channel);
-    float l2 = getChannelValue(x + 1, y, channel);
-    float l3 = getChannelValue(x, y - 1, channel);
-    float l4 = getChannelValue(x, y + 1, channel);
-    float l5 = getChannelValue(x - 1, y - 1, channel);
-    float l6 = getChannelValue(x + 1, y + 1, channel);
-    float l7 = getChannelValue(x - 1, y + 1, channel);
-    float l8 = getChannelValue(x + 1, y - 1, channel);
-    float l0 = back[o + channel];
-    float v0 = (l0 + l1 + l3 + l5) / 4F;
-    float v1 = (l0 + l1 + l4 + l7) / 4F;
-    float v2 = (l0 + l2 + l4 + l6) / 4F;
-    float v3 = (l0 + l2 + l3 + l8) / 4F;
-    float aoTL = back[o + 3];
-    float aoBL = back[o + 4];
-    float aoBR = back[o + 5];
-    float aoTR = back[o + 6];
-    back[o + channel + 7] = v0 * aoTL;
-    back[o + channel + 10] = v3 * aoTR;
-    back[o + channel + 13] = v2 * aoBR;
-    back[o + channel + 16] = v1 * aoBL;
-  }
-
-  /**
-   * Marks the light stale after world content changed (block, wall, or liquid edits);
-   * the next {@link #tick(Box2D)} recomputes it.
-   */
-  public void requestRecalc() {
-    worldDirty = true;
-  }
-
-  /**
    * Rebuilds the light window around the given camera bounds.
    *
-   * <p>The full-window computation is skipped while nothing changed: the world is
-   * untouched, the sunlight is within the previous values, and the camera is still
-   * inside the computed window (the window is the view plus {@link #SPREAD_MARGIN} on
-   * every side, so normal movement rides along).
+   * <p>The window covers the visible tiles plus a light-travel border and follows the
+   * camera every tick; the small size (a screenful plus border) keeps a full recompute
+   * cheap, so entity light and sky light always track the camera in real time.
    *
    * @param cam the camera bounds to cover
    */
   public void tick(Box2D cam) {
+    if (level.getTicks() % Math.max(1, computeInterval) != 0) {
+      return;
+    }
+
     // adapt window to the visible area + spread margin
     requestSize((int) Math.ceil(cam.width()) + 2 * SPREAD_MARGIN + 4,
         (int) Math.ceil(cam.height()) + 2 * SPREAD_MARGIN + 4);
 
-    if (worker != null && worker.isAlive()) {
-      return;
+    if (asyncComputation != null && !asyncComputation.isDone()) {
+      return; // the previous compute is still running — keep its frame
     }
-    if (done || worker == null) {
-      boolean skyDirty = Math.abs(sunlight[0] - lastSunR) > 0.01F
-          || Math.abs(sunlight[1] - lastSunG) > 0.01F
-          || Math.abs(sunlight[2] - lastSunB) > 0.01F;
-      boolean camDirty = windowMissesCamera(cam);
-      if (!worldDirty && !skyDirty && !camDirty) {
-        return; // nothing changed — keep the current front buffer
-      }
-      lastSunR = sunlight[0];
-      lastSunG = sunlight[1];
-      lastSunB = sunlight[2];
-      // resize only while idle. the worker must not see the array change
-      if (applyPendingResize()) {
-        version.incrementAndGet();
-        onResized();
-      }
-      swap();
-      worker = Thread.ofVirtual().start(() -> {
-        calculate(cam);
-        worldDirty = false;
-        done = true;
-        version.incrementAndGet();
-      });
+    // resize only while idle. the worker must not see the array change
+    if (applyPendingResize()) {
+      version.incrementAndGet();
+      onResized();
     }
+    // fix the window origin before the worker starts: the worker lays out the
+    // back buffer with oriX/oriY, and publishes them via swap() when done
     oriX = (int) Math.floor(cam.centralX()) - sizeX / 2;
     oriY = (int) Math.floor(cam.centralY()) - sizeY / 2;
-  }
-
-  /**
-   * Returns whether the requested window (view + spread margin) no longer fits inside
-   * the current light window, i.e. the camera moved so far that the cached light no
-   * longer covers it.
-   */
-  private boolean windowMissesCamera(Box2D cam) {
-    int nw = Math.clamp((int) Math.ceil(cam.width()) + 2 * SPREAD_MARGIN + 4, MIN_SIZE, MAX_SIZE);
-    int nh = Math.clamp((int) Math.ceil(cam.height()) + 2 * SPREAD_MARGIN + 4, MIN_SIZE, MAX_SIZE);
-    int rx = (int) Math.floor(cam.centralX()) - nw / 2;
-    int ry = (int) Math.floor(cam.centralY()) - nh / 2;
-    return nw != sizeX || nh != sizeY
-        || rx < oriX || rx + nw > oriX + sizeX
-        || ry < oriY || ry + nh > oriY + sizeY;
+    asyncComputation = ForkJoinPool.commonPool().submit(() -> {
+      calculate(cam);
+      swap();
+      version.incrementAndGet();
+    });
   }
 
   /**
@@ -810,6 +629,9 @@ public abstract class LightEngine implements AutoCloseable {
   public int bufferIndex(int x, int y) {
     x -= frontOriX;
     y -= frontOriY;
+    if (x < 0 || x >= sizeX || y < 0 || y >= sizeY) {
+      return -1;
+    }
     return (x + y * sizeX) * STRIDE;
   }
 
@@ -823,12 +645,15 @@ public abstract class LightEngine implements AutoCloseable {
   protected int backBufferIndex(int x, int y) {
     x -= oriX;
     y -= oriY;
+    if (x < 0 || x >= sizeX || y < 0 || y >= sizeY) {
+      return -1;
+    }
     return (x + y * sizeX) * STRIDE;
   }
 
   /**
-   * No-op: the engine owns no GPU resources; the {@link LightMapRenderer} releases the
-   * lightmap targets and meshes.
+   * No-op: the engine owns no pool of its own (channel dispatch runs on the
+   * common ForkJoinPool); subclasses close their own pools.
    */
   @Override
   public void close() {

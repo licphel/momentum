@@ -116,7 +116,7 @@ public class LiquidRenderer {
             int upLv = level.getLiquidLevel(wx, wy + 1);
             // exposed surface wobbles (Enchant)
             if (upLv == 0 && (p < 1F || !perfect(up)))
-              p += 0.025F * (float) Math.sin(wx * 0.5F + wy * 0.05F + time * 3F);
+              p += 0.05F * (float) Math.sin(wx * 0.5F + wy * 0.05F + time * 3F);
             float h = Math.clamp(p, 0F, 1F);
 
             // falling liquid (nothing below): a small centered blob

@@ -28,14 +28,12 @@ import net.fmhi.math.Box2D;
 import net.fmhi.util.Profiler;
 import net.fmhi.world.entity.Entity;
 import net.fmhi.world.level.Chunk;
-import net.fmhi.world.level.ChunkCache;
 import net.fmhi.world.level.Level;
 
 import java.util.*;
 
 /**
- * Light engine that computes light by flood-filling from light sources,
- * Starbound/Enchant {@code LightEngineSourced} style.
+ * Light engine that computes light by flood-filling from light sources.
  *
  * <p>Every emitting tile (sky light, glowing blocks and liquids, entities) is collected
  * as a source, sorted brightest-first, and spread through the four neighbors with a
@@ -94,18 +92,17 @@ public class BFSLightEngine extends LightEngine {
 
   /**
    * Computes the next frame into the back buffer: seeds and collects light sources, then
-   * flood-fills from every source into the raw RGB channels; ambient occlusion and
-   * per-vertex smoothing are populated afterwards.
+   * flood-fills from every source into the raw RGB channels.
    *
    * @param cam the camera bounds to compute light for
    */
   @Override
   protected void calculate(Box2D cam) {
-    float spd = MAX_VALUE_GENERAL / UNIT;
-    int x0 = (int) (cam.minX() - spd);
-    int y0 = (int) (cam.minY() - spd);
-    int x1 = (int) (cam.maxX() + spd);
-    int y1 = (int) (cam.maxY() + spd);
+    float margin = MAX_VALUE_GENERAL / UNIT - cam.width() / 128.0F;
+    int x0 = (int) (cam.minX() - margin);
+    int y0 = (int) (cam.minY() - margin);
+    int x1 = (int) (cam.maxX() + margin);
+    int y1 = (int) (cam.maxY() + margin);
 
     // guard: the window must contain the computation range
     if (x1 - x0 + 1 > sizeX || y1 - y0 + 1 > sizeY) {
@@ -161,25 +158,6 @@ public class BFSLightEngine extends LightEngine {
     // Beam light: max-blend into raw channels after spread (spread is
     // isotropic and would wash out the cone if the beam went through it)
     mergeBeam();
-
-    // Phase 5: ambient occlusion and per-vertex smoothing
-    try (Profiler.Scope _ = Profiler.scope("lighting:populate")) {
-      for (int y = y0; y <= y1; y++) {
-        for (int x = x0; x <= x1; x++) {
-          int o = backBufferIndex(x, y);
-          
-          populateAO(o, cc, x, y);
-        }
-      }
-      channelDispatch(channel -> {
-        for (int y = y0; y <= y1; y++) {
-          for (int x = x0; x <= x1; x++) {
-            int o = backBufferIndex(x, y);
-            populateSmoothedLightVerticesByChannel(o, channel, x, y);
-          }
-        }
-      });
-    }
   }
 
   /**
@@ -196,7 +174,7 @@ public class BFSLightEngine extends LightEngine {
 
   /**
    * Flood-fills from one source; a tile already lit at or above the incoming intensity
-   * truncates the wave (Enchant's filter + cutoff).
+   * truncates the wave (filter + cutoff).
    */
   private void bfsSpread(Source src) {
     int cap = qx.length;
@@ -217,6 +195,9 @@ public class BFSLightEngine extends LightEngine {
       head++;
 
       int o = backBufferIndex(x, y);
+      if (o < 0) {
+        continue;
+      }
       // per-channel max write: a stronger light that arrived after this
       // entry must not be rolled back — but the wave keeps spreading either
       // way, the carried value is exactly this entry's light
@@ -249,20 +230,13 @@ public class BFSLightEngine extends LightEngine {
       return tail;
     }
 
-    // one chunk-cache pass for all three channels (a per-channel filter
-    // would triple the lookups on this hot path)
-    float[] f = filtered;
-    f[0] = pr;
-    f[1] = pg;
-    f[2] = pb;
-    filter3(cc, nx, ny, f);
-    float nr = f[0];
-    float ng = f[1];
-    float nb = f[2];
+    float nr = filter(cc, Channel.RED, nx, ny, pr);
+    float ng = filter(cc, Channel.GREEN, nx, ny, pg);
+    float nb = filter(cc, Channel.BLUE, nx, ny, pb);
     if (nr <= DARK_LUMINANCE && ng <= DARK_LUMINANCE && nb <= DARK_LUMINANCE) {
       return tail;
     }
-    // per-channel cutoff (Enchant): each channel keeps its brighter value,
+    // per-channel cutoff: each channel keeps its brighter value,
     // so overlapping sources compose by maximum instead of overwriting
     // each other's stronger channels
     boolean brighter = false;

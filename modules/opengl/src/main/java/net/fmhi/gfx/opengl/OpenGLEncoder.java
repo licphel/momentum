@@ -26,7 +26,6 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.collection.MSPCRingBuffer;
 import net.fmhi.gfx.GfxMetrics;
-import net.fmhi.gfx.GfxMetrics;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.cmd.Encoder;
