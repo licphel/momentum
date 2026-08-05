@@ -34,6 +34,12 @@ subprojects {
   apply plugin: 'java-library'
   apply plugin: 'maven-publish'
 
+  // Subprojects do not inherit group/version from the root project; set them
+  // explicitly so composite-build substitution (and publication) uses
+  // net.fmhi:fmhi-<name>:<version> coordinates.
+  group = 'net.fmhi'
+  version = property('fmhi_version')
+
   java {
     toolchain { languageVersion = JavaLanguageVersion.of(25) }
     withJavadocJar()
