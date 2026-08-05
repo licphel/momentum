@@ -1,0 +1,85 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+plugins {
+  id 'java-library'
+  id 'maven-publish'
+}
+
+group = 'net.fmhi'
+version = property('fmhi_version')
+
+subprojects {
+  apply plugin: 'java-library'
+  apply plugin: 'maven-publish'
+
+  java {
+    toolchain { languageVersion = JavaLanguageVersion.of(25) }
+    withJavadocJar()
+    withSourcesJar()
+  }
+
+  repositories { mavenCentral() }
+
+  tasks.withType(JavaCompile).configureEach {
+    it.options.encoding = "UTF-8"
+    it.options.compilerArgs.add("-Xlint:all")
+    it.options.compilerArgs.add("-Werror")
+  }
+
+  tasks.withType(Javadoc).configureEach {
+    options.addBooleanOption('Xdoclint:all,-missing,-html5', true)
+    failOnError = false
+  }
+
+  tasks.withType(Test).configureEach { useJUnitPlatform() }
+
+  // Shared dependencies, injected into every module from here so the
+  // per-module build scripts stay free of boilerplate.
+  dependencies {
+    compileOnly libs.jspecify
+    testCompileOnly libs.jspecify
+    implementation libs.log4j.api
+    implementation libs.log4j.core
+    implementation libs.fastutil
+    implementation libs.jackson.databind
+  }
+
+  // Each module publishes as its own artifact: net.fmhi:fmhi-<name>.
+  publishing {
+    publications {
+      maven(MavenPublication) {
+        from components.java
+        groupId = 'net.fmhi'
+        artifactId = project.name
+        version = property('fmhi_version')
+      }
+    }
+    repositories {
+      maven { name = 'Local'; url = rootProject.layout.buildDirectory.dir('repo') }
+    }
+  }
+}
+
+repositories { mavenCentral() }

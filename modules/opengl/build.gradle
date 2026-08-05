@@ -1,0 +1,12 @@
+plugins {
+  id 'java-library'
+}
+
+dependencies {
+  api project(':fmhi-gfx')
+
+  compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
+  compileOnly "org.lwjgl:lwjgl-opengl:${lwjgl_version}"
+  compileOnly "org.lwjgl:lwjgl-shaderc:${lwjgl_version}"
+  compileOnly "org.lwjgl:lwjgl-spvc:${lwjgl_version}"
+}
