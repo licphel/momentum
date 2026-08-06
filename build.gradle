@@ -22,14 +22,9 @@
  * SOFTWARE.
  */
 
-plugins {
-  id 'java-library'
-  id 'maven-publish'
-}
-
-group = 'net.fmhi'
-version = property('fmhi_version')
-
+// The fmhi root project is a pure aggregator for the modules/ subprojects. It
+// must NOT apply java-library/maven-publish here — that would surface an empty
+// root java module alongside the real fmhi-* modules.
 subprojects {
   apply plugin: 'java-library'
   apply plugin: 'maven-publish'
@@ -89,3 +84,14 @@ subprojects {
 }
 
 repositories { mavenCentral() }
+
+// Root has no sources of its own; expose lifecycle tasks that aggregate the
+// modules so plain `./gradlew build|test|clean` works from the engine root
+// (e.g. the engine's own CI).
+['build', 'check', 'test', 'clean', 'assemble'].each { name ->
+  tasks.register(name) {
+    group = 'build'
+    description = "Aggregates '$name' across all modules."
+    dependsOn subprojects.collect { "${it.path}:$name" }
+  }
+}
