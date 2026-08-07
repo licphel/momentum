@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.input.event;
 
-import net.fmhi.fml.event.Event;
+import net.fmhi.event.Event;
 
 /**
  * One or more files were dropped onto the view.

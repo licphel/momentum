@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.input.event;
 
-import net.fmhi.fml.event.Event;
+import net.fmhi.event.Event;
 import net.fmhi.gfx.input.KeyAction;
 import net.fmhi.gfx.input.KeyCode;
 

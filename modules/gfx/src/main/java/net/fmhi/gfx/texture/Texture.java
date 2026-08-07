@@ -24,17 +24,12 @@
 
 package net.fmhi.gfx.texture;
 
-import net.fmhi.fml.resource.ResourceException;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.gfx.io.ImageInputStream;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.math.Box3D;
-import net.fmhi.util.ResourceProvider;
 
-import java.io.IOException;
-import java.io.InputStream;
 import java.nio.ByteBuffer;
 
 /**

@@ -22,38 +22,18 @@
  * SOFTWARE.
  */
 
-import org.gradle.internal.os.OperatingSystem
-
-plugins {
-  id 'java-library'
-  id 'maven-publish'
-}
-
-group = 'net.fmhi'
-version = property('fmhi_version')
-
-ext {
-  switch (OperatingSystem.current()) {
-    case OperatingSystem.WINDOWS:
-      def osArch = System.getProperty("os.arch")
-      lwjglNatives = osArch.contains("64")
-          ? "natives-windows${osArch.startsWith("aarch64") ? "-arm64" : ""}"
-          : "natives-windows-x86"
-      break
-    case OperatingSystem.MAC_OS:
-      lwjglNatives = System.getProperty("os.arch").startsWith("aarch64") ? "natives-macos-arm64" : "natives-macos"
-      break
-    default:
-      def osArch = System.getProperty("os.arch")
-      lwjglNatives = osArch.startsWith("arm") || osArch.startsWith("aarch64")
-          ? "natives-linux-${osArch.contains("64") || osArch.startsWith("armv8") ? "arm64" : "arm32"}"
-          : "natives-linux"
-      break
-  }
-}
-
+// The fmhi root project is a pure aggregator for the modules/ subprojects. It
+// must NOT apply java-library/maven-publish here — that would surface an empty
+// root java module alongside the real fmhi-* modules.
 subprojects {
   apply plugin: 'java-library'
+  apply plugin: 'maven-publish'
+
+  // Subprojects do not inherit group/version from the root project; set them
+  // explicitly so composite-build substitution (and publication) uses
+  // net.fmhi:fmhi-<name>:<version> coordinates.
+  group = 'net.fmhi'
+  version = property('fmhi_version')
 
   java {
     toolchain { languageVersion = JavaLanguageVersion.of(25) }
@@ -86,71 +66,32 @@ subprojects {
     implementation libs.fastutil
     implementation libs.jackson.databind
   }
+
+  // Each module publishes as its own artifact: net.fmhi:fmhi-<name>.
+  publishing {
+    publications {
+      maven(MavenPublication) {
+        from components.java
+        groupId = 'net.fmhi'
+        artifactId = project.name
+        version = property('fmhi_version')
+      }
+    }
+    repositories {
+      maven { name = 'Local'; url = rootProject.layout.buildDirectory.dir('repo') }
+    }
+  }
 }
 
 repositories { mavenCentral() }
 
-// All discovered subprojects get pulled into main + test classpaths.
-def allSubprojects = subprojects.collect { project(":${it.name}") }
-
-dependencies {
-  allSubprojects.each { implementation it }
-  allSubprojects.each { testImplementation it }
-
-  compileOnly libs.jspecify
-  testCompileOnly libs.jspecify
-
-  testImplementation platform('org.junit:junit-bom:5.10.0')
-  testImplementation 'org.junit.jupiter:junit-jupiter'
-  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-
-  // primitive-keyed collections: no boxing on the hot chunk lookup paths
-  implementation libs.fastutil
-
-  implementation "org.lwjgl:lwjgl:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-opengl:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-glfw:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-openal:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-shaderc:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-spvc:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-freetype:${lwjgl_version}"
-  implementation "org.lwjgl:lwjgl-harfbuzz:${lwjgl_version}"
-
-  runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-shaderc::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-spvc::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-freetype::${lwjglNatives}"
-  runtimeOnly "org.lwjgl:lwjgl-harfbuzz::${lwjglNatives}"
-}
-
-test {
-  useJUnitPlatform()
-  failOnNoDiscoveredTests = false
-}
-
-publishing {
-  publications {
-    maven(MavenPublication) { from components.java }
-  }
-  repositories {
-    maven { name = 'Local'; url = layout.buildDirectory.dir('repo') }
-  }
-}
-
-tasks.register('copyDependencies', Copy) {
-  from(configurations.runtimeClasspath)
-  into(layout.buildDirectory.dir('libs'))
-}
-
-tasks.jar {
-  dependsOn('copyDependencies')
-  manifest {
-    attributes(
-        'Class-Path': configurations.runtimeClasspath.files.collect { it.name }.join(' '),
-        'Main-Class': 'net.fmhi.Main'
-    )
+// Root has no sources of its own; expose lifecycle tasks that aggregate the
+// modules so plain `./gradlew build|test|clean` works from the engine root
+// (e.g. the engine's own CI).
+['build', 'check', 'test', 'clean', 'assemble'].each { name ->
+  tasks.register(name) {
+    group = 'build'
+    description = "Aggregates '$name' across all modules."
+    dependsOn subprojects.collect { "${it.path}:$name" }
   }
 }

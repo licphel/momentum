@@ -219,16 +219,18 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void pollEvents() {
-    long ms = System.currentTimeMillis();
+    if (view != null && view.isDebug()) {
+      long ms = System.currentTimeMillis();
 
-    if (ms -  lastCheckErrorMs > 1000) {
-      lastCheckErrorMs = ms;
-      submit(() -> {
-        int err;
-        while ((err = GL11.glGetError()) != GL11.GL_NO_ERROR) {
-          LOGGER.warn("OpenGL error: 0x{}", Integer.toHexString(err));
-        }
-      });
+      if (ms -  lastCheckErrorMs > 1000) {
+        lastCheckErrorMs = ms;
+        submit(() -> {
+          int err;
+          while ((err = GL11.glGetError()) != GL11.GL_NO_ERROR) {
+            LOGGER.warn("OpenGL error: 0x{}", Integer.toHexString(err));
+          }
+        });
+      }
     }
   }
 

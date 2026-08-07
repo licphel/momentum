@@ -24,9 +24,9 @@
 
 package net.fmhi.gfx;
 
-import net.fmhi.fml.event.Event;
-import net.fmhi.fml.event.EventBus;
-import net.fmhi.fml.event.EventListener;
+import net.fmhi.event.Event;
+import net.fmhi.event.EventBus;
+import net.fmhi.event.EventListener;
 import net.fmhi.gfx.input.Snapshot;
 import net.fmhi.gfx.input.event.*;
 import net.fmhi.gfx.io.ImageInfo;

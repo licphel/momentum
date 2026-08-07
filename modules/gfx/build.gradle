@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
   api project(':fmhi-core')
-  api project(':fmhi-fml')
+  api project(':fmhi-asset')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   implementation "org.lwjgl:lwjgl-freetype:${lwjgl_version}"

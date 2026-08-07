@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.glfw;
 
-import net.fmhi.fml.event.Event;
+import net.fmhi.event.Event;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.ViewInfo;
