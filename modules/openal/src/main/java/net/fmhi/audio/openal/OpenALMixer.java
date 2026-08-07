@@ -69,6 +69,7 @@ public final class OpenALMixer implements Mixer {
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
   private long lastCheckErrorMs;
+  private boolean debug = false;
 
   /**
    * Creates a new mixer, opens the default OpenAL device and context, and starts the audio thread.
@@ -84,23 +85,36 @@ public final class OpenALMixer implements Mixer {
     audioThread.start();
   }
 
+  /**
+   * Sets whether to get debug outputs.
+   *
+   * @param debug debug flag
+   * @return this for chaining
+   */
+  public OpenALMixer setDebug(boolean debug) {
+    this.debug = debug;
+    return this;
+  }
+
   @Override
   public MixerInfo info() {
     return new MixerInfo("OpenAL-Mixer", true);
   }
 
   public void pollEvents() {
-    long ms = System.currentTimeMillis();
+    if (debug) {
+      long ms = System.currentTimeMillis();
 
-    if (ms -  lastCheckErrorMs > 1000) {
-      lastCheckErrorMs = ms;
+      if (ms - lastCheckErrorMs > 1000) {
+        lastCheckErrorMs = ms;
 
-      submit(() -> {
-        int err;
-        while ((err = alGetError()) != AL_NO_ERROR) {
-          LOGGER.warn("OpenAL error: 0x{}", Integer.toHexString(err));
-        }
-      });
+        submit(() -> {
+          int err;
+          while ((err = alGetError()) != AL_NO_ERROR) {
+            LOGGER.warn("OpenAL error: 0x{}", Integer.toHexString(err));
+          }
+        });
+      }
     }
 
     submit(() -> {

@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.input.event;
 
-import net.fmhi.fml.event.Event;
+import net.fmhi.event.Event;
 
 /**
  * A Unicode character typed by the user, after keyboard layout and IME composition.

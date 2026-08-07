@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.ui;
 
-import net.fmhi.fml.event.EventBus;
-import net.fmhi.fml.event.EventListener;
+import net.fmhi.event.EventBus;
+import net.fmhi.event.EventListener;
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.View;
 import net.fmhi.gfx.input.KeyAction;

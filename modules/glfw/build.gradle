@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
   api project(':fmhi-gfx')
-  api project(':fmhi-fml')
+  api project(':fmhi-mod')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-glfw:${lwjgl_version}"

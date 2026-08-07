@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.text;
 
-import net.fmhi.codec.i18n.Language;
+import net.fmhi.i18n.Language;
 import net.fmhi.gfx.text.raster.Raster;
 import org.jspecify.annotations.Nullable;
 
