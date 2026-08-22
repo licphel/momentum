@@ -167,6 +167,25 @@ public record Color(float red, float green, float blue, float alpha) {
   }
 
   /**
+   * Pack RGBA as half-float ABGR without allocating a Color object.
+   *
+   * <p>Layout: {@code [R:15..0 | G:31..16 | B:47..32 | A:63..48]}
+   *
+   * @param r red channel
+   * @param g green channel
+   * @param b blue channel
+   * @param a alpha channel
+   * @return packed half-precision values
+   */
+  public static long packF16LE(float r, float g, float b, float a) {
+    long hr = Float.floatToFloat16(r) & 0xFFFFL;
+    long hg = Float.floatToFloat16(g) & 0xFFFFL;
+    long hb = Float.floatToFloat16(b) & 0xFFFFL;
+    long ha = Float.floatToFloat16(a) & 0xFFFFL;
+    return hr | (hg << 16) | (hb << 32) | (ha << 48);
+  }
+
+  /**
    * Returns the sum of this color and another (component-wise).
    *
    * @param o the other color
@@ -212,43 +231,7 @@ public record Color(float red, float green, float blue, float alpha) {
    *
    * @return packed half-precision values
    */
-  public long pack() {
-    return pack(red, green, blue, alpha);
-  }
-
-  /**
-   * Pack RGBA as half-float ABGR without allocating a Color object.
-   *
-   * <p>Layout: {@code [R:15..0 | G:31..16 | B:47..32 | A:63..48]}
-   *
-   * @param r red channel
-   * @param g green channel
-   * @param b blue channel
-   * @param a alpha channel
-   *
-   * @return packed half-precision values
-   */
-  public static long pack(float r, float g, float b, float a) {
-    long hr = Half.quickHalf(r) & 0xFFFFL;
-    long hg = Half.quickHalf(g) & 0xFFFFL;
-    long hb = Half.quickHalf(b) & 0xFFFFL;
-    long ha = Half.quickHalf(a) & 0xFFFFL;
-    return hr | (hg << 16) | (hb << 32) | (ha << 48);
-  }
-
-  /**
-   * Packs RGBA as four unsigned bytes into an {@code int} in ARGB order.
-   *
-   * <p>Layout: {@code [B:7..0 | G:15..8 | R:23..16 | A:31..24]}
-   * (i.e., high-to-low bytes: A, R, G, B)
-   *
-   * @return packed ARGB value
-   */
-  public int toARGB() {
-    int r = Math.round(Math.clamp(red, 0.0F, 1.0F) * 255.0F);
-    int g = Math.round(Math.clamp(green, 0.0F, 1.0F) * 255.0F);
-    int b = Math.round(Math.clamp(blue, 0.0F, 1.0F) * 255.0F);
-    int a = Math.round(Math.clamp(alpha, 0.0F, 1.0F) * 255.0F);
-    return (b) | (g << 8) | (r << 16) | (a << 24);
+  public long packF16LE() {
+    return packF16LE(red, green, blue, alpha);
   }
 }

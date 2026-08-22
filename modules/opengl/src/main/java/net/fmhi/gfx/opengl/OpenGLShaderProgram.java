@@ -26,8 +26,8 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.shader.ShaderModule;
 import net.fmhi.gfx.shader.ShaderProgram;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import static org.lwjgl.opengl.GL33.*;

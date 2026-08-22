@@ -25,11 +25,11 @@
 package net.fmhi.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
-import net.fmhi.gfx.brush.tint.Gradient;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.FontMetrics;
 import net.fmhi.gfx.text.Literal;
 import net.fmhi.gfx.text.harfbuzz.HarfbuzzShaper;
+import net.fmhi.gfx.util.fast2d.tint.Gradient;
 import net.fmhi.math.Box2D;
 
 import java.util.*;

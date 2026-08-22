@@ -27,8 +27,8 @@ package net.fmhi.gfx.opengl;
 import net.fmhi.gfx.pass.RenderTarget;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureFilter;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CopyOnWriteArrayList;

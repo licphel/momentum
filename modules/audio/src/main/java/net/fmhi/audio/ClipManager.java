@@ -28,8 +28,6 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 
-import java.util.Map;
-
 /**
  * Manages automatic cleanup of {@link Clip}s that have finished playing.
  *

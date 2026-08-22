@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.text.raster;
 
-import net.fmhi.gfx.brush.tint.Gradient;
+import net.fmhi.gfx.util.fast2d.tint.Gradient;
 
 /**
  * A glyph positioned by the layout pass, ready for rendering.

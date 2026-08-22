@@ -24,7 +24,7 @@
 
 package net.fmhi.asset;
 
-import net.fmhi.registry.Identifier;
+import net.fmhi.util.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;

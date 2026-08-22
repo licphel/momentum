@@ -43,9 +43,9 @@ import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureDesc;
-import net.fmhi.util.InternalApi;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.internal.InternalApi;
+import net.fmhi.util.logging.Log;
+import net.fmhi.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
@@ -70,7 +70,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 @InternalApi
 public final class OpenGLDevice implements Device {
-  private static final Logger LOGGER = LogManager.getLogger();
+  private static final Logger LOGGER = Log.getLogger();
   /**
    * Shared GL state cache — only accessed during {@link #pollEvents()}.
    */
@@ -83,8 +83,8 @@ public final class OpenGLDevice implements Device {
   private final Queue<Runnable> queue = new ConcurrentLinkedQueue<>();
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
-  private long lastCheckErrorMs;
   @Nullable View view;
+  private long lastCheckErrorMs;
 
   /**
    * Creates a new device.
@@ -213,7 +213,7 @@ public final class OpenGLDevice implements Device {
         task.run();
       }
     } catch (Exception e) {
-      LOGGER.error("OpenGL execution error", e);
+      LOGGER.warn("OpenGL execution error", e);
     }
   }
 
@@ -222,7 +222,7 @@ public final class OpenGLDevice implements Device {
     if (view != null && view.isDebug()) {
       long ms = System.currentTimeMillis();
 
-      if (ms -  lastCheckErrorMs > 1000) {
+      if (ms - lastCheckErrorMs > 1000) {
         lastCheckErrorMs = ms;
         submit(() -> {
           int err;

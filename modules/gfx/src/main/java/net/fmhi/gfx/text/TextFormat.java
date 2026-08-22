@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.text;
 
-import net.fmhi.gfx.brush.tint.Gradient;
-import net.fmhi.gfx.brush.tint.SimpleGradient;
+import net.fmhi.gfx.util.fast2d.tint.Gradient;
+import net.fmhi.gfx.util.fast2d.tint.SimpleGradient;
 import net.fmhi.math.Color;
 
 /**

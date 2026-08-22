@@ -25,7 +25,7 @@
 package net.fmhi.mod;
 
 import net.fmhi.event.EventBus;
-import net.fmhi.registry.Namespace;
+import net.fmhi.util.Namespace;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;

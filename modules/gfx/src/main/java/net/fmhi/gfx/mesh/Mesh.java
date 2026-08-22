@@ -39,19 +39,18 @@ import java.util.List;
  * <p>This class implements {@link AutoCloseable}; closing a mesh releases the uniform buffer,
  * all vertex and index buffers, and all materials.
  *
+ * @param sections mesh sections
+ *
  * @see Section
  * @see Material
  */
-public final class Mesh implements AutoCloseable {
-  private final List<Section> sections;
-
+public record Mesh(List<Section> sections) implements AutoCloseable {
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
    *
    * @param sections the list of geometry sections
    */
-  public Mesh(List<Section> sections) {
-    this.sections = sections;
+  public Mesh {
   }
 
   /**
@@ -59,6 +58,7 @@ public final class Mesh implements AutoCloseable {
    *
    * @return the list of sections
    */
+  @Override
   public List<Section> sections() {
     return sections;
   }

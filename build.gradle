@@ -61,8 +61,6 @@ subprojects {
   dependencies {
     compileOnly libs.jspecify
     testCompileOnly libs.jspecify
-    implementation libs.log4j.api
-    implementation libs.log4j.core
     implementation libs.fastutil
     implementation libs.jackson.databind
   }

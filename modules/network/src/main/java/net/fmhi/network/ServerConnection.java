@@ -25,7 +25,6 @@
 package net.fmhi.network;
 
 import io.netty.bootstrap.ServerBootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
@@ -38,6 +37,8 @@ import net.fmhi.network.codec.PacketDecoder;
 import net.fmhi.network.codec.PacketEncoder;
 import net.fmhi.network.packet.HeartbeatPacket;
 import net.fmhi.network.packet.Packet;
+import net.fmhi.network.packet.SessionAckPacket;
+import net.fmhi.network.packet.SessionOpenPacket;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -50,12 +51,18 @@ import java.util.function.Consumer;
 /**
  * A server-side network endpoint that binds to a port, accepts client connections, and manages sessions.
  *
- * <p>Each connecting client transmits its identity during the handshake. The server exposes this via
- * {@link Session#remoteId()}.
+ * <p>Each accepted TCP channel begins a handshake: the server assigns the connection's shared identifier and sends it
+ * in a {@link SessionOpenPacket}; the connection only becomes established — and {@code onConnected} only fires — when
+ * the client answers with a {@link SessionAckPacket} echoing the same UUID. Until then the session reports
+ * {@link SessionState#CONNECTING}, is not {@link Session#isActive() active}, its packets are dropped, and it is
+ * evicted
+ * silently after {@link NetSharedConstants#HANDSHAKE_TIMEOUT_MS}.
  *
  * <h3>Heartbeat and timeouts</h3>
- * <p>The server broadcasts heartbeat packets at the interval defined by {@link NetConfig#HEARTBEAT_INTERVAL_MS}.
- * Sessions that remain inactive for longer than {@link NetConfig#SESSION_TIMEOUT_MS} are automatically disconnected.
+ * <p>The server broadcasts heartbeat packets at the interval defined by
+ * {@link NetSharedConstants#HEARTBEAT_INTERVAL_MS}.
+ * Sessions that remain inactive for longer than {@link NetSharedConstants#SESSION_TIMEOUT_MS} are automatically
+ * disconnected.
  *
  * <p>This class is thread-safe. {@link #send(Packet)} and {@link #send(UUID, Packet)} may be called from any thread,
  * while {@link #process()} should be called from a single dedicated thread.
@@ -121,13 +128,17 @@ public final class ServerConnection implements AutoCloseable {
       @Override
       protected void initChannel(Channel ch) {
         ChannelPipeline p = ch.pipeline();
-        // identity receiver: reads the first 16 bytes as the client's UUID
-        p.addLast("identityReceiver", new IdentityReceiver());
-        p.addLast("frameDecoder", new LengthFieldBasedFrameDecoder(NetConfig.FRAME_MAX_SIZE, 0, 4, 0, 4));
+        // Outbound traversal is tail→head, so the encoders must sit head-side of
+        // the session handler: writes from sessionHandler pass packetEncoder
+        // (Packet→bytes) then frameEncoder (prepend length) before the socket.
+        // inbound
+        p.addLast("frameDecoder", new LengthFieldBasedFrameDecoder(NetSharedConstants.FRAME_MAX_SIZE, 0, 4, 0, 4));
         p.addLast("packetDecoder", decoder);
-        p.addLast("sessionHandler", new ServerSessionHandler());
-        p.addLast("packetEncoder", encoder);
+        // outbound
         p.addLast("frameEncoder", new LengthFieldPrepender(4));
+        p.addLast("packetEncoder", encoder);
+        // business
+        p.addLast("sessionHandler", new ServerSessionHandler());
       }
     });
 
@@ -172,7 +183,7 @@ public final class ServerConnection implements AutoCloseable {
 
   /**
    * Processes a single tick: drains the inbound packet queue, fires pending lifecycle events, transmits heartbeats, and
-   * evicts stale sessions.
+   * evicts stale or never-established sessions.
    *
    * <p>This method should be called once per frame from the main thread. Inbound packets receive their
    * {@link Packet#handle(Session)} call on the calling thread.
@@ -198,7 +209,7 @@ public final class ServerConnection implements AutoCloseable {
     }
 
     long now = System.currentTimeMillis();
-    if (now - lastHeartbeatSent >= NetConfig.HEARTBEAT_INTERVAL_MS) {
+    if (now - lastHeartbeatSent >= NetSharedConstants.HEARTBEAT_INTERVAL_MS) {
       send(new HeartbeatPacket());
       lastHeartbeatSent = now;
     }
@@ -206,11 +217,21 @@ public final class ServerConnection implements AutoCloseable {
     Iterator<NettySession> iter = sessions.values().iterator();
     while (iter.hasNext()) {
       NettySession session = iter.next();
-      if (!session.isActive()) {
+      // Channel liveness (not Session.isActive(): a handshaking session is not
+      // yet active but its channel is very much alive) decides eviction.
+      if (!session.channel.isActive()) {
         iter.remove();
         channels.remove(session.channel);
-        disconnectEvents.add(session);
-      } else if (now - session.lastActivityTime() > NetConfig.SESSION_TIMEOUT_MS) {
+        if (session.established) {
+          disconnectEvents.add(session);
+        }
+      } else if (!session.established && now - session.createdAt > NetSharedConstants.HANDSHAKE_TIMEOUT_MS) {
+        // Handshake never finished: agreement was never reached, so evict
+        // silently — no onConnected/onDisconnected pair ever fires.
+        session.close();
+        iter.remove();
+        channels.remove(session.channel);
+      } else if (session.established && now - session.lastActivityTime() > NetSharedConstants.SESSION_TIMEOUT_MS) {
         session.close();
         iter.remove();
         channels.remove(session.channel);
@@ -222,7 +243,8 @@ public final class ServerConnection implements AutoCloseable {
   /**
    * Registers a callback invoked when a new session is established.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread.
+   * <p>The callback fires during {@link #process()} on the calling thread, after the handshake completed and the client
+   * acknowledged the shared connection identifier.
    *
    * @param callback the callback to invoke for each new connection
    */
@@ -248,22 +270,6 @@ public final class ServerConnection implements AutoCloseable {
    */
   public Collection<Session> sessions() {
     return Collections.unmodifiableCollection(new ArrayList<>(sessions.values()));
-  }
-
-  /**
-   * Finds a session by the client's self-reported identity.
-   *
-   * @param clientId the client's self-reported identity
-   * @return the session if found, otherwise an empty {@link Optional}
-   */
-  public Optional<Session> sessionByClientId(UUID clientId) {
-    for (NettySession s : sessions.values()) {
-      UUID rid = s.remoteId();
-      if (clientId.equals(rid)) {
-        return Optional.of(s);
-      }
-    }
-    return Optional.empty();
   }
 
   /**
@@ -299,43 +305,26 @@ public final class ServerConnection implements AutoCloseable {
     sessions.clear();
   }
 
-  private static final class IdentityReceiver extends ChannelInboundHandlerAdapter {
-    private boolean received;
-
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      if (received) {
-        ctx.fireChannelRead(msg);
-        return;
-      }
-      if (msg instanceof ByteBuf buf && buf.readableBytes() >= 16) {
-        long msb = buf.readLong();
-        long lsb = buf.readLong();
-        ctx.channel().attr(NetConfig.CLIENT_ID_KEY).set(new UUID(msb, lsb));
-        received = true;
-        if (buf.isReadable()) {
-          ctx.fireChannelRead(buf);
-        } else {
-          buf.release();
-        }
-      } else {
-        ctx.fireChannelRead(msg);
-      }
-    }
-  }
-
   private record PacketWithSession(Packet packet, Session session) {
   }
 
   private static final class NettySession implements Session {
     private final UUID id;
     private final Channel channel;
+    private final long createdAt;
     private volatile long lastActivity;
+    /** Whether the client acknowledged the handshake; set once on the I/O thread, read from any thread. */
+    private volatile boolean established;
 
     NettySession(UUID id, Channel channel) {
       this.id = id;
       this.channel = channel;
-      this.lastActivity = System.currentTimeMillis();
+      this.createdAt = System.currentTimeMillis();
+      this.lastActivity = createdAt;
+    }
+
+    void touch() {
+      lastActivity = System.currentTimeMillis();
     }
 
     @Override
@@ -358,11 +347,15 @@ public final class ServerConnection implements AutoCloseable {
 
     @Override
     public boolean isActive() {
-      return channel.isActive();
+      // A session is only usable once both endpoints agreed on the identifier.
+      return established && channel.isActive();
     }
 
     @Override
     public SessionState state() {
+      if (!established) {
+        return SessionState.CONNECTING;
+      }
       if (channel.isActive()) {
         return SessionState.CONNECTED;
       }
@@ -373,17 +366,8 @@ public final class ServerConnection implements AutoCloseable {
     }
 
     @Override
-    public UUID remoteId() {
-      return channel.attr(NetConfig.CLIENT_ID_KEY).get();
-    }
-
-    @Override
     public long lastActivityTime() {
       return lastActivity;
-    }
-
-    void touch() {
-      lastActivity = System.currentTimeMillis();
     }
 
     @Override
@@ -397,37 +381,42 @@ public final class ServerConnection implements AutoCloseable {
     public void channelActive(ChannelHandlerContext ctx) {
       Channel ch = ctx.channel();
       channels.add(ch);
-      UUID sid = UUID.randomUUID();
-      NettySession session = new NettySession(sid, ch);
-      sessions.put(sid, session);
+      UUID connId = UUID.randomUUID();
+      NettySession session = new NettySession(connId, ch);
+      sessions.put(connId, session);
 
-      // Send the assigned session UUID back to the client so it can use it as a remote identity.
-      ByteBuf idBuf = ctx.alloc().buffer(16);
-      idBuf.writeLong(sid.getMostSignificantBits());
-      idBuf.writeLong(sid.getLeastSignificantBits());
-      ctx.writeAndFlush(idBuf);
-
-      connectEvents.add(session);
-    }
-
-    @Override
-    public void channelInactive(ChannelHandlerContext ctx) {
-      // Session cleanup is deferred to process().
+      // Assign the shared connection identifier; the session stays CONNECTING
+      // until the client echoes it back in a SessionAckPacket. Write failures
+      // surface on the promise, not via exceptionCaught — log them or they
+      // vanish silently.
+      ctx.writeAndFlush(new SessionOpenPacket(connId)).addListener((ChannelFutureListener) f -> {
+        if (!f.isSuccess()) {
+          System.err.println("[fmhi-net/server] session-open write failed: " + f.cause());
+        }
+      });
     }
 
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      if (msg instanceof Packet packet) {
-        UUID sid = null;
-        for (Map.Entry<UUID, NettySession> entry : sessions.entrySet()) {
-          if (entry.getValue().channel == ctx.channel()) {
-            sid = entry.getKey();
-            entry.getValue().touch();
-            break;
-          }
+      if (msg instanceof SessionAckPacket ack) {
+        NettySession session = sessionFor(ctx.channel());
+        if (session == null) {
+          return;
         }
-        NettySession session = sid != null ? sessions.get(sid) : null;
-        if (session != null) {
+        if (!session.established && ack.connId().equals(session.id)) {
+          session.established = true;
+          connectEvents.add(session);
+        } else if (!ack.connId().equals(session.id)) {
+          // Echo mismatch: the protocol is broken, abort the connection.
+          ctx.close();
+        }
+        return;
+      }
+      if (msg instanceof Packet packet) {
+        NettySession session = sessionFor(ctx.channel());
+        if (session != null && session.established) {
+          // Packets from not-yet-established sessions are dropped.
+          session.touch();
           inbound.add(new PacketWithSession(packet, session));
         }
       }
@@ -436,6 +425,15 @@ public final class ServerConnection implements AutoCloseable {
     @Override
     public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) {
       ctx.close();
+    }
+
+    private @Nullable NettySession sessionFor(Channel ch) {
+      for (NettySession s : sessions.values()) {
+        if (s.channel == ch) {
+          return s;
+        }
+      }
+      return null;
     }
   }
 }

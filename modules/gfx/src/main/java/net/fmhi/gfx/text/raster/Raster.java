@@ -25,8 +25,8 @@
 package net.fmhi.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
-import net.fmhi.gfx.brush.tint.Gradient;
 import net.fmhi.gfx.text.Meta;
+import net.fmhi.gfx.util.fast2d.tint.Gradient;
 import net.fmhi.math.Box2D;
 import net.fmhi.math.Vector2;
 import org.jspecify.annotations.Nullable;
@@ -202,8 +202,8 @@ public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float last
   /**
    * A decoration line (underline or strikethrough) in visual space.
    *
-   * @param bounds the bounding rectangle of the stroke
-   * @param gradient  the stroke gradient
+   * @param bounds   the bounding rectangle of the stroke
+   * @param gradient the stroke gradient
    */
   public record Stroke(Box2D bounds, Gradient gradient) {
   }

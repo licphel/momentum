@@ -28,7 +28,7 @@ import net.fmhi.audio.AudioException;
 import net.fmhi.audio.AudioFormat;
 import net.fmhi.audio.Clip;
 import net.fmhi.audio.Controller;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;

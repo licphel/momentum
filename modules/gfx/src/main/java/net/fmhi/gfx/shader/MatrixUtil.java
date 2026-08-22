@@ -15,7 +15,8 @@ import java.nio.ByteBuffer;
  * allocation overhead during high-frequency rendering loops.
  */
 public final class MatrixUtil {
-  private MatrixUtil() {}
+  private MatrixUtil() {
+  }
 
   /**
    * Writes a 4x4 view-projection matrix into a Uniform Buffer Object (UBO).

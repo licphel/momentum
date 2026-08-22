@@ -25,9 +25,10 @@
 package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.pipe.*;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
-import static org.lwjgl.opengl.GL33.*;
+import static org.lwjgl.opengl.GL33.GL_BACK;
+import static org.lwjgl.opengl.GL33.GL_FRONT;
 
 /**
  * Immutable OpenGL render pipeline that applies all fixed-function and programmable state via the {@link OpenGLCache}

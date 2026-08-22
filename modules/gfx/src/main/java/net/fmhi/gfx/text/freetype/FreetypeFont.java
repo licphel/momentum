@@ -28,7 +28,7 @@ import net.fmhi.gfx.Device;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.FontMetrics;
 import net.fmhi.gfx.text.raster.Glyph;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;

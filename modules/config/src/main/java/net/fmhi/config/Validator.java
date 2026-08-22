@@ -128,10 +128,8 @@ public interface Validator<T> {
    * @param <T>    the value type
    * @return a validator that checks for set membership
    */
-  @SafeVarargs
-  @SuppressWarnings("varargs")
-  static <T> Validator<T> oneOf(T... values) {
-    Set<T> set = Set.of(values);
+  static <T> Validator<T> oneOf(Object... values) {
+    Set<?> set = Set.of(values);
     return value -> {
       if (!set.contains(value)) {
         return "Value must be one of " + set + ", got " + value;

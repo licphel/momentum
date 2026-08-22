@@ -108,7 +108,7 @@ public interface Profiler {
    * Returns the shared profiler.
    *
    * @return the active chart profiler when profiling is enabled, otherwise a no-op
-   *     profiler that records nothing
+   * profiler that records nothing
    */
   static Profiler get() {
     return ProfilerConfig.enabled ? ChartProfiler.INSTANCE : NoopProfiler.INSTANCE;
@@ -165,8 +165,8 @@ public interface Profiler {
    * is {@code null}; closing it then does nothing.
    *
    * @param profiler the profiler that started the section, or {@code null} for the no-op
-   *     scope of a disabled profiler
-   * @param name the name of the timed section
+   *                 scope of a disabled profiler
+   * @param name     the name of the timed section
    */
   record Scope(@Nullable Profiler profiler, String name) implements AutoCloseable {
     /**

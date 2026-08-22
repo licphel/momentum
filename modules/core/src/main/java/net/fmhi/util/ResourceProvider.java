@@ -113,7 +113,7 @@ public interface ResourceProvider {
    *
    * @param path the resource path (implementation-specific format)
    * @return an input stream, or {@code null} if the resource does not exist
-   * @throws IOException if an I/O error occurs while opening the stream
+   * @throws IOException          if an I/O error occurs while opening the stream
    * @throws NullPointerException if {@code path} is null
    */
   @Nullable InputStream openStream(String path) throws IOException;
@@ -127,7 +127,7 @@ public interface ResourceProvider {
    *
    * @param path the resource path
    * @return the resource content as a UTF-8 string
-   * @throws RuntimeException if an I/O error occurs or the resource is not found
+   * @throws RuntimeException     if an I/O error occurs or the resource is not found
    * @throws NullPointerException if {@code path} is null
    * @see #readBytes(String)
    * @see #openStream(String)
@@ -145,7 +145,7 @@ public interface ResourceProvider {
    *
    * @param path the resource path
    * @return the resource content as a byte array
-   * @throws RuntimeException if an I/O error occurs or the resource is not found
+   * @throws RuntimeException     if an I/O error occurs or the resource is not found
    * @throws NullPointerException if {@code path} is null
    * @see #readString(String)
    * @see #openStream(String)

@@ -3,7 +3,7 @@ package net.fmhi.gfx.opengl;
 import net.fmhi.gfx.math.TransformHandler;
 import net.fmhi.gfx.texture.Texture;
 import net.fmhi.math.Matrix4x4;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 /**
  * OpenGL transform handler - encodes OpenGL coordinate convention to ours.

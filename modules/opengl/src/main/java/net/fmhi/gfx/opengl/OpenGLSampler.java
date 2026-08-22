@@ -26,8 +26,8 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.SamplerDesc;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 
 import static org.lwjgl.opengl.GL33.*;
 

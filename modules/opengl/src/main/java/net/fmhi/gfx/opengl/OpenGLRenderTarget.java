@@ -31,8 +31,8 @@ import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureDesc;
 import net.fmhi.gfx.texture.TextureFilter;
 import net.fmhi.math.Box3D;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 
 import java.nio.ByteBuffer;
 

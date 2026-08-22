@@ -24,22 +24,14 @@
 
 package net.fmhi.util.profiler;
 
-import java.awt.Color;
-import java.awt.Font;
-import java.awt.Graphics2D;
-import java.awt.RenderingHints;
+import javax.imageio.ImageIO;
+import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import javax.imageio.ImageIO;
 
 /**
  * The profiling-enabled {@link Profiler} implementation.
@@ -51,8 +43,6 @@ import javax.imageio.ImageIO;
 final class ChartProfiler implements Profiler {
   static final ChartProfiler INSTANCE = new ChartProfiler();
   private static final double NS_TO_MS = 1.0 / 1_000_000.0;
-  /** Nanosecond clock at creation, used to skip recording during the warm-up. */
-  private final long bootNanos = System.nanoTime();
   /** Maximum number of samples retained per section. */
   private static final int SERIES_CAPACITY = 1024;
   /** Line colors for the PNG charts, picked by a stable hash of the section name. */
@@ -66,70 +56,13 @@ final class ChartProfiler implements Profiler {
       new Color(0xBE, 0x57, 0x2F),
       new Color(0x8C, 0x8C, 0x8C),
   };
-
+  /** Nanosecond clock at creation, used to skip recording during the warm-up. */
+  private final long bootNanos = System.nanoTime();
   private final Map<String, Entry> entries = new ConcurrentHashMap<>();
   /** Per-thread LIFO stack of open sections. */
   private final ThreadLocal<Deque<Frame>> stack = ThreadLocal.withInitial(ArrayDeque::new);
 
   ChartProfiler() {
-  }
-
-  @Override
-  public void start(String name) {
-    stack.get().push(new Frame(name, System.nanoTime()));
-  }
-
-  @Override
-  public void end(String name) {
-    Deque<Frame> st = stack.get();
-    if (st.isEmpty()) {
-      return;
-    }
-    Frame top = st.pop();
-    if (!top.name.equals(name)) {
-      return;
-    }
-    long now = System.nanoTime();
-    if (now - bootNanos < ProfilerConfig.warmupNanos) {
-      return; // ignore the startup phase, dominated by JIT/resource loading
-    }
-    long elapsed = now - top.start;
-    entries.compute(name, (k, e) -> (e == null ? new Entry() : e).record(elapsed));
-  }
-
-  @Override
-  public void dump() {
-    var list = sortedEntries();
-    if (list.isEmpty()) {
-      System.out.println("[Profiler] no data");
-      return;
-    }
-
-    System.out.println("[Profiler]");
-    System.out.printf("  %-40s %8s %8s %8s %8s %9s %8s %8s %8s %10s%n",
-        "section", "calls", "min ms", "avg ms", "max ms", "stdev ms", "p50", "p90", "p99", "total ms");
-    System.out.println("  " + "-".repeat(118));
-    for (var e : list) {
-      Entry entry = e.getValue();
-      System.out.printf("  %-40s %8d %8.3f %8.3f %8.3f %9.3f %8.3f %8.3f %8.3f %10.3f%n",
-          e.getKey(), entry.count, entry.minMs(), entry.avgMs(), entry.maxMs(),
-          entry.stddevMs(), entry.percentileMs(0.50), entry.percentileMs(0.90),
-          entry.percentileMs(0.99), entry.totalMs());
-    }
-    System.out.println();
-    renderCharts(list);
-  }
-
-  @Override
-  public void reset() {
-    entries.clear();
-  }
-
-  /** Returns the recorded sections sorted by total time, most expensive first. */
-  private ArrayList<Map.Entry<String, Entry>> sortedEntries() {
-    var list = new ArrayList<>(entries.entrySet());
-    list.sort(Comparator.<Map.Entry<String, Entry>>comparingLong(e -> e.getValue().totalNs).reversed());
-    return list;
   }
 
   /** Writes one duration-curve PNG chart per section into the output directory. */
@@ -154,9 +87,9 @@ final class ChartProfiler implements Profiler {
   /**
    * Draws a section's recent-duration curve as a PNG.
    *
-   * @param name the section name, used as the chart title and line color
+   * @param name  the section name, used as the chart title and line color
    * @param entry the recorded statistics for the section
-   * @param file the PNG file to write
+   * @param file  the PNG file to write
    * @return {@code false} if the section has fewer than two samples, {@code true} otherwise
    * @throws IOException if the PNG file cannot be written
    */
@@ -198,7 +131,7 @@ final class ChartProfiler implements Profiler {
       g.drawString(name, left, 26);
       g.setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
       g.drawString(String.format("calls %d   avg %.2f ms   max %.2f ms   p99 %.2f ms   stdev %.2f ms",
-          entry.count, entry.avgMs(), entry.maxMs(), entry.percentileMs(0.99), entry.stddevMs()),
+              entry.count, entry.avgMs(), entry.maxMs(), entry.percentileMs(0.99), entry.stddevMs()),
           left, 44);
 
       // horizontal grid
@@ -264,20 +197,77 @@ final class ChartProfiler implements Profiler {
     return v >= 1 ? String.format("%.1f", v) : String.format("%.2f", v);
   }
 
+  @Override
+  public void start(String name) {
+    stack.get().push(new Frame(name, System.nanoTime()));
+  }
+
+  @Override
+  public void end(String name) {
+    Deque<Frame> st = stack.get();
+    if (st.isEmpty()) {
+      return;
+    }
+    Frame top = st.pop();
+    if (!top.name.equals(name)) {
+      return;
+    }
+    long now = System.nanoTime();
+    if (now - bootNanos < ProfilerConfig.warmupNanos) {
+      return; // ignore the startup phase, dominated by JIT/resource loading
+    }
+    long elapsed = now - top.start;
+    entries.compute(name, (k, e) -> (e == null ? new Entry() : e).record(elapsed));
+  }
+
+  @Override
+  public void dump() {
+    var list = sortedEntries();
+    if (list.isEmpty()) {
+      System.out.println("[Profiler] no data");
+      return;
+    }
+
+    System.out.println("[Profiler]");
+    System.out.printf("  %-40s %8s %8s %8s %8s %9s %8s %8s %8s %10s%n",
+        "section", "calls", "min ms", "avg ms", "max ms", "stdev ms", "p50", "p90", "p99", "total ms");
+    System.out.println("  " + "-".repeat(118));
+    for (var e : list) {
+      Entry entry = e.getValue();
+      System.out.printf("  %-40s %8d %8.3f %8.3f %8.3f %9.3f %8.3f %8.3f %8.3f %10.3f%n",
+          e.getKey(), entry.count, entry.minMs(), entry.avgMs(), entry.maxMs(),
+          entry.stddevMs(), entry.percentileMs(0.50), entry.percentileMs(0.90),
+          entry.percentileMs(0.99), entry.totalMs());
+    }
+    System.out.println();
+    renderCharts(list);
+  }
+
+  @Override
+  public void reset() {
+    entries.clear();
+  }
+
+  /** Returns the recorded sections sorted by total time, most expensive first. */
+  private ArrayList<Map.Entry<String, Entry>> sortedEntries() {
+    var list = new ArrayList<>(entries.entrySet());
+    list.sort(Comparator.<Map.Entry<String, Entry>>comparingLong(e -> e.getValue().totalNs).reversed());
+    return list;
+  }
+
   /** An open section: its name and the time at which it was started. */
   private record Frame(String name, long start) {
   }
 
   /** Aggregated statistics and a bounded time series for a single section. */
   private static final class Entry {
+    final long[] series = new long[SERIES_CAPACITY];
     long count;
     long totalNs;
     long minNs = Long.MAX_VALUE;
     long maxNs = Long.MIN_VALUE;
-    // Welford's online variance.
     double mean;
     double m2;
-    final long[] series = new long[SERIES_CAPACITY];
     int head;
     int size;
 

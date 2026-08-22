@@ -29,14 +29,13 @@ import net.fmhi.gfx.buffer.BufferFrequency;
 import net.fmhi.gfx.buffer.BufferObject;
 import net.fmhi.gfx.buffer.BufferObjectDesc;
 import net.fmhi.gfx.buffer.BufferUsage;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL33.*;
-import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * OpenGL buffer object implementation supporting vertex, index, and uniform buffer usage.

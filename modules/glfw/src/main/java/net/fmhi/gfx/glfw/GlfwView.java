@@ -32,7 +32,7 @@ import net.fmhi.gfx.input.KeyAction;
 import net.fmhi.gfx.input.KeyCode;
 import net.fmhi.gfx.input.event.*;
 import net.fmhi.gfx.io.ImageInfo;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.*;
 import org.lwjgl.system.MemoryUtil;

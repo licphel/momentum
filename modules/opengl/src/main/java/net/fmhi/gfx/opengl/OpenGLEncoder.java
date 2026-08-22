@@ -24,7 +24,6 @@
 
 package net.fmhi.gfx.opengl;
 
-import net.fmhi.collection.MSPCRingBuffer;
 import net.fmhi.gfx.GfxMetrics;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.buffer.BufferObject;
@@ -36,9 +35,10 @@ import net.fmhi.gfx.pipe.Topology;
 import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.shader.ResourceSetLayout;
 import net.fmhi.math.Color;
-import net.fmhi.util.InternalApi;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.collection.MSPCRingBuffer;
+import net.fmhi.util.internal.InternalApi;
+import net.fmhi.util.logging.Log;
+import net.fmhi.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
@@ -73,7 +73,7 @@ import static org.lwjgl.opengl.GL43.glDispatchCompute;
  */
 @InternalApi
 public final class OpenGLEncoder implements Encoder {
-  private static final Logger LOGGER = LogManager.getLogger();
+  private static final Logger LOGGER = Log.getLogger();
 
   private static final int OP_BEGIN_PASS = 0;
   private static final int OP_END_PASS = 1;
@@ -92,22 +92,24 @@ public final class OpenGLEncoder implements Encoder {
   private static final int OP_DRAW_INDEXED_INSTANCED = 14;
   private static final int OP_DISPATCH = 15;
 
-  /** Ring capacity: the consumer drains the ring every frame, so the capacity only
+  /**
+   * Ring capacity: the consumer drains the ring every frame, so the capacity only
    * needs to hold one frame's worst-case stream (~35k ints today); the producer
-   * spins only if the consumer ever runs behind. */
+   * spins only if the consumer ever runs behind.
+   */
   private static final int RING_CAPACITY = 1 << 16;
   private static final int REF_CAPACITY = 1 << 4;
 
   private final OpenGLDevice ctx;
   private final MSPCRingBuffer ring = new MSPCRingBuffer(RING_CAPACITY);
+  // Per-frame recording state (single-threaded)
+  private final @Nullable OpenGLResourceSet[] currentRss = new OpenGLResourceSet[64]; // Most support 64 sets
   private @Nullable Object[] refs = new Object[REF_CAPACITY];
   private int refCount;
   private int batchRefStart;
   /** Ints recorded since the batch start; the consumer polls exactly this many. */
   private int pendingInts;
   private int cmdCount;
-  // Per-frame recording state (single-threaded)
-  private final @Nullable OpenGLResourceSet[] currentRss = new OpenGLResourceSet[64]; // Most support 64 sets
   private @Nullable OpenGLPipeline currentPipe;
   private int currentVboHandle;
   private int currentEboHandle;
@@ -163,27 +165,6 @@ public final class OpenGLEncoder implements Encoder {
     GfxMetrics.ECMDPT.add(cmdCount);
 
     ctx.submit(() -> executeBatch(ints, refsSnapshot));
-  }
-
-  /** Records an opcode; the caller then records its operands via {@link #operand(int)}. */
-  private void opStart(int opcode, int operandCount) {
-    ring.add(opcode);
-    pendingInts += 1 + operandCount;
-    cmdCount++;
-  }
-
-  /** Records one operand of the current command. */
-  private void operand(int value) {
-    ring.add(value);
-  }
-
-  /** Registers an object referenced by the current batch and returns its batch-local id. */
-  private int refId(@Nullable Object obj) {
-    if (refCount == refs.length) {
-      refs = Arrays.copyOf(refs, refs.length * 2);
-    }
-    refs[refCount] = obj;
-    return refCount++ - batchRefStart;
   }
 
   @Override
@@ -356,6 +337,27 @@ public final class OpenGLEncoder implements Encoder {
     batchRefStart = 0;
     pendingInts = 0;
     cmdCount = 0;
+  }
+
+  /** Records an opcode; the caller then records its operands via {@link #operand(int)}. */
+  private void opStart(int opcode, int operandCount) {
+    ring.add(opcode);
+    pendingInts += 1 + operandCount;
+    cmdCount++;
+  }
+
+  /** Records one operand of the current command. */
+  private void operand(int value) {
+    ring.add(value);
+  }
+
+  /** Registers an object referenced by the current batch and returns its batch-local id. */
+  private int refId(@Nullable Object obj) {
+    if (refCount == refs.length) {
+      refs = Arrays.copyOf(refs, refs.length * 2);
+    }
+    refs[refCount] = obj;
+    return refCount++ - batchRefStart;
   }
 
   /**
@@ -569,7 +571,7 @@ public final class OpenGLEncoder implements Encoder {
   private void warnIfNotReset() {
     if (queryReset && !loggedResetWarn) {
       loggedResetWarn = true;
-      LOGGER.warn("Encoder is not reset after use. Do you forget it?");
+      LOGGER.warn("Encoder is not reset after use. Have you forgotten it?");
     }
   }
 

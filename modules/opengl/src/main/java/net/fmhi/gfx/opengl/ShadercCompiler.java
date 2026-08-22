@@ -27,7 +27,7 @@ package net.fmhi.gfx.opengl;
 import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.shader.ShaderCompiler;
 import net.fmhi.gfx.shader.ShaderType;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import java.nio.ByteBuffer;
 

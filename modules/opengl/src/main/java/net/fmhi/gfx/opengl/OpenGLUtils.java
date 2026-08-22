@@ -33,7 +33,7 @@ import net.fmhi.gfx.texture.TextureFilter;
 import net.fmhi.gfx.texture.TextureFormat;
 import net.fmhi.gfx.texture.TextureType;
 import net.fmhi.gfx.texture.TextureWrap;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.opengl.GL43.GL_COMPUTE_SHADER;

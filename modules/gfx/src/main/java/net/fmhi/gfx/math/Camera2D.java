@@ -40,13 +40,13 @@ import net.fmhi.math.Vector3;
  * {@code height/zoom} vertically, centered on the position.
  */
 public class Camera2D {
+  private final TransformHandler handler;
   private Vector2 center;
   private float width;
   private float height;
   private float zoom = 1.0F;
   private Matrix4x4 vpMatrix = Matrix4x4.IDENTITY;
   private boolean dirty = true;
-  private final TransformHandler handler;
 
   /**
    * Creates a camera with the specified viewport dimensions.

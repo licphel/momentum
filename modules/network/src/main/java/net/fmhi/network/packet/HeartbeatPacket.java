@@ -25,7 +25,7 @@
 package net.fmhi.network.packet;
 
 import net.fmhi.codec.streaming.CursorBuffer;
-import net.fmhi.network.NetConfig;
+import net.fmhi.network.NetSharedConstants;
 import net.fmhi.network.Session;
 
 /**
@@ -35,8 +35,8 @@ import net.fmhi.network.Session;
  * always available. Reception is tracked by the session activity timestamp, with timeout detection handled
  * automatically by the server.
  *
- * @see NetConfig#HEARTBEAT_INTERVAL_MS
- * @see NetConfig#SESSION_TIMEOUT_MS
+ * @see NetSharedConstants#HEARTBEAT_INTERVAL_MS
+ * @see NetSharedConstants#SESSION_TIMEOUT_MS
  */
 public final class HeartbeatPacket extends Packet {
   @Override

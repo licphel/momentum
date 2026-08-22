@@ -29,7 +29,7 @@ import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.raster.Glyph;
 import net.fmhi.gfx.texture.TextureAtlas;
 import net.fmhi.gfx.texture.TexturePart;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.util.freetype.FT_Bitmap;
 import org.lwjgl.util.freetype.FT_Face;

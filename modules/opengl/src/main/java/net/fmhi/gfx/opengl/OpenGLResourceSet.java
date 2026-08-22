@@ -30,7 +30,7 @@ import net.fmhi.gfx.shader.ResourceSet;
 import net.fmhi.gfx.shader.ResourceSetLayout;
 import net.fmhi.gfx.texture.Sampler;
 import net.fmhi.gfx.texture.Texture;
-import net.fmhi.util.Handle;
+import net.fmhi.util.internal.Handle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
@@ -87,6 +87,10 @@ public final class OpenGLResourceSet implements ResourceSet {
     s.uboOffset = offset;
   }
 
+  @Override
+  public void close() {
+  }
+
   /** Returns the slot entry, updating an existing one or appending a new one. */
   private ResourceSlot findOrCreate(int slot) {
     for (int i = 0; i < slotCount; i++) {
@@ -100,10 +104,6 @@ public final class OpenGLResourceSet implements ResourceSet {
     ResourceSlot s = new ResourceSlot(slot);
     slots[slotCount++] = s;
     return s;
-  }
-
-  @Override
-  public void close() {
   }
 
   /**

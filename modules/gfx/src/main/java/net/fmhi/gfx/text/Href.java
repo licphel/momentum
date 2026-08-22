@@ -24,8 +24,8 @@
 
 package net.fmhi.gfx.text;
 
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.logging.Log;
+import net.fmhi.util.logging.Logger;
 
 import java.awt.*;
 import java.io.IOException;
@@ -42,7 +42,7 @@ import java.net.URISyntaxException;
  * @param url the target URL
  */
 public record Href(String url) implements Meta {
-  private static final Logger LOGGER = LogManager.getLogger();
+  private static final Logger LOGGER = Log.getLogger();
 
   /**
    * Opens the URL in the system default browser.
@@ -55,7 +55,7 @@ public record Href(String url) implements Meta {
    */
   public void raiseBrowser() {
     if (!Desktop.isDesktopSupported()) {
-      LOGGER.warn("Cannot open {}: Desktop is not supported.", url);
+      LOGGER.warn("Cannot open" + url + ": Desktop is not supported.");
       return;
     }
     try {

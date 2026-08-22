@@ -24,9 +24,9 @@
 
 package net.fmhi.mod.resource;
 
-import net.fmhi.registry.Identifier;
 import net.fmhi.mod.Mod;
 import net.fmhi.mod.ModLoader;
+import net.fmhi.util.Identifier;
 
 import java.io.IOException;
 import java.io.InputStream;

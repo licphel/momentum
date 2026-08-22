@@ -24,7 +24,7 @@
 
 package net.fmhi.codec.streaming;
 
-import net.fmhi.codec.tag.CompoundTag;
+import net.fmhi.codec.nbt.CompoundTag;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteOrder;

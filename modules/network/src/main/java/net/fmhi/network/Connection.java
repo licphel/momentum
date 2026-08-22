@@ -15,7 +15,7 @@
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * FITNESS FOR A PARTICULAR PURPOSE, NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
@@ -25,7 +25,6 @@
 package net.fmhi.network;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
@@ -35,10 +34,11 @@ import net.fmhi.network.codec.PacketDecoder;
 import net.fmhi.network.codec.PacketEncoder;
 import net.fmhi.network.packet.HeartbeatPacket;
 import net.fmhi.network.packet.Packet;
+import net.fmhi.network.packet.SessionAckPacket;
+import net.fmhi.network.packet.SessionOpenPacket;
 import org.jspecify.annotations.Nullable;
 
 import java.net.ConnectException;
-import java.net.SocketAddress;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -49,8 +49,10 @@ import java.util.function.Consumer;
 /**
  * A client-side network endpoint that manages a single connection to a remote server.
  *
- * <p>Each client has a unique identity that is automatically transmitted to the server on connect. On the server side,
- * {@link Session#remoteId()} returns this value.
+ * <p>The connection identifier is assigned by the server during the handshake: the server sends a
+ * {@link SessionOpenPacket}, the client adopts the carried UUID as its own session id and answers with a session ack
+ * echoing it back. Until that exchange completes, the connection is not established — {@link #state()} reports
+ * {@link SessionState#CONNECTING}, {@link #session()} is empty, and no lifecycle callback has fired.
  *
  * <p>The typical lifecycle is: register lifecycle callbacks, call {@link #connect(String, int)}, then invoke
  * {@link #process()} each frame to drain inbound packets and fire lifecycle events.
@@ -68,13 +70,11 @@ public final class Connection implements AutoCloseable {
   private final ConcurrentLinkedQueue<Packet> inbound;
   private final ConcurrentLinkedQueue<Session> connectEvents;
   private final ConcurrentLinkedQueue<Session> disconnectEvents;
-  private final UUID clientId;
 
   private volatile @Nullable Channel channel;
   private volatile @Nullable NettySession session;
   private volatile SessionState state = SessionState.DISCONNECTED;
   private volatile long lastHeartbeatSent;
-  private volatile @Nullable UUID remoteId;
 
   private @Nullable Consumer<Session> onConnected;
   private @Nullable Consumer<Session> onDisconnected;
@@ -87,38 +87,17 @@ public final class Connection implements AutoCloseable {
     this.inbound = new ConcurrentLinkedQueue<>();
     this.connectEvents = new ConcurrentLinkedQueue<>();
     this.disconnectEvents = new ConcurrentLinkedQueue<>();
-    this.clientId = UUID.randomUUID();
-  }
-
-  /**
-   * Returns this client's unique identity.
-   *
-   * @return the client identifier
-   */
-  public UUID clientId() {
-    return clientId;
-  }
-
-  /**
-   * Returns the server-assigned session identifier.
-   *
-   * <p>This value is populated after the server acknowledges the connection. It is the same value returned by
-   * {@link Session#id()} on the server side.
-   *
-   * @return the server-assigned session identifier, or {@code null} if the handshake is not yet complete
-   */
-  public @Nullable UUID remoteId() {
-    return remoteId;
   }
 
   /**
    * Initiates an asynchronous connection to a server.
    *
-   * <p>The client's identity is sent automatically during the handshake.
+   * <p>The returned future completes only when the handshake finishes — that is, when the server-assigned connection
+   * identifier has been received, adopted, and acknowledged — not when the TCP channel alone is open.
    *
    * @param host the server hostname or IP address
    * @param port the server port
-   * @return a future that completes when the connection is established
+   * @return a future that completes when the connection is fully established
    * @throws NetworkException if the client is already connecting or connected
    */
   @SuppressWarnings("all")
@@ -138,28 +117,28 @@ public final class Connection implements AutoCloseable {
       @Override
       protected void initChannel(Channel ch) {
         ChannelPipeline p = ch.pipeline();
-        // identity sender: writes clientId UUID as first 16 bytes on the wire
-        p.addLast("identitySender", new IdentitySender());
-        // identity receiver: reads the server's 16-byte session UUID response
-        p.addLast("identityReceiver", new ServerIdentityReceiver());
+        // Outbound traversal is tail→head, so the encoders must sit head-side of
+        // the session handler: writes from sessionHandler pass packetEncoder
+        // (Packet→bytes) then frameEncoder (prepend length) before the socket.
         // inbound
-        p.addLast("frameDecoder", new LengthFieldBasedFrameDecoder(NetConfig.FRAME_MAX_SIZE, 0, 4, 0, 4));
+        p.addLast("frameDecoder", new LengthFieldBasedFrameDecoder(NetSharedConstants.FRAME_MAX_SIZE, 0, 4, 0, 4));
         p.addLast("packetDecoder", decoder);
-        p.addLast("sessionHandler", new ClientSessionHandler());
         // outbound
-        p.addLast("packetEncoder", encoder);
         p.addLast("frameEncoder", new LengthFieldPrepender(4));
+        p.addLast("packetEncoder", encoder);
+        // business
+        p.addLast("sessionHandler", new ClientSessionHandler(future));
       }
     });
 
     bootstrap.connect(host, port).addListener((ChannelFutureListener) f -> {
-      if (f.isSuccess()) {
-        future.complete(null);
-      } else {
+      if (!f.isSuccess()) {
         state = SessionState.DISCONNECTED;
         Throwable cause = f.cause();
         future.completeExceptionally(cause != null ? cause : new ConnectException("Connection refused"));
       }
+      // On success the handshake continues: the server sends SessionOpenPacket,
+      // ClientSessionHandler completes the future when the exchange finishes.
     });
 
     return future;
@@ -213,7 +192,7 @@ public final class Connection implements AutoCloseable {
     Session sess = this.session;
     if (sess != null && sess.isActive()) {
       long now = System.currentTimeMillis();
-      if (now - lastHeartbeatSent >= NetConfig.HEARTBEAT_INTERVAL_MS) {
+      if (now - lastHeartbeatSent >= NetSharedConstants.HEARTBEAT_INTERVAL_MS) {
         send(new HeartbeatPacket());
         lastHeartbeatSent = now;
       }
@@ -223,7 +202,8 @@ public final class Connection implements AutoCloseable {
   /**
    * Registers a callback invoked when the connection to the server is established.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread.
+   * <p>The callback fires during {@link #process()} on the calling thread, after the handshake completed and both
+   * endpoints agreed on the connection identifier.
    *
    * @param callback the callback to invoke on connection
    */
@@ -243,7 +223,7 @@ public final class Connection implements AutoCloseable {
   }
 
   /**
-   * Returns the current session if connected.
+   * Returns the current session if the handshake has completed.
    *
    * @return the session if active, otherwise an empty {@link Optional}
    */
@@ -254,6 +234,9 @@ public final class Connection implements AutoCloseable {
 
   /**
    * Returns the current lifecycle state of this client.
+   *
+   * <p>The state is {@link SessionState#CONNECTING} from the moment {@link #connect(String, int)} is called until the
+   * handshake finishes, so a session identifier is only ever observable in {@link SessionState#CONNECTED}.
    *
    * @return the client state
    */
@@ -271,56 +254,7 @@ public final class Connection implements AutoCloseable {
     state = SessionState.DISCONNECTED;
   }
 
-  private final class IdentitySender extends ChannelOutboundHandlerAdapter {
-    @Override
-    public void connect(ChannelHandlerContext ctx, SocketAddress remote, SocketAddress local, ChannelPromise promise) {
-      ctx.connect(remote, local, promise.addListener((ChannelFutureListener) f -> {
-        if (f.isSuccess()) {
-          ByteBuf id = ctx.alloc().buffer(16);
-          id.writeLong(clientId.getMostSignificantBits());
-          id.writeLong(clientId.getLeastSignificantBits());
-          ctx.writeAndFlush(id);
-        }
-      }));
-    }
-  }
-
-  private final class ServerIdentityReceiver extends ChannelInboundHandlerAdapter {
-    private boolean received;
-
-    @Override
-    public void channelRead(ChannelHandlerContext ctx, Object msg) {
-      if (received) {
-        ctx.fireChannelRead(msg);
-        return;
-      }
-      if (msg instanceof ByteBuf buf && buf.readableBytes() >= 16) {
-        long msb = buf.readLong();
-        long lsb = buf.readLong();
-        remoteId = new UUID(msb, lsb);
-        received = true;
-
-        // Handshake complete — create session and fire connect event.
-        Channel ch = ctx.channel();
-        UUID sid = UUID.randomUUID();
-        NettySession sess = new NettySession(sid, ch);
-        session = sess;
-        state = SessionState.CONNECTED;
-        lastHeartbeatSent = System.currentTimeMillis();
-        connectEvents.add(sess);
-
-        if (buf.isReadable()) {
-          ctx.fireChannelRead(buf);
-        } else {
-          buf.release();
-        }
-      } else {
-        ctx.fireChannelRead(msg);
-      }
-    }
-  }
-
-  private final class NettySession implements Session {
+  private static final class NettySession implements Session {
     private final UUID id;
     private final Channel channel;
     private volatile long lastActivity;
@@ -366,11 +300,6 @@ public final class Connection implements AutoCloseable {
     }
 
     @Override
-    public @Nullable UUID remoteId() {
-      return remoteId;
-    }
-
-    @Override
     public long lastActivityTime() {
       return lastActivity;
     }
@@ -381,6 +310,12 @@ public final class Connection implements AutoCloseable {
   }
 
   private final class ClientSessionHandler extends ChannelInboundHandlerAdapter {
+    private final CompletableFuture<Void> connectFuture;
+
+    ClientSessionHandler(CompletableFuture<Void> connectFuture) {
+      this.connectFuture = connectFuture;
+    }
+
     @Override
     public void channelActive(ChannelHandlerContext ctx) {
       channel = ctx.channel();
@@ -388,6 +323,7 @@ public final class Connection implements AutoCloseable {
 
     @Override
     public void channelInactive(ChannelHandlerContext ctx) {
+      boolean wasConnected = session != null;
       state = SessionState.DISCONNECTED;
       NettySession s = session;
       if (s != null) {
@@ -395,17 +331,42 @@ public final class Connection implements AutoCloseable {
       }
       session = null;
       channel = null;
+      if (!wasConnected) {
+        // The channel died mid-handshake: agreement was never reached, so the
+        // connect future must fail rather than hang until its own timeout.
+        connectFuture.completeExceptionally(new ConnectException("Connection closed during handshake"));
+      }
     }
 
+    @SuppressWarnings("all")
     @Override
     public void channelRead(ChannelHandlerContext ctx, Object msg) {
+      if (msg instanceof SessionOpenPacket open) {
+        // The server assigned the shared connection identifier. Adopt it, then
+        // acknowledge so the server can consider the connection established.
+        UUID connId = open.connId();
+        NettySession sess = new NettySession(connId, ctx.channel());
+        session = sess;
+        state = SessionState.CONNECTED;
+        lastHeartbeatSent = System.currentTimeMillis();
+        connectEvents.add(sess);
+        connectFuture.complete(null);
+        ctx.writeAndFlush(new SessionAckPacket(connId));
+        return;
+      }
       if (msg instanceof Packet packet) {
         NettySession s = session;
         if (s != null) {
           s.touch();
+          inbound.add(packet);
+        } else {
+          System.err.println("[fmhi-net/client] dropped pre-handshake packet: " + packet);
         }
-        inbound.add(packet);
       }
+    }
+
+    @Override
+    public void userEventTriggered(ChannelHandlerContext ctx, Object evt) {
     }
 
     @Override

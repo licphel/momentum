@@ -55,10 +55,13 @@ public record SamplerDesc(TextureFilter magFilter, TextureFilter minFilter, Text
   public static final SamplerDesc DEFAULT = new Builder().build();
 
   /**
-   * Nearest filtering, repeat wrapping, no anisotropy. Suitable for pixel rendering.
+   * Linear filtering, repeat wrapping, anisotropy = 4.
    */
-  public static final SamplerDesc PIXEL =
-      new Builder().minFilter(TextureFilter.NEAREST).magFilter(TextureFilter.NEAREST).build();
+  public static final SamplerDesc QUALITY = new Builder()
+      .minFilter(TextureFilter.LINEAR)
+      .magFilter(TextureFilter.LINEAR)
+      .anisotropyLevel(4.0F)
+      .build();
 
   /**
    * Builder for {@link SamplerDesc} with sensible defaults — nearest filtering, repeat wrapping, no anisotropy.
@@ -71,10 +74,10 @@ public record SamplerDesc(TextureFilter magFilter, TextureFilter minFilter, Text
     public TextureWrap wrapY = TextureWrap.REPEAT;
     public TextureWrap wrapZ = TextureWrap.REPEAT;
     public Color wrapBorderColor = Color.EMPTY;
-    public float lodBias = 0f;
-    public float minLod = 0f;
+    public float lodBias = 0.0F;
+    public float minLod = 0.0F;
     public float maxLod = 1000f;
-    public float anisotropyLevel = 1f;
+    public float anisotropyLevel = 1.0F;
     public int mipmapLevel = 0;
     public int sampleCount = 1;
 
@@ -196,6 +199,17 @@ public record SamplerDesc(TextureFilter magFilter, TextureFilter minFilter, Text
      */
     public Builder anisotropyLevel(float v) {
       anisotropyLevel = v;
+      return this;
+    }
+
+    /**
+     * Sets the mipmap level.
+     *
+     * @param v mipmap level (&gt; 0 to enable, 0 = off)
+     * @return this builder
+     */
+    public Builder mipmapLevel(int v) {
+      mipmapLevel = v;
       return this;
     }
 

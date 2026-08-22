@@ -24,7 +24,7 @@
 
 package net.fmhi.gfx.opengl;
 
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import java.util.Arrays;
 

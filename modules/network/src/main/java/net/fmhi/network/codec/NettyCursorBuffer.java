@@ -26,7 +26,7 @@ package net.fmhi.network.codec;
 
 import io.netty.buffer.ByteBuf;
 import net.fmhi.codec.streaming.CursorBuffer;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteOrder;

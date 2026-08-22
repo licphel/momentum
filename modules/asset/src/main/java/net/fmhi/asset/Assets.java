@@ -24,8 +24,8 @@
 
 package net.fmhi.asset;
 
-import net.fmhi.registry.Identifier;
-import net.fmhi.registry.Namespace;
+import net.fmhi.util.Identifier;
+import net.fmhi.util.Namespace;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.ConcurrentHashMap;

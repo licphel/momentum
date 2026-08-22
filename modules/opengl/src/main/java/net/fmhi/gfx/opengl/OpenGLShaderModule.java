@@ -28,10 +28,8 @@ import net.fmhi.gfx.GraphicsException;
 import net.fmhi.gfx.shader.ShaderLanguage;
 import net.fmhi.gfx.shader.ShaderModule;
 import net.fmhi.gfx.shader.ShaderModuleDesc;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;
@@ -47,8 +45,6 @@ import static org.lwjgl.util.spvc.Spvc.*;
  */
 @InternalApi
 public final class OpenGLShaderModule implements ShaderModule, Handle {
-  private static final Logger LOGGER = LogManager.getLogger();
-
   private final OpenGLDevice ctx;
   private final ShaderModuleDesc desc;
   int handle = 0;
@@ -66,7 +62,6 @@ public final class OpenGLShaderModule implements ShaderModule, Handle {
       } else {
         ByteBuffer spirv = ctx.getShaderCompiler().compile(desc.code(), desc.type());
         glsl = spirvToGLSL(spirv);
-        LOGGER.info("Compiling HLSL to GLSL:\n{}\n=============\n{}", desc.code(), glsl);
       }
 
       handle = glCreateShader(OpenGLUtils.shaderType(desc.type()));

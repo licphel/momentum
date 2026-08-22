@@ -27,7 +27,7 @@ package net.fmhi.gfx.text.harfbuzz;
 import com.ibm.icu.text.Bidi;
 import net.fmhi.gfx.text.Font;
 import net.fmhi.gfx.text.raster.ShapeResult;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.lwjgl.util.harfbuzz.hb_glyph_info_t;
 import org.lwjgl.util.harfbuzz.hb_glyph_position_t;
 

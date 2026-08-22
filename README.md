@@ -43,17 +43,6 @@ Fmhi is organized as a strict layered graph. Each module depends only on the
 layer directly beneath it. You pull in exactly what your application needs, and
 the dependency graph is shallow enough to reason about in your head.
 
-| Layer        | Module                                     | Depends on        |
-|--------------|--------------------------------------------|-------------------|
-| Foundation   | `fmhi-core`                                | —                 |
-| Abstractions | `fmhi-gfx`, `fmhi-rdext`, `fmhi-audio`     | `core`            |
-| Backends     | `fmhi-opengl`, `fmhi-glfw`, `fmhi-openal`, | corresponding API |
-
-Foundation provides math, events, resource I/O, and SPI utilities — no
-graphics, no audio. Graphics knows nothing about audio. The UI toolkit depends
-on graphics and text, and nothing else. This isn't a diagram on a whiteboard;
-it's enforced by the Gradle module graph.
-
 ### API design as a first principle
 
 Every public API in Fmhi follows a small set of rules:

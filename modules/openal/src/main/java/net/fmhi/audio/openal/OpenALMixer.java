@@ -27,9 +27,9 @@ package net.fmhi.audio.openal;
 import net.fmhi.audio.Clip;
 import net.fmhi.audio.Mixer;
 import net.fmhi.audio.MixerInfo;
-import net.fmhi.util.InternalApi;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.internal.InternalApi;
+import net.fmhi.util.logging.Log;
+import net.fmhi.util.logging.Logger;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.ALC;
 import org.lwjgl.openal.ALC10;
@@ -61,7 +61,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  */
 @InternalApi
 public final class OpenALMixer implements Mixer {
-  private static final Logger LOGGER = LogManager.getLogger();
+  private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
 
   private final List<OpenALClip> trackingList = new CopyOnWriteArrayList<>();
@@ -212,7 +212,7 @@ public final class OpenALMixer implements Mixer {
           try {
             task.run();
           } catch (Exception e) {
-            LOGGER.error("OpenAL consumer fault", e);
+            LOGGER.warn("OpenAL consumer fault", e);
           }
         }
       } catch (InterruptedException e) {

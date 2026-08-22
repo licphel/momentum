@@ -25,7 +25,6 @@
 package net.fmhi.network;
 
 import net.fmhi.network.packet.Packet;
-import org.jspecify.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -33,7 +32,9 @@ import java.util.UUID;
  * A network session representing one endpoint of a client-server connection.
  *
  * <p>On the client side there is a single session that communicates with the server. On the server side there is one
- * session per connected client.
+ * session per connected client. Both endpoints of a connection share the same server-assigned identifier, exposed via
+ * {@link #id()} and {@link #remoteId()}; the session (and the identifier) only becomes usable once the handshake
+ * completes.
  *
  * <p>Sessions are thread-safe: {@link #send(Packet)} may be called from any thread, while lifecycle introspection
  * methods may be called from the main thread without external synchronization.
@@ -78,14 +79,16 @@ public interface Session {
   SessionState state();
 
   /**
-   * Returns the identity of the remote peer, if known.
+   * Returns the identity of the remote peer.
    *
-   * <p>On the server side this is the client's self-reported identifier; on the client side this returns {@code null}
-   * since the server's identity is not tracked.
+   * <p>Both endpoints of a connection share the same server-assigned identifier, so by default this returns
+   * {@link #id()}. Implementations that track a separate remote identity may override it.
    *
-   * @return the remote peer's identifier, or {@code null} if not yet identified
+   * @return the shared connection identifier once the handshake completes
    */
-  @Nullable UUID remoteId();
+  default UUID remoteId() {
+    return id();
+  }
 
   /**
    * Returns the wall-clock timestamp of the most recent send or receive activity on this session.

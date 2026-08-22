@@ -30,8 +30,8 @@ import net.fmhi.gfx.texture.Texture;
 import net.fmhi.gfx.texture.TextureDesc;
 import net.fmhi.gfx.texture.TextureType;
 import net.fmhi.math.Box3D;
-import net.fmhi.util.Handle;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.Handle;
+import net.fmhi.util.internal.InternalApi;
 
 import java.nio.ByteBuffer;
 
@@ -94,8 +94,7 @@ public final class OpenGLTexture implements Texture, Handle {
 
       try {
         switch (desc.type()) {
-          case TextureType.TEXTURE_1D ->
-              glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
+          case TextureType.TEXTURE_1D -> glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
           case TextureType.TEXTURE_2D ->
               glTexImage2D(target, 0, internal, desc.width(), desc.height(), 0, pixFmt, pixType, data);
           case TextureType.TEXTURE_3D ->
@@ -188,8 +187,8 @@ public final class OpenGLTexture implements Texture, Handle {
         int srcH = OpenGLTexture.this.height();
         int dstH = dstTex.height();
         glBlitFramebuffer(sx, srcH - sy - sh, sx + sw, srcH - sy,
-                          dx, dstH - dy - dh, dx + dw, dstH - dy,
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+            dx, dstH - dy - dh, dx + dw, dstH - dy,
+            GL_COLOR_BUFFER_BIT, GL_NEAREST);
 
         if (dstTex.desc.mipLevels() > 1) {
           ctx.cache.setTexture(0, dstTex.target, dstTex.handle);

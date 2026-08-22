@@ -24,7 +24,7 @@
 
 package net.fmhi.codec.streaming;
 
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import java.nio.ByteOrder;
 

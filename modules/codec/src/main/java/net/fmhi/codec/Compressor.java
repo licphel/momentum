@@ -59,7 +59,7 @@ public enum Compressor {
    */
   GZIP {
     @Override
-    byte[] compress(final byte[] input, final CompressionLevel level) {
+    byte[] compress(final byte[] input, final net.fmhi.codec.CompressionLevel level) {
       ByteArrayOutputStream stream = new ByteArrayOutputStream();
       try {
         var Gzip = new GZIPOutputStream(stream) {{

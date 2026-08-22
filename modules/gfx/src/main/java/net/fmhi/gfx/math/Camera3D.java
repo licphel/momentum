@@ -39,6 +39,7 @@ import net.fmhi.math.dim3.Ray3D;
  * parameters change.
  */
 public abstract class Camera3D {
+  protected final TransformHandler handler;
   protected boolean dirty = true;
   private float near = 0.1F;
   private float far = 1000.0F;
@@ -49,7 +50,6 @@ public abstract class Camera3D {
   private Matrix4x4 projectionMatrix = Matrix4x4.IDENTITY;
   private Matrix4x4 viewProjectionMatrix = Matrix4x4.IDENTITY;
   private Frustum frustum = new Frustum(Matrix4x4.IDENTITY);
-  protected final TransformHandler handler;
 
   /**
    * Creates a camera with the given transform handler.

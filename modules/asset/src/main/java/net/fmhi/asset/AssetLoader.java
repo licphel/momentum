@@ -24,10 +24,10 @@
 
 package net.fmhi.asset;
 
-import net.fmhi.registry.Identifier;
-import net.fmhi.registry.Namespace;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
+import net.fmhi.util.Identifier;
+import net.fmhi.util.Namespace;
+import net.fmhi.util.logging.Log;
+import net.fmhi.util.logging.Logger;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -48,7 +48,7 @@ import java.util.function.Predicate;
  * automatically.
  */
 public final class AssetLoader {
-  private static final Logger LOGGER = LogManager.getLogger();
+  private static final Logger LOGGER = Log.getLogger();
 
   private final Namespace namespace;
   private final Path basePath;

@@ -26,7 +26,7 @@ package net.fmhi.gfx.text;
 
 import net.fmhi.gfx.Device;
 import net.fmhi.gfx.GraphicsException;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;

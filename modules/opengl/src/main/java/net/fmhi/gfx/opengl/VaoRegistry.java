@@ -26,7 +26,7 @@ package net.fmhi.gfx.opengl;
 
 import net.fmhi.gfx.shader.VertexAttributeType;
 import net.fmhi.gfx.shader.VertexLayout;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import java.util.Arrays;
 
@@ -56,8 +56,10 @@ public final class VaoRegistry {
   private static final int MIN_CAPACITY = 1 << 10;
   /** Safety cap for leaked buffers; reaching it clears the whole table. */
   private static final int MAX_CAPACITY = 1 << 17;
-  /** Tombstone marker: the slot held a VAO that was deleted (k0/k1 keep their
-   * stale values but the slot is skipped by lookups and reusable by inserts). */
+  /**
+   * Tombstone marker: the slot held a VAO that was deleted (k0/k1 keep their
+   * stale values but the slot is skipped by lookups and reusable by inserts).
+   */
   private static final int TOMBSTONE = -1;
 
   private final OpenGLDevice ctx;
@@ -75,6 +77,24 @@ public final class VaoRegistry {
 
   VaoRegistry(OpenGLDevice ctx) {
     this.ctx = ctx;
+  }
+
+  private static boolean isIntType(VertexAttributeType type) {
+    return switch (type) {
+      case INT8, INT16, INT32, UINT8, UINT16, UINT32 -> true;
+      default -> false;
+    };
+  }
+
+  /** SplitMix-style mix of the three key parts. */
+  private static int hash(long key0, long key1, int layoutId) {
+    long h = key0 * 0x9E3779B97F4A7C15L;
+    h ^= key1 * 0xBF58476D1CE4E5B9L;
+    h ^= (long) layoutId * 0x94D049BB133111EBL;
+    h ^= h >>> 29;
+    h *= 0x9E3779B97F4A7C15L;
+    h ^= h >>> 32;
+    return (int) h;
   }
 
   /**
@@ -138,7 +158,7 @@ public final class VaoRegistry {
     for (int i = 0; i < vaos.length; i++) {
       if (vaos[i] > 0
           && ((int) (k0[i] >>> 32) == handle || (int) k0[i] == handle
-              || (int) (k1[i] >>> 32) == handle)) {
+          || (int) (k1[i] >>> 32) == handle)) {
         glDeleteVertexArrays(vaos[i]);
         vaos[i] = TOMBSTONE;
         tombstones++;
@@ -162,8 +182,10 @@ public final class VaoRegistry {
     tombstones = 0;
   }
 
-  /** Rebuilds the table at double capacity, re-inserting live entries and
-   * sweeping the tombstones. */
+  /**
+   * Rebuilds the table at double capacity, re-inserting live entries and
+   * sweeping the tombstones.
+   */
   private void rehash() {
     int newCap = Math.min(vaos.length << 1, MAX_CAPACITY);
     if (newCap == vaos.length) {
@@ -258,23 +280,5 @@ public final class VaoRegistry {
 
     ctx.cache.bindVao(0);
     return vao;
-  }
-
-  private static boolean isIntType(VertexAttributeType type) {
-    return switch (type) {
-      case INT8, INT16, INT32, UINT8, UINT16, UINT32 -> true;
-      default -> false;
-    };
-  }
-
-  /** SplitMix-style mix of the three key parts. */
-  private static int hash(long key0, long key1, int layoutId) {
-    long h = key0 * 0x9E3779B97F4A7C15L;
-    h ^= key1 * 0xBF58476D1CE4E5B9L;
-    h ^= (long) layoutId * 0x94D049BB133111EBL;
-    h ^= h >>> 29;
-    h *= 0x9E3779B97F4A7C15L;
-    h ^= h >>> 32;
-    return (int) h;
   }
 }

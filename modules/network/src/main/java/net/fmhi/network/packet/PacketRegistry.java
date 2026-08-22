@@ -48,7 +48,13 @@ public final class PacketRegistry {
   private static final Object LOCK = new Object();
 
   static {
+    // Built-in packets: registered first, in a fixed order, so their wire IDs
+    // are identical on every endpoint regardless of what application code
+    // registers later.
     register(HeartbeatPacket.class, HeartbeatPacket::new);
+    register(EchoPacket.class, EchoPacket::new);
+    register(SessionOpenPacket.class, SessionOpenPacket::new);
+    register(SessionAckPacket.class, SessionAckPacket::new);
   }
 
   private PacketRegistry() {

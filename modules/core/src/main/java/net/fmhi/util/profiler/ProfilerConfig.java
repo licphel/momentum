@@ -34,7 +34,7 @@ final class ProfilerConfig {
   /** The directory into which {@link Profiler#dump()} writes the PNG charts. */
   static volatile Path outputPath = Path.of("perf");
   /** The startup period to skip before recording begins. */
-  static volatile long warmupNanos = TimeUnit.SECONDS.toNanos(3);
+  static volatile long warmupNanos = TimeUnit.SECONDS.toNanos(5);
 
   private ProfilerConfig() {
   }

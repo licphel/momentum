@@ -24,8 +24,6 @@
 
 package net.fmhi.gfx.input;
 
-import java.util.List;
-
 /**
  * Modifier key bitmask constants aligned with GLFW modifier flags.
  *

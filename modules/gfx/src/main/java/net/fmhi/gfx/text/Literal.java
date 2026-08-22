@@ -24,11 +24,9 @@
 
 package net.fmhi.gfx.text;
 
-import net.fmhi.i18n.Language;
 import net.fmhi.gfx.text.raster.Raster;
 import org.jspecify.annotations.Nullable;
 
-import java.text.MessageFormat;
 import java.util.Arrays;
 import java.util.Objects;
 
@@ -40,9 +38,8 @@ import java.util.Objects;
  * attachments such as hyperlinks. Layout parameters are inherited from the
  * enclosing {@link MutableText}.
  *
- * <p>Instances are created via {@link #of(String, Object...)} for static text
- * or {@link #translated(String, Object...)} for localized text resolved through
- * {@link Language#current()}. Style and metadata are set fluently with
+ * <p>Instances are created via {@link #of(String)} for static text.
+ * Style and metadata are set fluently with
  * {@link #with(TextFormat)} and {@link #with(Meta...)}.
  */
 public final class Literal implements Text {
@@ -53,41 +50,20 @@ public final class Literal implements Text {
   /**
    * Creates a literal with optional format arguments.
    *
-   * @param text the text, possibly containing {@link MessageFormat} placeholders
-   * @param args the format arguments
+   * @param text the text
    */
-  private Literal(String text, Object... args) {
-    if (args.length > 0) {
-      try {
-        text = MessageFormat.format(text, args);
-      } catch (IllegalArgumentException e) {
-        // Ignored
-      }
-    }
+  private Literal(String text) {
     this.text = text;
   }
 
   /**
    * Creates a literal with optional format arguments.
    *
-   * @param text the text, possibly containing {@link MessageFormat} placeholders
-   * @param args the format arguments
+   * @param text the text
    * @return a new literal
    */
-  public static Literal of(String text, Object... args) {
-    return new Literal(text, args);
-  }
-
-  /**
-   * Creates a literal whose text is resolved from the current
-   * {@link Language}.
-   *
-   * @param key  the translation key
-   * @param args optional format arguments
-   * @return a new literal with translated text
-   */
-  public static Literal translated(String key, Object... args) {
-    return new Literal(Language.current().translate(key), args);
+  public static Literal of(String text) {
+    return new Literal(text);
   }
 
   /**

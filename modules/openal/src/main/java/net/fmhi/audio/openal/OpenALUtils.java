@@ -25,7 +25,7 @@
 package net.fmhi.audio.openal;
 
 import net.fmhi.audio.AudioFormat;
-import net.fmhi.util.InternalApi;
+import net.fmhi.util.internal.InternalApi;
 
 import static org.lwjgl.openal.AL10.*;
 
