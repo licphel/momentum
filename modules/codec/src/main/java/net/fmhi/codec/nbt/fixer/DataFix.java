@@ -22,7 +22,27 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package net.fmhi.codec;
+package net.fmhi.codec.nbt.fixer;
 
-import org.jspecify.annotations.NullMarked;
+import net.fmhi.codec.nbt.NBT;
+
+/**
+ * A single data migration from one version to the next.
+ *
+ * <p>Fixes are applied to any tree the fixer is asked to update, including
+ * parent containers, so an implementation must inspect the input and return it
+ * unchanged when it does not match the expected structure.
+ *
+ * <p>Implementations should not mutate the input tree; return a new tree with
+ * the migrated content instead.
+ */
+@FunctionalInterface
+public interface DataFix {
+  /**
+   * Applies this migration to a tree.
+   *
+   * @param input the tree to migrate
+   * @return the migrated tree
+   */
+  NBT fix(NBT input);
+}

@@ -24,8 +24,8 @@
 
 package net.fmhi.tag;
 
-import net.fmhi.codec.nbt.CompoundTag;
-import net.fmhi.codec.nbt.ListTag;
+import net.fmhi.codec.nbt.CompoundNBT;
+import net.fmhi.codec.nbt.ListNBT;
 import net.fmhi.registry.Registry;
 import net.fmhi.registry.RegistryEntry;
 import net.fmhi.util.Identifier;
@@ -74,11 +74,11 @@ public final class TagManager<T extends RegistryEntry<T>> {
    * @param key the tag key (derived from the file path)
    * @param tag the compound tag containing the {@code "values"} list
    */
-  public void load(Identifier key, CompoundTag tag) {
+  public void load(Identifier key, CompoundNBT tag) {
     if (resolved) {
       throw new IllegalStateException("Cannot load tags after resolution");
     }
-    ListTag values = tag.getList("values");
+    ListNBT values = tag.getList("values");
     if (values == null) {
       tags.put(key, new SimpleTag<>(key, Set.of(), Set.of()));
       return;
@@ -115,25 +115,26 @@ public final class TagManager<T extends RegistryEntry<T>> {
    * @param valueExtractor converts a raw NBT value to type {@code V}
    * @param <V>            the mapped value type
    */
-  public <V> void loadMap(Identifier key, CompoundTag tag,
+  public <V> void loadMap(Identifier key, CompoundNBT tag,
                           Function<Object, V> valueExtractor) {
     if (resolved) {
       throw new IllegalStateException("Cannot load tags after resolution");
     }
-    CompoundTag mappingsTag = tag.getCompound("mappings");
+    CompoundNBT mappingsTag = tag.getCompound("mappings");
     if (mappingsTag == null) {
       tags.put(key, new SimpleTagMap<>(key, Map.of(), Map.of()));
       return;
     }
     Map<Identifier, V> rawMappings = new LinkedHashMap<>();
     Map<Identifier, V> tagRefMappings = new LinkedHashMap<>();
-    for (Map.Entry<String, @Nullable Object> entry : mappingsTag.entrySet()) {
+    for (var entry : mappingsTag.entrySet()) {
       String rawKey = entry.getKey();
       if (rawKey.isBlank()) {
         continue;
       }
 
-      Object obj = entry.getValue();
+      // Unwrap to the raw boxed value the extractor expects (Integer, String, ...)
+      Object obj = entry.getValue().asObject();
       if (obj != null) {
         V value = valueExtractor.apply(obj);
 

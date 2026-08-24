@@ -24,7 +24,9 @@
 
 package net.fmhi.codec.streaming;
 
-import net.fmhi.codec.nbt.CompoundTag;
+import net.fmhi.codec.Codec;
+import net.fmhi.codec.nbt.DataType;
+import net.fmhi.codec.nbt.NBT;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteOrder;
@@ -406,12 +408,13 @@ public abstract class CursorBuffer implements AutoCloseable {
   }
 
   /**
-   * Serializes a {@link CompoundTag} into this buffer.
+   * Serializes a {@link NBT} into this buffer.
    *
-   * @param tag the compound tag to write
+   * @param nbt the nbt to write
    */
-  public void writeCompoundTag(CompoundTag tag) {
-    tag.serialize(this);
+  @SuppressWarnings("unchecked")
+  public void writeNBT(NBT nbt) {
+    ((Codec<NBT>) nbt.codec()).serialize(nbt, this);
   }
 
   /**
@@ -632,12 +635,13 @@ public abstract class CursorBuffer implements AutoCloseable {
   }
 
   /**
-   * Deserializes a {@link CompoundTag} from this buffer.
+   * Deserializes a {@link NBT} from this buffer.
    *
-   * @return the deserialized compound tag
+   * @param type the data type of the NBT
+   * @return the deserialized nbt
    */
-  public CompoundTag readCompoundTag() {
-    return CompoundTag.deserialize(this);
+  public NBT readNBT(DataType type) {
+    return type.codec().deserialize(this);
   }
 
   /**

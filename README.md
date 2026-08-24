@@ -71,7 +71,7 @@ the full modern JDK on the platforms where Java excels.
 
 ## Quick Start
 
-**Prerequisites:** JDK 25+
+**Prerequisites:** JDK 21+
 
 ```bash
 git clone https://github.com/licphel/fmhi.git

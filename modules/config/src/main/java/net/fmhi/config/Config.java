@@ -24,7 +24,8 @@
 
 package net.fmhi.config;
 
-import net.fmhi.codec.nbt.CompoundTag;
+import net.fmhi.codec.nbt.CompoundNBT;
+import net.fmhi.codec.nbt.NBT;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -47,7 +48,7 @@ public final class Config<T> {
   private final T defaultValue;
   private final @Nullable Validator<T> validator;
   private final @Nullable String comment;
-  private @Nullable CompoundTag data;
+  private @Nullable CompoundNBT data;
 
   Config(String path, T defaultValue,
          @Nullable Validator<T> validator,
@@ -58,7 +59,7 @@ public final class Config<T> {
     this.comment = comment;
   }
 
-  void bind(CompoundTag data) {
+  void bind(CompoundNBT data) {
     this.data = data;
   }
 
@@ -85,11 +86,14 @@ public final class Config<T> {
    *
    * @return the current value; may be {@code null} if the default is {@code null}
    */
+  @SuppressWarnings("unchecked")
   public @Nullable T get() {
     if (data == null) {
       return defaultValue;
     }
-    return data.get(path);
+    NBT v = data.get(path);
+    // Unwrap to the raw boxed value the caller expects (Integer, String, Boolean, ...)
+    return v == null ? null : (T) v.asObject();
   }
 
   /**
@@ -111,7 +115,7 @@ public final class Config<T> {
         return;
       }
     }
-    data.put(path, value);
+    data.put(path, NBT.wrap(value));
   }
 
   /**

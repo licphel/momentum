@@ -26,6 +26,8 @@ package net.fmhi.util.logging;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -73,8 +75,8 @@ abstract class AbstractLogger implements Logger {
         .append(caller).append(": ").append(message).append('\n');
     if (error != null) {
       sb.append("  at ").append(caller).append('\n');
-      java.io.StringWriter sw = new java.io.StringWriter();
-      error.printStackTrace(new java.io.PrintWriter(sw));
+      StringWriter sw = new StringWriter();
+      error.printStackTrace(new PrintWriter(sw));
       sb.append(sw);
     }
     return sb.toString();

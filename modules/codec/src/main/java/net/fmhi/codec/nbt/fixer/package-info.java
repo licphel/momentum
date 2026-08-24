@@ -23,6 +23,6 @@
  */
 
 @NullMarked
-package net.fmhi.codec;
+package net.fmhi.codec.nbt.fixer;
 
 import org.jspecify.annotations.NullMarked;

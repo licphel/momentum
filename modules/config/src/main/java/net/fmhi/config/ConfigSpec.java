@@ -24,8 +24,9 @@
 
 package net.fmhi.config;
 
-import net.fmhi.codec.nbt.CompoundTag;
+import net.fmhi.codec.nbt.CompoundNBT;
 import net.fmhi.codec.nbt.JsonUtil;
+import net.fmhi.codec.nbt.NBT;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -48,7 +49,7 @@ import java.util.Map;
  * @see Validator
  */
 public final class ConfigSpec {
-  private final CompoundTag data = new CompoundTag();
+  private final CompoundNBT data = new CompoundNBT();
   private final Map<String, Config<?>> values = new LinkedHashMap<>();
   private @Nullable Path filePath;
 
@@ -118,7 +119,7 @@ public final class ConfigSpec {
     cv.bind(data);
     values.put(path, cv);
     if (!data.contains(path)) {
-      data.put(path, def);
+      data.put(path, NBT.wrap(def));
     }
     return cv;
   }
@@ -184,19 +185,19 @@ public final class ConfigSpec {
    */
   public void reload(String json) {
     for (Config<?> cv : values.values()) {
-      data.put(cv.path(), cv.defaultValue());
+      data.put(cv.path(), NBT.wrap(cv.defaultValue()));
     }
 
     if (json.isBlank()) {
       return;
     }
-    CompoundTag parsed;
+    CompoundNBT parsed;
     try {
       parsed = JsonUtil.parse(json);
     } catch (Exception e) {
       throw new ConfigException("Failed to parse JSON", e);
     }
-    for (Map.Entry<String, @Nullable Object> entry : parsed.entrySet()) {
+    for (Map.Entry<String, NBT> entry : parsed.entrySet()) {
       data.put(entry.getKey(), entry.getValue());
     }
   }
@@ -244,7 +245,7 @@ public final class ConfigSpec {
    *
    * @return the backing compound tag
    */
-  public CompoundTag data() {
+  public CompoundNBT data() {
     return data;
   }
 }

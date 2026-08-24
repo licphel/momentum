@@ -22,7 +22,27 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package net.fmhi.codec;
+package net.fmhi.codec.nbt.fixer;
 
-import org.jspecify.annotations.NullMarked;
+/**
+ * Identifies a kind of business object embedded in an {@code NBT} tree — e.g.
+ * an item stack inside a chest — that data fixes are registered against.
+ *
+ * <p>Two references with the same name are equal, so the same logical type can
+ * be shared freely across a fixer's registration, walkers, and update calls.
+ *
+ * @param name the type name
+ */
+public record TypeReference(String name) {
+  /**
+   * Creates a type reference.
+   *
+   * @param name the type name
+   * @throws IllegalArgumentException if {@code name} is {@code null} or empty
+   */
+  public TypeReference {
+    if (name.isEmpty()) {
+      throw new IllegalArgumentException("Type reference name must not be null or empty");
+    }
+  }
+}

@@ -29,6 +29,7 @@ import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import net.fmhi.codec.nbt.primitives.*;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -38,7 +39,7 @@ import java.util.Map;
 /**
  * JSON serializer and deserializer for NBT structures.
  *
- * <p>Converts {@link CompoundTag} to/from JSON text using Jackson.
+ * <p>Converts {@link CompoundNBT} to/from JSON text using Jackson.
  * Supports nested structures, arrays, and all NBT primitive types.
  *
  * <h2>Format mapping</h2>
@@ -73,7 +74,7 @@ public final class JsonUtil {
    * @param pretty   whether to pretty-print with indentation
    * @return the JSON string representation
    */
-  public static String dump(CompoundTag compound, boolean pretty) {
+  public static String dump(CompoundNBT compound, boolean pretty) {
     ObjectNode root = toJsonNode(compound);
     try {
       if (pretty) {
@@ -91,7 +92,7 @@ public final class JsonUtil {
    * @param compound the NBT compound to serialize
    * @return the formatted JSON string
    */
-  public static String dumpPrettily(CompoundTag compound) {
+  public static String dumpPrettily(CompoundNBT compound) {
     return dump(compound, true);
   }
 
@@ -102,7 +103,7 @@ public final class JsonUtil {
    * @return the parsed NBT compound
    * @throws IllegalArgumentException if the JSON is malformed or the root is not an object
    */
-  public static CompoundTag parse(String json) {
+  public static CompoundNBT parse(String json) {
     try {
       JsonNode root = MAPPER.readTree(json);
       if (!root.isObject()) {
@@ -114,82 +115,92 @@ public final class JsonUtil {
     }
   }
 
-  private static ObjectNode toJsonNode(CompoundTag compound) {
+  private static ObjectNode toJsonNode(CompoundNBT compound) {
     ObjectNode node = MAPPER.createObjectNode();
-    for (Map.Entry<String, @Nullable Object> entry : compound.entrySet()) {
+    for (Map.Entry<String, NBT> entry : compound.entrySet()) {
       node.set(entry.getKey(), valueToJsonNode(entry.getValue()));
     }
     return node;
   }
 
-  private static JsonNode valueToJsonNode(@Nullable Object value) {
+  private static JsonNode valueToJsonNode(@Nullable NBT value) {
     if (value == null) {
       return MAPPER.nullNode();
     }
 
-    return switch (value) {
-      case String s -> MAPPER.getNodeFactory().textNode(s);
-      case Boolean b -> MAPPER.getNodeFactory().booleanNode(b);
-      case Long l -> {
+    return switch (value.dataType()) {
+      case BYTE -> MAPPER.getNodeFactory().numberNode(((ByteNBT) value).get());
+      case SHORT -> MAPPER.getNodeFactory().numberNode(((ShortNBT) value).get());
+      case INT -> MAPPER.getNodeFactory().numberNode(((IntNBT) value).get());
+      case LONG -> {
+        long l = ((LongNBT) value).get();
         if (l > MAX_SAFE_INTEGER || l < -MAX_SAFE_INTEGER) {
-          yield MAPPER.getNodeFactory().textNode(l.toString());
+          yield MAPPER.getNodeFactory().textNode(Long.toString(l));
         }
-        yield MAPPER.getNodeFactory().numberNode((long) l);
+        yield MAPPER.getNodeFactory().numberNode(l);
       }
-      case Integer i -> MAPPER.getNodeFactory().numberNode((int) i);
-      case Double d -> MAPPER.getNodeFactory().numberNode((double) d);
-      case Float f -> MAPPER.getNodeFactory().numberNode((float) f);
-      case Short s -> MAPPER.getNodeFactory().numberNode((short) s);
-      case Byte b -> MAPPER.getNodeFactory().numberNode((byte) b);
-      case Number n -> MAPPER.getNodeFactory().numberNode(n.doubleValue());
-      case byte[] bytes -> {
+      case FLOAT -> MAPPER.getNodeFactory().numberNode(((FloatNBT) value).get());
+      case DOUBLE -> MAPPER.getNodeFactory().numberNode(((DoubleNBT) value).get());
+      case BOOLEAN -> MAPPER.getNodeFactory().booleanNode(((BooleanNBT) value).get());
+      case STRING -> MAPPER.getNodeFactory().textNode(((StringNBT) value).get());
+      case BYTE_ARRAY -> {
+        byte[] bytes = ((ByteArrayNBT) value).get();
         ArrayNode arr = MAPPER.createArrayNode();
         for (byte b : bytes) {
           arr.add(b & 0xFF);
         }
         yield arr;
       }
-      case CompoundTag compound -> toJsonNode(compound);
-      case ListTag list -> {
+      case COMPOUND -> toJsonNode((CompoundNBT) value);
+      case LIST -> {
         ArrayNode arr = MAPPER.createArrayNode();
-        for (Object elem : list) {
+        for (NBT elem : (ListNBT) value) {
           arr.add(valueToJsonNode(elem));
         }
         yield arr;
       }
-      default -> throw new IllegalArgumentException("Unsupported type: " + value.getClass());
+      case NULL, END -> MAPPER.nullNode();
+      default -> throw new IllegalArgumentException("Unsupported NBT type: " + value.dataType());
     };
   }
 
-  private static CompoundTag fromJsonNode(JsonNode node) {
+  private static CompoundNBT fromJsonNode(JsonNode node) {
     if (!node.isObject()) {
       throw new IllegalArgumentException("Expected JSON object, got: " + node.getNodeType());
     }
-    CompoundTag compound = new CompoundTag();
+    CompoundNBT compound = new CompoundNBT();
     Iterator<String> names = node.fieldNames();
     while (names.hasNext()) {
       String key = names.next();
-      compound.put(key, jsonNodeToValue(node.get(key)));
+      // Insert directly into the map: JSON keys may legitimately start with '$'
+      // (written via the "$$" escape), and put() would re-parse them as paths.
+      CompoundNBT.putDirect(compound, key, jsonNodeToValue(node.get(key)));
     }
     return compound;
   }
 
-  private static @Nullable Object jsonNodeToValue(JsonNode node) {
+  private static NBT jsonNodeToValue(JsonNode node) {
     return switch (node.getNodeType()) {
-      case NULL -> null;
-      case STRING -> node.asText();
-      case BOOLEAN -> node.asBoolean();
+      case NULL -> NullNBT.INSTANCE;
+      case STRING -> new StringNBT(node.asText());
+      case BOOLEAN -> new BooleanNBT(node.asBoolean());
       case NUMBER -> {
+        if (node.isShort()) {
+          yield new ShortNBT(node.shortValue());
+        }
         if (node.isInt()) {
-          yield node.intValue();
+          yield new IntNBT(node.intValue());
         }
         if (node.isLong()) {
-          yield node.longValue();
+          yield new LongNBT(node.longValue());
         }
-        yield node.doubleValue();
+        if (node.isFloat()) {
+          yield new FloatNBT(node.floatValue());
+        }
+        yield new DoubleNBT(node.doubleValue());
       }
       case ARRAY -> {
-        ListTag list = new ListTag();
+        ListNBT list = new ListNBT();
         for (JsonNode elem : node) {
           list.add(jsonNodeToValue(elem));
         }

@@ -22,7 +22,60 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package net.fmhi.codec;
+package net.fmhi.codec.nbt.primitives;
 
-import org.jspecify.annotations.NullMarked;
+import net.fmhi.codec.Codec;
+import net.fmhi.codec.nbt.DataType;
+import net.fmhi.codec.nbt.NBT;
+import net.fmhi.codec.streaming.CursorBuffer;
+import org.jspecify.annotations.Nullable;
+
+/**
+ * Null tag value, per-program singleton.
+ */
+public final class NullNBT implements NBT {
+  public static final NullNBT INSTANCE = new NullNBT();
+  public static final Codec<NullNBT> CODEC = new Codec<>() {
+    @Override
+    public NBT toNbt(NullNBT value) {
+      return value;
+    }
+
+    @Override
+    public NullNBT fromNbt(NBT nbt) {
+      return (NullNBT) nbt;
+    }
+
+    @Override
+    public void serialize(NullNBT value, CursorBuffer buffer) {
+    }
+
+    @Override
+    public NullNBT deserialize(CursorBuffer buffer) {
+      return INSTANCE;
+    }
+  };
+
+  private NullNBT() {
+  }
+
+  @Override
+  public DataType dataType() {
+    return DataType.NULL;
+  }
+
+  @Override
+  public @Nullable Object asObject() {
+    return null;
+  }
+
+  @Override
+  public NBT copy() {
+    return INSTANCE;
+  }
+
+  @Override
+  public String toString() {
+    return "null";
+  }
+}

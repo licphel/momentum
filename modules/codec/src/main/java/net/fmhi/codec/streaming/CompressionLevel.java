@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.fmhi.codec;
+package net.fmhi.codec.streaming;
 
 /**
  * Compression level for {@link Compressor} operations.
