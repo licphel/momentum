@@ -100,7 +100,7 @@ public Point { ...}
 
 ### Exemplar
 
-See `fmhi-core:net.fmhi.event` package. This is a small-scaled but good exemplar.
+See `momentum-core:net.momentum.event` package. This is a small-scaled but good exemplar.
 
 ## Example
 

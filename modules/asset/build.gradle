@@ -3,5 +3,5 @@ plugins {
 }
 
 dependencies {
-  api project(':fmhi-core')
+  api project(':momentum-core')
 }

@@ -34,7 +34,7 @@
 ### API Design Principles
 
 - **Factory over constructors**: Provide static factory methods like `open()`. It's better to acquire implementations
-  via `fmhi-core/util/Service`
+  via `momentum-core/util/Service`
 - **Fluent defaults**: Use `default` methods for common operations
 - **Immutable by default**: Records and value objects
 - **Composition over inheritance**: Use interfaces for public APIs

@@ -3,8 +3,8 @@ plugins {
 }
 
 dependencies {
-  api project(':fmhi-core')
-  api project(':fmhi-codec')
+  api project(':momentum-core')
+  api project(':momentum-codec')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   implementation "org.lwjgl:lwjgl-freetype:${lwjgl_version}"

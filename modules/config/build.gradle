@@ -3,6 +3,6 @@ plugins {
 }
 
 dependencies {
-  api project(':fmhi-core')
-  api project(':fmhi-codec')
+  api project(':momentum-core')
+  api project(':momentum-codec')
 }

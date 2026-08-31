@@ -22,18 +22,18 @@
  * SOFTWARE.
  */
 
-// The fmhi root project is a pure aggregator for the modules/ subprojects. It
+// The momentum root project is a pure aggregator for the modules/ subprojects. It
 // must NOT apply java-library/maven-publish here — that would surface an empty
-// root java module alongside the real fmhi-* modules.
+// root java module alongside the real momentum-* modules.
 subprojects {
   apply plugin: 'java-library'
   apply plugin: 'maven-publish'
 
   // Subprojects do not inherit group/version from the root project; set them
   // explicitly so composite-build substitution (and publication) uses
-  // net.fmhi:fmhi-<name>:<version> coordinates.
-  group = 'net.fmhi'
-  version = property('fmhi_version')
+  // net.momentum:momentum-<name>:<version> coordinates.
+  group = 'net.momentum'
+  version = property('momentum_version')
 
   java {
     toolchain { languageVersion = JavaLanguageVersion.of(25) }
@@ -65,14 +65,14 @@ subprojects {
     implementation libs.jackson.databind
   }
 
-  // Each module publishes as its own artifact: net.fmhi:fmhi-<name>.
+  // Each module publishes as its own artifact: net.momentum:momentum-<name>.
   publishing {
     publications {
       maven(MavenPublication) {
         from components.java
-        groupId = 'net.fmhi'
+        groupId = 'net.momentum'
         artifactId = project.name
-        version = property('fmhi_version')
+        version = property('momentum_version')
       }
     }
     repositories {

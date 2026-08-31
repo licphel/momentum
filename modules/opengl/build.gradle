@@ -3,7 +3,7 @@ plugins {
 }
 
 dependencies {
-  api project(':fmhi-gfx')
+  api project(':momentum-gfx')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-opengl:${lwjgl_version}"

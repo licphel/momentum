@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-rootProject.name = "fmhi"
+rootProject.name = "momentum"
 
 // Shared-library versions, declared once here and injected into every
 // subproject from the root build script; modules must not repeat them.
@@ -39,7 +39,7 @@ dependencyResolutionManagement {
 var modulesDir = file("modules")
 
 modulesDir.listFiles()?.findAll { it.isDirectory() }?.each { dir ->
-  var projectName = "fmhi-${dir.name}"
+  var projectName = "momentum-${dir.name}"
   include(projectName)
   project(":${projectName}").projectDir = dir
 }
