@@ -26,8 +26,12 @@ package net.momentum.asset;
 
 import net.momentum.util.Identifier;
 import net.momentum.util.Namespace;
+import net.momentum.util.logging.Log;
+import net.momentum.util.logging.Logger;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -40,11 +44,17 @@ import java.util.concurrent.ConcurrentHashMap;
  * changes should call {@link #getRef(Identifier, Class)} and hold the
  * returned {@code Ref}, reading from it each time the value is needed.
  *
+ * <p>Values that implement {@link AutoCloseable} are closed when removed
+ * via {@link #remove(Identifier)} or when the store is cleared.
+ *
  * <p>Assets are loaded by {@link AssetLoader} instances and consumed
  * anywhere in the engine.
  */
 public final class Assets {
+  private static final Logger LOGGER = Log.getLogger();
+
   private static final ConcurrentHashMap<Identifier, Ref<?>> STORE = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Class<?>, @Nullable Object> FALLBACKS = new ConcurrentHashMap<>();
 
   private Assets() {
   }
@@ -54,16 +64,24 @@ public final class Assets {
    *
    * <p>If a {@link Ref} already exists for the identifier, its value is
    * updated in place and all registered listeners are notified — this is
-   * the mechanism that enables hot-reloading.
+   * the mechanism that enables hot-reloading. The value is verified against
+   * the type of the previous value; a mismatch throws
+   * {@link IllegalArgumentException} and leaves the store unchanged.
    *
    * @param id    the asset identifier
    * @param value the asset value
    */
   @SuppressWarnings("unchecked")
   public static void set(Identifier id, Object value) {
-    Ref<Object> ref = (Ref<Object>) STORE.computeIfAbsent(id,
-        k -> new Ref<>(id, value));
-    ref.set(value);
+    Ref<?>[] toNotify = new Ref<?>[1];
+    STORE.compute(id, (k, ref) -> {
+      if (ref == null) {
+        return new Ref<>(id, value);
+      }
+      toNotify[0] = ref;
+      return ref;
+    });
+    ((Ref<Object>) toNotify[0]).set(value);
   }
 
   /**
@@ -90,46 +108,132 @@ public final class Assets {
    * the underlying {@link Ref}. For hot-reload support, prefer
    * {@link #getRef(Identifier, Class)} and hold the returned {@code Ref}.
    *
+   * <p>If no compatible asset is registered, a fallback registered via
+   * {@link #registerFallback(Class, Object)} for the requested type is
+   * returned, or {@code null} if none exists.
+   *
    * @param id   the asset identifier
    * @param type the expected type
    * @param <T>  the expected type
-   * @return the asset, or {@code null} if not found or of a different type
+   * @return the asset, or a type fallback, or {@code null}
    */
   @SuppressWarnings("unchecked")
   public static <T> @Nullable T get(Identifier id, Class<T> type) {
     Ref<?> ref = STORE.get(id);
-    if (ref == null) {
-      return null;
+    if (ref != null) {
+      Object value = ref.get();
+      if (type.isInstance(value)) {
+        return (T) value;
+      }
     }
-    Object value = ref.get();
-    if (type.isInstance(value)) {
-      return (T) value;
-    }
-    return null;
+    Object fallback = FALLBACKS.getOrDefault(type, null);
+    return type.isInstance(fallback) ? (T) fallback : null;
   }
 
   /**
-   * Removes an asset from the store.
+   * Registers a fallback value returned by {@link #get(Identifier, Class)}
+   * when no compatible asset is registered for the type.
+   *
+   * <p>Typical use is a placeholder asset — e.g. a checkerboard texture or
+   * a silent sound — so consumers never have to special-case {@code null}.
+   *
+   * @param type  the asset type the fallback covers
+   * @param value the fallback value
+   * @param <T>   the asset type
+   */
+  public static <T> void registerFallback(Class<T> type, T value) {
+    FALLBACKS.put(type, value);
+  }
+
+  /**
+   * Returns whether an asset is registered under the identifier.
+   *
+   * @param id the asset identifier
+   * @return {@code true} if an asset is registered
+   */
+  public static boolean contains(Identifier id) {
+    return STORE.containsKey(id);
+  }
+
+  /**
+   * Returns the identifiers of all registered assets.
+   *
+   * <p>The returned set is a live view backed by the store.
+   *
+   * @return the registered identifiers
+   */
+  public static Set<Identifier> keys() {
+    return STORE.keySet();
+  }
+
+  /**
+   * Returns a snapshot of all current asset values keyed by identifier.
+   *
+   * @return a snapshot map of the store
+   */
+  public static Map<Identifier, Object> entries() {
+    ConcurrentHashMap<Identifier, Object> snapshot = new ConcurrentHashMap<>();
+    STORE.forEach((id, ref) -> {
+      Object value = ref.get();
+      if (value != null) {
+        snapshot.put(id, value);
+      }
+    });
+    return snapshot;
+  }
+
+  /**
+   * Returns the number of registered assets.
+   *
+   * @return the asset count
+   */
+  public static int size() {
+    return STORE.size();
+  }
+
+  /**
+   * Removes an asset from the store, closing it if it implements
+   * {@link AutoCloseable}.
    *
    * @param id the asset identifier
    */
   public static void remove(Identifier id) {
-    STORE.remove(id);
+    Ref<?> ref = STORE.remove(id);
+    if (ref != null) {
+      dispose(ref.get());
+    }
   }
 
   /**
-   * Clears all assets for the given namespace.
+   * Clears all assets for the given namespace, closing each one if it
+   * implements {@link AutoCloseable}.
    *
    * @param namespace the namespace to clear
    */
   public static void clearNamespace(Namespace namespace) {
-    STORE.keySet().removeIf(id -> id.namespace().equals(namespace));
+    for (Identifier id : STORE.keySet().toArray(new Identifier[0])) {
+      if (id.namespace().equals(namespace)) {
+        remove(id);
+      }
+    }
   }
 
   /**
-   * Clears all assets from every namespace.
+   * Clears all assets from every namespace, closing each one if it
+   * implements {@link AutoCloseable}.
    */
   public static void clear() {
+    STORE.forEach((id, ref) -> dispose(ref.get()));
     STORE.clear();
+  }
+
+  private static void dispose(@Nullable Object value) {
+    if (value instanceof AutoCloseable closeable) {
+      try {
+        closeable.close();
+      } catch (Exception e) {
+        LOGGER.warn("Failed to dispose asset", e);
+      }
+    }
   }
 }

@@ -28,8 +28,11 @@ import net.momentum.util.QuickFmt;
 import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.function.Consumer;
 
 /**
  * A localization table mapping translation keys to translated text.
@@ -49,6 +52,7 @@ public final class Language {
   public static final Language EN_US = new Language(EN_US_KEY);
   private static volatile Language currentLanguage = EN_US;
   private static final Map<String, Language> LANGUAGES = new ConcurrentHashMap<>();
+  private static final List<Consumer<Language>> CURRENT_LISTENERS = new CopyOnWriteArrayList<>();
 
   static {
     LANGUAGES.put(EN_US_KEY, EN_US);
@@ -82,19 +86,48 @@ public final class Language {
   /**
    * Sets the global current language.
    *
+   * <p>Listeners registered via {@link #addChangeListener(Consumer)} are
+   * notified with the newly selected language.
+   *
    * @param lang the language to set
    */
   public static void setCurrent(Language lang) {
     currentLanguage = lang;
+    for (Consumer<Language> listener : CURRENT_LISTENERS) {
+      listener.accept(lang);
+    }
   }
 
   /**
    * Sets the global current language.
    *
+   * <p>Listeners registered via {@link #addChangeListener(Consumer)} are
+   * notified with the newly selected language.
+   *
    * @param langKey the language key to set
    */
   public static void setCurrent(String langKey) {
-    currentLanguage = get(langKey);
+    setCurrent(get(langKey));
+  }
+
+  /**
+   * Registers a listener invoked whenever the current language changes.
+   *
+   * <p>UI systems can use this to refresh all displayed text.
+   *
+   * @param listener the listener, receiving the newly current language
+   */
+  public static void addChangeListener(Consumer<Language> listener) {
+    CURRENT_LISTENERS.add(listener);
+  }
+
+  /**
+   * Removes a change listener.
+
+   * @param listener the listener, receiving the newly current language
+   */
+  public static void removeChangeListener(Consumer<Language> listener) {
+    CURRENT_LISTENERS.remove(listener);
   }
 
   /**

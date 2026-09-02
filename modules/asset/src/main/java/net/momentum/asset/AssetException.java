@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package net.momentum.mod.resource;
+package net.momentum.asset;
 
 import java.io.Serial;
 
@@ -32,7 +32,7 @@ import java.io.Serial;
  * <p>Typical causes include: file not found, mod not found,
  * or other faults that prevents resource I/O connection.
  */
-public class ResourceException extends RuntimeException {
+public class AssetException extends RuntimeException {
   @Serial
   private static final long serialVersionUID = 2026060100L;
 
@@ -41,7 +41,7 @@ public class ResourceException extends RuntimeException {
    *
    * @param message a human-readable description of the error
    */
-  public ResourceException(String message) {
+  public AssetException(String message) {
     super(message);
   }
 
@@ -51,7 +51,7 @@ public class ResourceException extends RuntimeException {
    * @param message a human-readable description of the error
    * @param cause   the underlying throwable that triggered this error, or {@code null}
    */
-  public ResourceException(String message, Throwable cause) {
+  public AssetException(String message, Throwable cause) {
     super(message, cause);
   }
 }

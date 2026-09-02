@@ -24,9 +24,10 @@
 
 package net.momentum.mod;
 
+import net.momentum.asset.AssetFinder;
+import net.momentum.asset.NamespacedAssetFinder;
 import net.momentum.event.EventBus;
 import net.momentum.event.Subscribe;
-import net.momentum.mod.resource.ResourceFinder;
 import net.momentum.util.Namespace;
 import org.jspecify.annotations.Nullable;
 
@@ -60,7 +61,7 @@ public final class ModLoader {
   private final Map<String, Mod> mods = new ConcurrentHashMap<>();
   private final Map<ClassLoader, Mod> classLoaderMap = new ConcurrentHashMap<>();
   private final EventBus globalEventBus = new EventBus();
-  private final ResourceFinder resourceFinder = new ResourceFinder(this);
+  private final NamespacedAssetFinder assetFinder = new NamespacedAssetFinder();
   private @Nullable Mod core;
 
   private static URLClassLoader createClassLoader(Path jarPath) {
@@ -94,8 +95,8 @@ public final class ModLoader {
    *
    * @return the mod loader resource finder
    */
-  public ResourceFinder resourceFinder() {
-    return resourceFinder;
+  public AssetFinder resourceFinder() {
+    return assetFinder;
   }
 
   /**
@@ -202,6 +203,8 @@ public final class ModLoader {
       }
       core = mod;
     }
+
+    assetFinder.register(modId, jarPath);
 
     if (entrypoint instanceof ModInitializer init) {
       init.onPreLoad();

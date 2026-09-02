@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
   api project(':momentum-core')
+  api project(':momentum-asset')
 }

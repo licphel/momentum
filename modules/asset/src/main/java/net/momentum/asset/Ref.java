@@ -28,9 +28,9 @@ import net.momentum.util.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
-import java.util.function.Supplier;
 
 /**
  * A typed, mutable reference to an asset that supports hot-reloading.
@@ -38,7 +38,7 @@ import java.util.function.Supplier;
  * <p>When an asset is updated via {@link Assets#set(Identifier, Object)},
  * all existing {@code Ref} instances for that identifier automatically
  * reflect the new value. Listeners registered via
- * {@link #fireChanged(BiConsumer)} are notified of every update.
+ * {@link #addChangeListener(BiConsumer)} are notified of every update.
  *
  * <p>{@code Ref} is thread-safe: reads are volatile and writes are
  * guarded by the owning {@link Assets} store.
@@ -50,10 +50,14 @@ public final class Ref<T> {
   private final Identifier id;
   private final List<BiConsumer<@Nullable T, @Nullable T>> listeners = new CopyOnWriteArrayList<>();
   private volatile @Nullable T value;
+  private volatile @Nullable Class<?> type;
 
   Ref(Identifier id, @Nullable T initialValue) {
     this.id = id;
     this.value = initialValue;
+    if (initialValue != null) {
+      this.type = initialValue.getClass();
+    }
   }
 
   /**
@@ -72,6 +76,15 @@ public final class Ref<T> {
    */
   public @Nullable T get() {
     return value;
+  }
+
+  /**
+   * Returns the current asset value.
+   *
+   * @return the current optional value
+   */
+  public Optional<@Nullable T> optional() {
+    return Optional.ofNullable(value);
   }
 
   /**
@@ -101,38 +114,16 @@ public final class Ref<T> {
    *
    * @param listener a consumer receiving the old and new values
    */
-  public void fireChanged(BiConsumer<@Nullable T, @Nullable T> listener) {
+  public void addChangeListener(BiConsumer<@Nullable T, @Nullable T> listener) {
     listeners.add(listener);
   }
 
   /**
-   * Returns the value if present, otherwise the given fallback.
+   * Removes a change listener.
    *
-   * @param fallback the fallback value
-   * @return the current value, or {@code fallback} if the value is {@code null}
+   * @param listener a consumer receiving the old and new values
    */
-  public T orElse(T fallback) {
-    T v = value;
-    return v != null ? v : fallback;
-  }
-
-  /**
-   * Returns the value if present, otherwise the value supplied by the fallback.
-   *
-   * @param supplier the fallback supplier
-   * @return the current value, or the supplier's result if the value is {@code null}
-   */
-  public T orElseGet(Supplier<? extends T> supplier) {
-    T v = value;
-    return v != null ? v : supplier.get();
-  }
-
-  /**
-   * Returns whether a non-null value is present.
-   *
-   * @return {@code true} if the value is non-null
-   */
-  public boolean isPresent() {
-    return value != null;
+  public void removeChangeListener(BiConsumer<@Nullable T, @Nullable T> listener) {
+    listeners.remove(listener);
   }
 }
