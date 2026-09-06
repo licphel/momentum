@@ -87,10 +87,10 @@ repositories {
 }
 
 dependencies {
-    implementation 'net.momentum:momentum-core:1.0.0'
-    implementation 'net.momentum:momentum-gfx:1.0.0'
-    runtimeOnly    'net.momentum:momentum-opengl:1.0.0'
-    runtimeOnly    'net.momentum:momentum-glfw:1.0.0'
+    implementation 'io.viki.momentum:momentum-core:1.0.0'
+    implementation 'io.viki.momentum:momentum-gfx:1.0.0'
+    runtimeOnly    'io.viki.momentum:momentum-opengl:1.0.0'
+    runtimeOnly    'io.viki.momentum:momentum-glfw:1.0.0'
 }
 ```
 

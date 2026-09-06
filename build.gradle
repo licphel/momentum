@@ -31,8 +31,8 @@ subprojects {
 
   // Subprojects do not inherit group/version from the root project; set them
   // explicitly so composite-build substitution (and publication) uses
-  // net.momentum:momentum-<name>:<version> coordinates.
-  group = 'net.momentum'
+  // io.viki.momentum:momentum-<name>:<version> coordinates.
+  group = 'io.viki.momentum'
   version = property('momentum_version')
 
   java {
@@ -65,12 +65,12 @@ subprojects {
     implementation libs.jackson.databind
   }
 
-  // Each module publishes as its own artifact: net.momentum:momentum-<name>.
+  // Each module publishes as its own artifact: io.viki.momentum:momentum-<name>.
   publishing {
     publications {
       maven(MavenPublication) {
         from components.java
-        groupId = 'net.momentum'
+        groupId = 'io.viki.momentum'
         artifactId = project.name
         version = property('momentum_version')
       }

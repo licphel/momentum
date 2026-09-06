@@ -38,7 +38,9 @@ dependencyResolutionManagement {
 
 var modulesDir = file("modules")
 
-modulesDir.listFiles()?.findAll { it.isDirectory() }?.each { dir ->
+// ui.old is a source archive, not a Gradle module. Keep archived code beside
+// the replacement UI without letting the dynamic module scan configure it.
+modulesDir.listFiles()?.findAll { it.isDirectory() && it.name != "ui.old" }?.each { dir ->
   var projectName = "momentum-${dir.name}"
   include(projectName)
   project(":${projectName}").projectDir = dir
