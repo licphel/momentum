@@ -76,7 +76,7 @@ public record SamplerDesc(TextureFilter magFilter, TextureFilter minFilter, Text
     public Color wrapBorderColor = Color.EMPTY;
     public float lodBias = 0.0F;
     public float minLod = 0.0F;
-    public float maxLod = 1000f;
+    public float maxLod = 1000F;
     public float anisotropyLevel = 1.0F;
     public int mipmapLevel = 0;
     public int sampleCount = 1;

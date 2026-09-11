@@ -491,8 +491,8 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param h the height of the bounding box
    */
   public void drawOval(float x, float y, float w, float h) {
-    float rx = w / 2f;
-    float ry = h / 2f;
+    float rx = w / 2F;
+    float ry = h / 2F;
     float cx = x + rx;
     float cy = y + ry;
     int segments = computeOvalSegments(x, y, w, h);
@@ -531,8 +531,8 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param h the height of the bounding box
    */
   public void drawOvalFrame(float x, float y, float w, float h) {
-    float rx = w / 2.0f;
-    float ry = h / 2.0f;
+    float rx = w / 2.0F;
+    float ry = h / 2.0F;
     float cx = x + rx;
     float cy = y + ry;
     int segments = computeOvalSegments(x, y, w, h);
@@ -728,8 +728,8 @@ public class VertexBuilder2D extends VertexBuilder {
    * @return the segment count, clamped to {@code [8, 128]}
    */
   private int computeOvalSegments(float x, float y, float w, float h) {
-    float rx = w / 2.0f;
-    float ry = h / 2.0f;
+    float rx = w / 2.0F;
+    float ry = h / 2.0F;
     float cx = x + rx;
     float cy = y + ry;
     Vector3 tc = transform().top().transform(new Vector3(cx, cy, 0));
@@ -737,7 +737,7 @@ public class VertexBuilder2D extends VertexBuilder {
     float dx = tr.x() - tc.x();
     float dy = tr.y() - tc.y();
     float screenRx = (float) Math.sqrt(dx * dx + dy * dy);
-    int segments = (int) (screenRx * Math.PI * 0.5f);
+    int segments = (int) (screenRx * Math.PI * 0.5F);
     return Math.clamp(segments, 8, 128);
   }
 
