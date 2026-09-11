@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.view;
 
 import io.viki.momentum.event.EventBus;
 import io.viki.momentum.gfx.Device;
-import io.viki.momentum.gfx.input.Snapshot;
+import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.math.Vector2;
 
 /**
@@ -42,7 +42,7 @@ public abstract class View implements AutoCloseable {
   public static final int DEFAULT_HEIGHT = 450;
 
   private final EventBus eventBus = new EventBus();
-  private final Snapshot snapshot = new Snapshot();
+  private final InputSnapshot snapshot = new InputSnapshot();
   protected int width = DEFAULT_WIDTH;
   protected int height = DEFAULT_HEIGHT;
   protected boolean vsync = true;
@@ -67,7 +67,7 @@ public abstract class View implements AutoCloseable {
    *
    * @return mutable input snapshot owned by the display
    */
-  public final Snapshot snapshot() {
+  public final InputSnapshot snapshot() {
     return snapshot;
   }
 

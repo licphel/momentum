@@ -24,7 +24,7 @@
 
 package io.viki.momentum.codec.streaming;
 
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import java.nio.ByteOrder;
 

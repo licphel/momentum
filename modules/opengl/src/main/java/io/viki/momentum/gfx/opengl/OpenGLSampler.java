@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
-import io.viki.momentum.internal.Handle;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.Handle;
+import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.opengl.GL33.*;
 

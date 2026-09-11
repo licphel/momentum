@@ -25,7 +25,7 @@ package io.viki.momentum.gfx.ui;
 
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.quick2d.impl.Graphics;
+import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.Box2D;
 import io.viki.momentum.math.Vector2;
 
@@ -70,6 +70,7 @@ public final class Resolution {
     this.onlyInteger = onlyInteger;
     this.fixedScale = fixedScale;
     this.camera = new Camera2D(logicalWidth, logicalHeight, handler);
+    camera.setFlipY(true);
     recalculate();
   }
   
@@ -158,6 +159,10 @@ public final class Resolution {
   }
 
   public Vector2 inputToLogical(double x, double y, double inputWidth, double inputHeight) {
+    if (inputWidth <= 0.0 || inputHeight <= 0.0) {
+      throw new IllegalArgumentException("Input coordinate size must be positive: "
+          + inputWidth + "x" + inputHeight);
+    }
     return screenToLogical(x * width / inputWidth, y * height / inputHeight);
   }
 

@@ -5,6 +5,9 @@ plugins {
 dependencies {
   api project(':momentum-gfx')
   api project(':momentum-mod')
+  api project(':momentum-event')
+  api project(':momentum-input')
+  api project(':momentum-math')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-glfw:${lwjgl_version}"

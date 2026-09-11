@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.pipe.*;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.opengl.GL33.GL_BACK;
 import static org.lwjgl.opengl.GL33.GL_FRONT;

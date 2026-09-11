@@ -27,7 +27,7 @@ package io.viki.momentum.gfx.text.harfbuzz;
 import com.ibm.icu.text.Bidi;
 import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.raster.ShapeResult;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import org.lwjgl.util.harfbuzz.hb_glyph_info_t;
 import org.lwjgl.util.harfbuzz.hb_glyph_position_t;
 

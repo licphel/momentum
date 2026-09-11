@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.texture;
 
-import io.viki.momentum.gfx.quick2d.VertexBuilder2D;
+import io.viki.momentum.gfx.util.VertexBuilder2D;
 
 import java.util.List;
 

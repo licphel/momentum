@@ -27,8 +27,8 @@ package io.viki.momentum.gfx.opengl;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureFilter;
-import io.viki.momentum.internal.Handle;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.Handle;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CopyOnWriteArrayList;

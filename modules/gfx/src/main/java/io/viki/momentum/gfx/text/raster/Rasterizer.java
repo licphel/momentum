@@ -29,7 +29,7 @@ import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.FontMetrics;
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.harfbuzz.HarfbuzzShaper;
-import io.viki.momentum.gfx.color.Gradient;
+import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.Box2D;
 
 import java.util.*;

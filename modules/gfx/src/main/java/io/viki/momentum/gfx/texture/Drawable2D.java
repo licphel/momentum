@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.texture;
 
-import io.viki.momentum.gfx.quick2d.VertexBuilder2D;
+import io.viki.momentum.gfx.util.VertexBuilder2D;
 
 /**
  * A drawable object that renders itself using a {@link VertexBuilder2D}.

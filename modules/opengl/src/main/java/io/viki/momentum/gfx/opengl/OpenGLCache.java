@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import java.util.Arrays;
 

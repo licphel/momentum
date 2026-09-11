@@ -26,12 +26,12 @@ package io.viki.momentum.gfx.glfw;
 
 import io.viki.momentum.event.Event;
 import io.viki.momentum.gfx.GraphicsException;
-import io.viki.momentum.gfx.input.KeyCode;
-import io.viki.momentum.gfx.input.event.*;
+import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.event.*;
 import io.viki.momentum.gfx.io.ImageInfo;
 import io.viki.momentum.gfx.view.DesktopView;
 import io.viki.momentum.math.Vector2;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.glfw.*;
 import org.lwjgl.system.MemoryStack;

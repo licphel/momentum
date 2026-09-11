@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.pipe;
 
-import io.viki.momentum.gfx.color.Color;
+import io.viki.momentum.gfx.tint.Color;
 
 /**
  * Creates a new {@code Blend} describing the blend state for a render pipeline.

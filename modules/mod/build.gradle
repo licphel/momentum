@@ -5,4 +5,6 @@ plugins {
 dependencies {
   api project(':momentum-core')
   api project(':momentum-asset')
+  api project(':momentum-event')
+  implementation project(':momentum-math')
 }

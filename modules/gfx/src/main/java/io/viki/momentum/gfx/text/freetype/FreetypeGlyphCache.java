@@ -30,7 +30,7 @@ import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.raster.Glyph;
 import io.viki.momentum.gfx.texture.TextureAtlas;
 import io.viki.momentum.gfx.texture.TexturePart;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.util.freetype.FT_Bitmap;
 import org.lwjgl.util.freetype.FT_Face;

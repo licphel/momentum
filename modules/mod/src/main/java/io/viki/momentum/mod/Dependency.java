@@ -25,28 +25,27 @@
 package io.viki.momentum.mod;
 
 import io.viki.momentum.util.SemanticVersion;
-import org.jspecify.annotations.Nullable;
+
+import java.util.function.Predicate;
 
 /**
- * A mod dependency with an optional version range.
+ * A mod dependency evaluated against a version condition.
  *
- * <p>Both {@code minVersion} and {@code maxVersion} are inclusive bounds.
- * If both are {@code null}, any version of the dependency is accepted.
+ * <p>The dependency is satisfied when its condition accepts the dependency's
+ * resolved version.
  *
- * @param modId      the required mod identifier
- * @param minVersion the minimum acceptable version, or {@code null} for no lower bound
- * @param maxVersion the maximum acceptable version, or {@code null} for no upper bound
+ * @param modId         the required mod identifier
+ * @param condition     the predicate used to determine whether a version is accepted
+ * @param conditionDesc description of the predicate
  */
-public record Dependency(String modId,
-                         @Nullable SemanticVersion minVersion,
-                         @Nullable SemanticVersion maxVersion) {
+public record Dependency(String modId, Predicate<SemanticVersion> condition, String conditionDesc) {
   /**
    * Creates a dependency with no version constraints.
    *
    * @param modId the required mod identifier
    */
   public Dependency(String modId) {
-    this(modId, null, null);
+    this(modId, _ -> true, "<any>");
   }
 
   /**
@@ -56,21 +55,17 @@ public record Dependency(String modId,
    * @return {@code true} if the version is within bounds
    */
   public boolean isSatisfiedBy(SemanticVersion version) {
-    if (minVersion != null && version.compareTo(minVersion) < 0) {
-      return false;
-    }
-    return maxVersion == null || version.compareTo(maxVersion) <= 0;
+    return condition.test(version);
   }
 
-  @Override
-  public String toString() {
-    StringBuilder sb = new StringBuilder("'").append(modId).append("'");
-    if (minVersion != null) {
-      sb.append(" >= ").append(minVersion);
-    }
-    if (maxVersion != null) {
-      sb.append(" <= ").append(maxVersion);
-    }
-    return sb.toString();
+  /**
+   * Creates a "Not satisfied" exception with detailed info.
+   *
+   * @param selfModId the mod that depends on this dependency
+   * @param version   the target mod version
+   * @return an exception object to be thrown
+   */
+  public ModException createNotSatisfiedException(String selfModId, SemanticVersion version) {
+    return new ModException(selfModId + " requires " + modId + " " + conditionDesc + ", but got " + version);
   }
 }

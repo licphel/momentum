@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
 import io.viki.momentum.gfx.text.Meta;
-import io.viki.momentum.gfx.color.Gradient;
+import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.Box2D;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;

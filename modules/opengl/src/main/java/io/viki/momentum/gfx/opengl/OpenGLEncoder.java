@@ -34,9 +34,9 @@ import io.viki.momentum.gfx.pipe.Pipeline;
 import io.viki.momentum.gfx.pipe.Topology;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.shader.ResourceSetLayout;
-import io.viki.momentum.gfx.color.Color;
-import io.viki.momentum.util.collection.MspcRingBuffer;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.util.MspcRingBuffer;
+import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import org.jspecify.annotations.Nullable;
@@ -162,7 +162,7 @@ public final class OpenGLEncoder implements Encoder {
     batchRefStart = refCount;
     @Nullable Object[] refsSnapshot = Arrays.copyOfRange(refs, refStart, refCount);
     queryReset = true;
-    GraphicsMetrics.ECMDPT.add(cmdCount);
+    GraphicsMetrics.EncoderSum.add(cmdCount);
 
     ctx.submit(() -> executeBatch(ints, refsSnapshot));
   }
@@ -486,7 +486,7 @@ public final class OpenGLEncoder implements Encoder {
 
           int vao = currentPipe.acquireVao(currentVboHandle, 0, 0, currentInstanceBase);
           ctx.cache.bindVao(vao);
-          GraphicsMetrics.DCPT.increment();
+          GraphicsMetrics.Drawcalls.increment();
           glDrawArrays(topology, firstVertex, vertexCount);
           ctx.cache.bindVao(0);
         }
@@ -508,7 +508,7 @@ public final class OpenGLEncoder implements Encoder {
 
           int vao = currentPipe.acquireVao(currentVboHandle, 0, currentEboHandle, currentInstanceBase);
           ctx.cache.bindVao(vao);
-          GraphicsMetrics.DCPT.increment();
+          GraphicsMetrics.Drawcalls.increment();
           glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
           ctx.cache.bindVao(0);
         }
@@ -528,7 +528,7 @@ public final class OpenGLEncoder implements Encoder {
 
           int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, 0, currentInstanceBase);
           ctx.cache.bindVao(vao);
-          GraphicsMetrics.DCPT.increment();
+          GraphicsMetrics.Drawcalls.increment();
           glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
           ctx.cache.bindVao(0);
         }
@@ -551,7 +551,7 @@ public final class OpenGLEncoder implements Encoder {
 
           int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, currentEboHandle, currentInstanceBase);
           ctx.cache.bindVao(vao);
-          GraphicsMetrics.DCPT.increment();
+          GraphicsMetrics.Drawcalls.increment();
           glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
           ctx.cache.bindVao(0);
         }
@@ -560,7 +560,7 @@ public final class OpenGLEncoder implements Encoder {
           int y = ring.poll();
           int z = ring.poll();
           consumed += 3;
-          GraphicsMetrics.DCPT.increment();
+          GraphicsMetrics.Drawcalls.increment();
           glDispatchCompute(x, y, z);
         }
         default -> throw new GraphicsException("Unknown command opcode: " + op);

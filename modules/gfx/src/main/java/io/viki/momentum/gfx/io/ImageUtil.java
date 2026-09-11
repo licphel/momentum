@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.io;
 
 import io.viki.momentum.gfx.DirectBufferPool;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import java.nio.ByteBuffer;
 

@@ -26,7 +26,7 @@ package io.viki.momentum.audio.openal;
 
 import io.viki.momentum.audio.Clip;
 import io.viki.momentum.audio.Mixer;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import org.lwjgl.openal.AL;

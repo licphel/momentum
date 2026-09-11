@@ -48,9 +48,20 @@ public final class MatrixUtil {
    * @param vpm the view-projection matrix to be uploaded
    * @param ubo the target Uniform Buffer Object to receive the matrix data
    */
-  public static void writeViewProjection(Matrix4x4 vpm, BufferObject ubo) {
+  public static void store(Matrix4x4 vpm, BufferObject ubo) {
     ByteBuffer out = DirectBufferPool.acquire(4 * 4 * Float.BYTES);
+    store(vpm, out);
+    ubo.submit(out.flip());
+    DirectBufferPool.release(out);
+  }
 
+  /**
+   * Writes a 4x4 view-projection matrix into a Uniform Buffer Object (UBO).
+   *
+   * @param vpm    the view-projection matrix to be uploaded
+   * @param out the cpu-side cursor buffer
+   */
+  public static void store(Matrix4x4 vpm, ByteBuffer out) {
     // Column 0
     out.putFloat(vpm.m00());
     out.putFloat(vpm.m10());
@@ -74,8 +85,5 @@ public final class MatrixUtil {
     out.putFloat(vpm.m13());
     out.putFloat(vpm.m23());
     out.putFloat(vpm.m33());
-
-    ubo.submit(out.flip());
-    DirectBufferPool.release(out);
   }
 }

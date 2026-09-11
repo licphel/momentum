@@ -27,7 +27,7 @@ package io.viki.momentum.gfx.opengl;
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.gfx.shader.ShaderCompiler;
 import io.viki.momentum.gfx.shader.ShaderType;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import java.nio.ByteBuffer;
 

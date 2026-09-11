@@ -25,10 +25,9 @@
 package io.viki.momentum.gfx.math;
 
 import io.viki.momentum.math.*;
-import io.viki.momentum.math.*;
-import io.viki.momentum.math.*;
-import io.viki.momentum.math.dim3.Frustum;
-import io.viki.momentum.math.dim3.Ray3D;
+import io.viki.momentum.math.Frustum;
+import io.viki.momentum.math.Quaternion;
+import io.viki.momentum.math.Ray;
 
 /**
  * Abstract base class for a 3D camera (Y-up convention).
@@ -317,8 +316,8 @@ public abstract class Camera3D {
    * @param viewport       viewport rectangle (Y-down)
    * @return unprojected world ray
    */
-  public Ray3D unproject(Vector2 screenPosition, Box2D viewport) {
-    return Ray3D.createFromScreen(screenPosition.x(), screenPosition.y(), viewport.width(), viewport.height(),
+  public Ray unproject(Vector2 screenPosition, Box2D viewport) {
+    return Ray.createFromScreen(screenPosition.x(), screenPosition.y(), viewport.width(), viewport.height(),
         getProjectionMatrix(), getViewMatrix());
   }
 

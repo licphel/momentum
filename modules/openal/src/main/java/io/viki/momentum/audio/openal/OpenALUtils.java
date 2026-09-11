@@ -25,7 +25,7 @@
 package io.viki.momentum.audio.openal;
 
 import io.viki.momentum.audio.AudioFormat;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.openal.AL10.*;
 

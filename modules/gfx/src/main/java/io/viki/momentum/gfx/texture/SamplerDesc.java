@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.texture;
 
-import io.viki.momentum.gfx.color.Color;
+import io.viki.momentum.gfx.tint.Color;
 
 /**
  * Creates a new {@code SamplerDesc} describing texture filtering, wrapping, and level-of-detail parameters.

@@ -24,9 +24,9 @@
 
 package io.viki.momentum.gfx.glfw;
 
-import io.viki.momentum.gfx.input.KeyAction;
-import io.viki.momentum.gfx.input.KeyCode;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.input.KeyAction;
+import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import static org.lwjgl.glfw.GLFW.*;

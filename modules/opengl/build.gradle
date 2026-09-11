@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
   api project(':momentum-gfx')
+  api project(':momentum-math')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-opengl:${lwjgl_version}"

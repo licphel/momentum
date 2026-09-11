@@ -35,9 +35,7 @@ import java.util.PriorityQueue;
  * priority run in enqueue order.
  */
 public final class TaskQueue {
-  private final PriorityQueue<Task> tasks = new PriorityQueue<>(
-      Comparator.comparingInt(Task::priority).thenComparingLong(Task::sequence)
-  );
+  private final PriorityQueue<Task> tasks = new PriorityQueue<>(Comparator.comparingInt(Task::priority).thenComparingLong(Task::sequence));
   private long nextSequence;
   private boolean started;
 

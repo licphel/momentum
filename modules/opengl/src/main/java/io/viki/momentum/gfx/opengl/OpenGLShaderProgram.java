@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.shader.ShaderModule;
 import io.viki.momentum.gfx.shader.ShaderProgram;
-import io.viki.momentum.internal.Handle;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.Handle;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import static org.lwjgl.opengl.GL33.*;

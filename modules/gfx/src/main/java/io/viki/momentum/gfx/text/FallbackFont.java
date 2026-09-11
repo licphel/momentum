@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsException;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;

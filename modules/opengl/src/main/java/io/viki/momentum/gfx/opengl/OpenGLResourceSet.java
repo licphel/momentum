@@ -30,7 +30,7 @@ import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.shader.ResourceSetLayout;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.Texture;
-import io.viki.momentum.internal.Handle;
+import io.viki.momentum.util.Handle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;

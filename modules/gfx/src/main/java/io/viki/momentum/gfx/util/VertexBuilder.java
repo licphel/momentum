@@ -26,9 +26,8 @@ package io.viki.momentum.gfx.util;
 
 import io.viki.momentum.codec.streaming.CursorBuffer;
 import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.quick2d.DrawingFlags;
-import io.viki.momentum.gfx.color.Gradient;
-import io.viki.momentum.gfx.color.Color;
+import io.viki.momentum.gfx.tint.Gradient;
+import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.math.MatrixStack;
 
 /**
@@ -88,7 +87,7 @@ public class VertexBuilder {
   /**
    * Returns the current draw flags.
    *
-   * @return the current {@link DrawingFlags} bitmask
+   * @return the current {@link DrawFlags} bitmask
    */
   public int flags() {
     return flags;
@@ -97,7 +96,7 @@ public class VertexBuilder {
   /**
    * Sets the draw flags applied to subsequent draws.
    *
-   * @param flags the bitmask of {@link DrawingFlags}
+   * @param flags the bitmask of {@link DrawFlags}
    */
   public void setFlags(int flags) {
     this.flags = flags;

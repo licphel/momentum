@@ -42,7 +42,7 @@ import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import org.jspecify.annotations.Nullable;
@@ -201,7 +201,7 @@ public final class OpenGLDevice implements Device {
   @Override
   public void execute() {
     Runnable task;
-    GraphicsMetrics.DCMDPT.add(queue.size());
+    GraphicsMetrics.DeviceQueueSize.add(queue.size());
     try {
       while ((task = queue.poll()) != null) {
         task.run();

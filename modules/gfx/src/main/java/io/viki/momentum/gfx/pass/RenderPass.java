@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.pass;
 
-import io.viki.momentum.gfx.color.Color;
+import io.viki.momentum.gfx.tint.Color;
 import org.jspecify.annotations.Nullable;
 
 /**

@@ -30,8 +30,8 @@ import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
 import io.viki.momentum.gfx.texture.TextureType;
 import io.viki.momentum.math.Box3D;
-import io.viki.momentum.internal.Handle;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.Handle;
+import io.viki.momentum.util.InternalApi;
 
 import java.nio.ByteBuffer;
 

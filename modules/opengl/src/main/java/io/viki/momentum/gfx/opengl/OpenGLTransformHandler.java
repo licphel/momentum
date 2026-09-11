@@ -27,7 +27,7 @@ package io.viki.momentum.gfx.opengl;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.math.Matrix4x4;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 /**
  * Provides OpenGL-specific coordinate and texture conversions.

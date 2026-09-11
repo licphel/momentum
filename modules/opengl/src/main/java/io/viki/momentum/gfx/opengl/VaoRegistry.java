@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.shader.VertexAttributeType;
 import io.viki.momentum.gfx.shader.VertexLayout;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import java.util.Arrays;
 

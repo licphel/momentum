@@ -23,15 +23,17 @@
  */
 package io.viki.momentum.gfx.ui;
 
-import io.viki.momentum.gfx.quick2d.impl.Graphics;
-import io.viki.momentum.gfx.input.KeyAction;
-import io.viki.momentum.gfx.input.KeyCode;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.input.KeyAction;
+import io.viki.momentum.input.KeyBinding;
+import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.KeyMatch;
+import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.texture.Drawable2D;
-import io.viki.momentum.gfx.quick2d.Alignment;
+import io.viki.momentum.gfx.util.Alignment;
 import io.viki.momentum.math.Box2D;
-import io.viki.momentum.gfx.color.Color;
-import io.viki.momentum.math.Vector2;
+import io.viki.momentum.gfx.tint.Color;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -50,12 +52,28 @@ public final class Button extends Element {
   public static final StyleKey<Object> DISABLED_BACKGROUND = new StyleKey<>("button.disabled.background", Object.class);
   public static final StyleKey<Text> LABEL = new StyleKey<>("button.label", Text.class);
   public static final StyleKey<Color> LABEL_COLOR = new StyleKey<>("button.label.color", Color.class);
+  public static final StyleKey<KeyBinding> ACTIVATE_BINDING = new StyleKey<>("button.activate",
+      KeyBinding.class);
   private State state = State.IDLE;
   private boolean enabled = true;
+  private boolean hovered;
+  private boolean pointerPressed;
+  private boolean keyboardPressed;
+  private @Nullable KeyCode pointerKey;
+  private @Nullable KeyCode keyboardKey;
   private @Nullable Runnable onClick;
 
   public Button(Box2D bounds, Look look) {
     super(bounds, look);
+  }
+
+  /** Creates the conventional mouse, Enter, and Space activation binding for one input snapshot. */
+  public static KeyBinding defaultActivate(InputSnapshot snapshot) {
+    return new KeyBinding("button.activate",
+        KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
+        KeyMatch.of(snapshot.key(KeyCode.ENTER)),
+        KeyMatch.of(snapshot.key(KeyCode.KP_ENTER)),
+        KeyMatch.of(snapshot.key(KeyCode.SPACE)));
   }
 
   public State state() {
@@ -69,40 +87,17 @@ public final class Button extends Element {
   public void setEnabled(boolean value) {
     enabled = value;
     if (!value) {
-      state = State.IDLE;
+      hovered = false;
+      pointerPressed = false;
+      keyboardPressed = false;
+      pointerKey = null;
+      keyboardKey = null;
     }
+    refreshState();
   }
 
   public void setOnClick(@Nullable Runnable value) {
     onClick = value;
-  }
-
-  public void move(Vector2 position) {
-    if (!enabled) {
-      return;
-    }
-    if (state != State.PRESSED) {
-      state = contains(position.x(), position.y()) ? State.HOVERED : State.IDLE;
-    }
-  }
-
-  /** Begins a primary-button press if the logical position is inside this button. */
-  public boolean press(Vector2 position) {
-    if (!enabled || !contains(position.x(), position.y())) {
-      return false;
-    }
-    state = State.PRESSED;
-    return true;
-  }
-
-  /** Releases a press, invoking the callback only when release remains inside the button. */
-  public boolean release(Vector2 position) {
-    boolean clicked = enabled && state == State.PRESSED && contains(position.x(), position.y());
-    state = contains(position.x(), position.y()) ? State.HOVERED : State.IDLE;
-    if (clicked && onClick != null) {
-      onClick.run();
-    }
-    return clicked;
   }
 
   @Override
@@ -127,39 +122,100 @@ public final class Button extends Element {
   }
 
   @Override
-  protected boolean onEvent(UiEvent event) {
+  public boolean onMouseMove(float x, float y) {
+    return enabled;
+  }
+
+  @Override
+  public boolean onMouseButton(float x, float y, KeyCode button, KeyAction action, int modifiers) {
+    if (!enabled || button.mouseId() < 0 || action == KeyAction.REPEAT) {
+      return false;
+    }
+    if (action == KeyAction.PRESS) {
+      KeyBinding binding = activationBinding();
+      if (binding == null || !binding.transitioned()) {
+        return false;
+      }
+      pointerPressed = true;
+      pointerKey = button;
+      refreshState();
+      return true;
+    }
+    if (!pointerPressed || pointerKey != button) {
+      return false;
+    }
+    pointerPressed = false;
+    pointerKey = null;
+    boolean clicked = containsLocal(x, y);
+    refreshState();
+    runClick(clicked);
+    return true;
+  }
+
+  @Override
+  public boolean onKey(KeyCode key, KeyAction action, int modifiers) {
     if (!enabled) {
       return false;
     }
-    if (event instanceof UiEvent.MouseMove move) {
-      boolean inside = containsLocal(move.position().x(), move.position().y());
-      if (state != State.PRESSED) {
-        state = inside ? State.HOVERED : State.IDLE;
-      }
-      return inside || state == State.PRESSED;
-    }
-    if (event instanceof UiEvent.MouseButton mouse) {
-      boolean inside = containsLocal(mouse.position().x(), mouse.position().y());
-      if (mouse.button() != KeyCode.MOUSE_LEFT || mouse.action() == KeyAction.REPEAT) {
+    if (action == KeyAction.PRESS) {
+      KeyBinding binding = activationBinding();
+      if (binding == null || !binding.transitioned()) {
         return false;
       }
-      if (mouse.action() == KeyAction.PRESS) {
-        if (!inside) {
-          return false;
-        }
-        state = State.PRESSED;
-        return true;
-      }
-      if (state != State.PRESSED) {
-        return false;
-      }
-      state = inside ? State.HOVERED : State.IDLE;
-      if (inside && onClick != null) {
-        onClick.run();
-      }
+      keyboardPressed = true;
+      keyboardKey = key;
+      refreshState();
       return true;
     }
-    return false;
+    if (!keyboardPressed || keyboardKey != key) {
+      return false;
+    }
+    if (action == KeyAction.RELEASE) {
+      keyboardPressed = false;
+      keyboardKey = null;
+      refreshState();
+      runClick(true);
+    }
+    return true;
+  }
+
+  @Override
+  public void onPointerEnter() {
+    hovered = true;
+    refreshState();
+  }
+
+  @Override
+  public void onPointerExit() {
+    hovered = false;
+    refreshState();
+  }
+
+  @Override
+  public void onPointerCancel(KeyCode button) {
+    if (pointerKey == button) {
+      pointerPressed = false;
+      pointerKey = null;
+      refreshState();
+    }
+  }
+
+  @Override
+  public boolean acceptsFocus() {
+    return enabled;
+  }
+
+  @Override
+  public void onFocusChanged(boolean focused) {
+  }
+
+  @Override
+  public void onKeyCancel(KeyCode key) {
+    if (keyboardKey == key) {
+      keyboardPressed = false;
+      keyboardKey = null;
+      refreshState();
+    }
   }
 
   private StyleKey<Object> backgroundKey() {
@@ -169,6 +225,24 @@ public final class Button extends Element {
       case PRESSED -> PRESSED_BACKGROUND;
       case DISABLED -> DISABLED_BACKGROUND;
     };
+  }
+
+  private void refreshState() {
+    if (pointerPressed || keyboardPressed) {
+      state = State.PRESSED;
+    } else {
+      state = hovered ? State.HOVERED : State.IDLE;
+    }
+  }
+
+  private void runClick(boolean clicked) {
+    if (clicked && onClick != null) {
+      onClick.run();
+    }
+  }
+
+  private @Nullable KeyBinding activationBinding() {
+    return look().get(ACTIVATE_BINDING);
   }
 
   public enum State {

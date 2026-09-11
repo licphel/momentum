@@ -28,7 +28,7 @@ import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.FontMetrics;
 import io.viki.momentum.gfx.text.raster.Glyph;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryStack;

@@ -33,7 +33,7 @@ import io.viki.momentum.gfx.texture.TextureFilter;
 import io.viki.momentum.gfx.texture.TextureFormat;
 import io.viki.momentum.gfx.texture.TextureType;
 import io.viki.momentum.gfx.texture.TextureWrap;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.opengl.GL43.GL_COMPUTE_SHADER;

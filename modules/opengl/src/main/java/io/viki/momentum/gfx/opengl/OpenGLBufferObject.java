@@ -29,8 +29,8 @@ import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.buffer.BufferUsage;
-import io.viki.momentum.internal.Handle;
-import io.viki.momentum.internal.InternalApi;
+import io.viki.momentum.util.Handle;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;

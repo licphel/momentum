@@ -36,6 +36,18 @@ import io.viki.momentum.gfx.pipe.PipelineDesc;
  * @see PipelineDesc.Builder#vertexLayout
  */
 public final class VertexLayout {
+  /** Default Xyz f32 RGBA f16 layout. */
+  public static final VertexLayout XYZ_F32_RGBA_F16 = bake(
+      new VertexLayout.Attr(3, VertexAttributeType.FLOAT32, false),
+      new VertexLayout.Attr(4, VertexAttributeType.FLOAT16, false)
+  );
+  /** Default Xyz f32 RGBA f16 UV f32 layout. */
+  public static final VertexLayout XYZ_F32_RGBA_F32_UV_F32 = VertexLayout.bake(
+      new VertexLayout.Attr(3, VertexAttributeType.FLOAT32, false),
+      new VertexLayout.Attr(4, VertexAttributeType.FLOAT16, false),
+      new VertexLayout.Attr(2, VertexAttributeType.FLOAT32, false)
+  );
+
   /**
    * The ordered list of vertex attributes.
    */

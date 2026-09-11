@@ -25,13 +25,13 @@
 package io.viki.momentum.mod;
 
 import io.viki.momentum.event.EventBus;
-import io.viki.momentum.event.Subscribe;
+import io.viki.momentum.math.util.Mutil;
 import io.viki.momentum.util.Namespace;
+import io.viki.momentum.util.SemanticVersion;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -39,6 +39,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
@@ -52,14 +53,14 @@ import java.util.stream.Stream;
  * <p>Loading is not thread-safe — call {@code load} and {@code freeze} from
  * a single coordinating thread. Reads ({@code get}, {@code all}, {@code forClass}) may be called concurrently.
  *
+ * @see ModInstance
  * @see Mod
- * @see ModInfo
  */
 public final class ModLoader {
-  private final Map<String, Mod> mods = new ConcurrentHashMap<>();
-  private final Map<ClassLoader, Mod> classLoaderMap = new ConcurrentHashMap<>();
+  private final Map<String, ModInstance> insts = new ConcurrentHashMap<>();
+  private final Map<ClassLoader, ModInstance> classLoaderMap = new ConcurrentHashMap<>();
   private final EventBus globalEventBus = new EventBus();
-  private @Nullable Mod core;
+  private @Nullable ModInstance core;
 
   private static URLClassLoader createClassLoader(Path jarPath) {
     try {
@@ -69,12 +70,80 @@ public final class ModLoader {
     }
   }
 
-  private static Object loadEntrypoint(URLClassLoader classLoader, ModInfo info) {
-    try {
-      Class<?> clazz = classLoader.loadClass(info.entrypoint());
-      return clazz.getDeclaredConstructor().newInstance();
-    } catch (ReflectiveOperationException e) {
-      throw new ModException("Failed to load entrypoint '" + info.entrypoint() + "' for mod '" + info.modId() + "'", e);
+  /**
+   * Finds the single annotated mod main class in a JAR.
+   *
+   * @param jarPath     the mod JAR to inspect
+   * @param classLoader the class loader that can resolve the JAR's classes
+   * @return the concrete class implementing {@link Mod}
+   * @throws ModException if no valid entrypoint exists or multiple entrypoints are declared
+   */
+  private static Class<? extends Mod> findEntrypoint(Path jarPath, URLClassLoader classLoader) {
+    List<String> classNames;
+    try (JarFile jar = new JarFile(jarPath.toFile())) {
+      classNames = jar.stream()
+          .map(JarEntry::getName)
+          .filter(name -> name.endsWith(".class"))
+          .filter(name -> !name.startsWith("META-INF/"))
+          .map(name -> name.substring(0, name.length() - ".class".length()).replace('/', '.'))
+          .filter(name -> !name.equals("module-info") && !name.endsWith(".package-info"))
+          .sorted()
+          .toList();
+    } catch (IOException e) {
+      throw new ModException("Failed to scan classes in mod JAR: " + jarPath, e);
+    }
+
+    Class<? extends Mod> entrypoint = null;
+    for (String className : classNames) {
+      Class<?> clazz;
+      try {
+        clazz = Class.forName(className, false, classLoader);
+      } catch (ClassNotFoundException | LinkageError ignored) {
+        continue;
+      }
+
+      if (clazz.getAnnotation(Entrypoint.class) == null) {
+        continue;
+      }
+      if (!Mod.class.isAssignableFrom(clazz)) {
+        throw new ModException("Entrypoint class '" + className + "' in mod JAR '" + jarPath
+            + "' must implement " + Mod.class.getName());
+      }
+      if (clazz.isInterface() || Modifier.isAbstract(clazz.getModifiers())) {
+        throw new ModException("Entrypoint class '" + className + "' in mod JAR '" + jarPath
+            + "' must be a concrete class");
+      }
+      if (entrypoint != null) {
+        throw new ModException("Mod JAR '" + jarPath + "' declares multiple @Entrypoint classes: "
+            + entrypoint.getName() + " and " + className);
+      }
+
+      @SuppressWarnings("unchecked") Class<? extends Mod> modClass = (Class<? extends Mod>) clazz;
+      entrypoint = modClass;
+    }
+    if (entrypoint == null) {
+      throw new ModException("No class annotated with @Entrypoint found in mod JAR: " + jarPath);
+    }
+    return entrypoint;
+  }
+
+  /**
+   * Validates the metadata contract exposed by a mod main class.
+   *
+   * @param mod     the mod main class instance
+   * @param jarPath the JAR that supplied the mod
+   * @throws ModException if the mod identifier or a dependency identifier is blank
+   */
+  private static void validateMod(Mod mod, Path jarPath) {
+    if (mod.modId().isBlank()) {
+      throw new ModException("Mod main class '" + mod.getClass().getName() + "' in JAR '" + jarPath
+          + "' returned a blank mod identifier");
+    }
+    for (Dependency dependency : mod.dependencies()) {
+      if (dependency.modId().isBlank()) {
+        throw new ModException("Mod '" + mod.modId() + "' in JAR '" + jarPath
+            + "' declares a dependency with a blank identifier");
+      }
     }
   }
 
@@ -94,8 +163,8 @@ public final class ModLoader {
    * @return the mod, or {@code null}
    */
   @SuppressWarnings("all")
-  public @Nullable Mod get(String modId) {
-    return mods.getOrDefault(modId, null);
+  public @Nullable ModInstance get(String modId) {
+    return insts.getOrDefault(modId, null);
   }
 
   /**
@@ -103,8 +172,8 @@ public final class ModLoader {
    *
    * @return an unmodifiable collection of mods
    */
-  public Collection<Mod> all() {
-    return List.copyOf(mods.values());
+  public Collection<ModInstance> all() {
+    return List.copyOf(insts.values());
   }
 
   /**
@@ -112,7 +181,7 @@ public final class ModLoader {
    *
    * @return the single core mod, or {@code null}
    */
-  public @Nullable Mod coreMod() {
+  public @Nullable ModInstance coreMod() {
     return core;
   }
 
@@ -123,7 +192,7 @@ public final class ModLoader {
    * @param clazz the class to look up
    * @return the owning mod, or {@code null}
    */
-  public @Nullable Mod forClass(Class<?> clazz) {
+  public @Nullable ModInstance forClass(Class<?> clazz) {
     ClassLoader loader = clazz.getClassLoader();
     if (loader == null) {
       return null;
@@ -134,73 +203,69 @@ public final class ModLoader {
   /**
    * Loads a single mod from the given JAR file.
    *
-   * <p>The JAR must contain {@code mod.json} at its root. The entrypoint
-   * class (if declared) is loaded from the same JAR via a {@link URLClassLoader}. {@code @Subscribe} methods on the
-   * entrypoint are registered on both the mod's private event bus and the global event bus.
+   * <p>The JAR is scanned for one class annotated with {@link Entrypoint}. That
+   * class must implement {@link Mod}; it supplies the mod metadata and is loaded
+   * from the same JAR via a {@link URLClassLoader}. {@code @Subscribe} methods
+   * on the entrypoint are registered on both the mod's private event bus and the
+   * global event bus.
    *
    * @param jarPath path to the mod JAR file
    * @return the loaded mod
-   * @throws ModException if the JAR is missing, mod.json is invalid, or a mod with the same ID is already loaded
+   * @throws ModException if the JAR is missing, no valid entrypoint is found, or a mod with the same ID is already
+   *                      loaded
    */
-  public Mod load(Path jarPath) {
-    if (!Files.exists(jarPath)) {
+  public ModInstance load(Path jarPath) {
+    if (!Files.isRegularFile(jarPath)) {
       throw new ModException("Mod JAR not found: " + jarPath);
     }
 
-    String json;
-    try (JarFile jar = new JarFile(jarPath.toFile())) {
-      JarEntry entry = jar.getJarEntry("mod.json");
-      if (entry == null) {
-        throw new ModException("No mod.json in JAR: " + jarPath);
+    URLClassLoader classLoader = createClassLoader(jarPath);
+
+    try {
+      Class<? extends Mod> entrypointClass = findEntrypoint(jarPath, classLoader);
+      Mod result;
+      try {
+        result = entrypointClass.getDeclaredConstructor().newInstance();
+      } catch (ReflectiveOperationException e) {
+        throw new ModException("Failed to instantiate entrypoint '" + entrypointClass.getName()
+            + "'", e);
       }
-      json = new String(jar.getInputStream(entry).readAllBytes());
-    } catch (IOException e) {
-      throw new ModException("Failed to read mod.json from JAR: " + jarPath, e);
-    }
+      Mod entrypoint = result;
+      validateMod(entrypoint, jarPath);
 
-    ModInfo info = ModInfo.fromJson(json);
-    String modId = info.modId();
+      String modId = entrypoint.modId();
+      if (insts.containsKey(modId)) {
+        throw new ModException("Mod with id '" + modId + "' is already loaded");
+      }
 
-    if (mods.containsKey(modId)) {
-      throw new ModException("Mod with id '" + modId + "' is already loaded");
-    }
-
-    Namespace namespace = Namespace.of(modId);
-
-    Object entrypoint = null;
-    URLClassLoader classLoader = null;
-    if (info.hasProgram()) {
-      classLoader = createClassLoader(jarPath);
-      entrypoint = loadEntrypoint(classLoader, info);
-    }
-
-    Mod mod = new Mod(namespace, info, jarPath, entrypoint, classLoader);
-    mods.put(modId, mod);
-    if (classLoader != null) {
-      classLoaderMap.put(classLoader, mod);
-    }
-
-    if (info.isCoreMod()) {
-      /*
-       * There will be only ONE bottom core,
-       * serving as the application's core logic supplier.
-       * All other mods are expected to be built on it.
-       */
-      if (core != null) {
+      Namespace namespace = Namespace.of(modId);
+      boolean isCoreMod = entrypoint.isCoreMod();
+      if (isCoreMod && core != null) {
         throw new ModException("Core mod " + core.namespace() + " has already been loaded");
       }
-      core = mod;
-    }
 
-    if (entrypoint instanceof ModInitializer init) {
-      init.onPreLoad();
-    }
+      ModInstance mod = new ModInstance(namespace, entrypoint, jarPath, classLoader);
+      insts.put(modId, mod);
+      classLoaderMap.put(classLoader, mod);
 
-    if (entrypoint != null) {
-      scanSubscribers(mod, entrypoint);
-    }
+      if (isCoreMod) {
+        /*
+         * There will be only ONE bottom core,
+         * serving as the application's core logic supplier.
+         * All other mods are expected to be built on it.
+         */
+        core = mod;
+      }
 
-    return mod;
+      return mod;
+    } catch (RuntimeException e) {
+      try {
+        classLoader.close();
+      } catch (IOException closeException) {
+        e.addSuppressed(new ModException("Failed to close class loader for JAR: " + jarPath, closeException));
+      }
+      throw e;
+    }
   }
 
   /**
@@ -213,12 +278,12 @@ public final class ModLoader {
    * @return the list of loaded mods, in discovery order
    * @throws UncheckedIOException if an I/O error occurs while scanning
    */
-  public List<Mod> loadDirectory(Path modsDir) {
+  public List<ModInstance> loadDirectory(Path modsDir) {
     if (!Files.isDirectory(modsDir)) {
       return List.of();
     }
 
-    List<Mod> loaded = new ArrayList<>();
+    List<ModInstance> loaded = new ArrayList<>();
     try (Stream<Path> entries = Files.list(modsDir)) {
       List<Path> jars =
           entries.filter(Files::isRegularFile).filter(p -> p.getFileName().toString().endsWith(".jar")).sorted().toList();
@@ -233,78 +298,31 @@ public final class ModLoader {
   }
 
   /**
-   * Topologically sorts all loaded mods by their dependency graph using Kahn's algorithm.
-   *
-   * <p>After freezing, each entrypoint that implements {@link ModInitializer}
-   * has its {@code onPostLoad()} called in the sorted order.
+   * Topologically sorts all loaded mods by their dependency graph.
    *
    * @return the sorted list of mods in dependency-respecting load order
    * @throws ModException if a dependency cycle is detected or a required dependency is missing
    */
-  public List<Mod> freeze() {
-    Map<String, Mod> modMap = new HashMap<>(mods);
-    Map<String, Integer> inDegree = new HashMap<>();
-    Map<String, List<String>> adjacency = new HashMap<>();
+  @SuppressWarnings("all")
+  public List<ModInstance> freeze() {
+    Map<String, ModInstance> insts = new HashMap<>(this.insts);
 
-    for (Mod mod : modMap.values()) {
-      String id = mod.info().modId();
-      inDegree.putIfAbsent(id, 0);
-      for (Dependency dep : mod.info().dependencies()) {
-        if (!modMap.containsKey(dep.modId())) {
-          throw new ModException("Mod '" + id + "' depends on '" + dep.modId() + "', which is not loaded");
-        }
-        adjacency.computeIfAbsent(dep.modId(), k -> new ArrayList<>()).add(id);
-        inDegree.merge(id, 1, Integer::sum);
-      }
-    }
-
-    Deque<String> queue = new ArrayDeque<>();
-    for (Map.Entry<String, Integer> entry : inDegree.entrySet()) {
-      if (entry.getValue() == 0) {
-        queue.add(entry.getKey());
-      }
-    }
-
-    List<Mod> sorted = new ArrayList<>();
-    while (!queue.isEmpty()) {
-      String current = queue.poll();
-      Mod mod = modMap.get(current);
-      if (mod != null) {
-        sorted.add(mod);
-      }
-      for (String neighbor : adjacency.getOrDefault(current, List.of())) {
-        int newDegree = inDegree.merge(neighbor, -1, Integer::sum);
-        if (newDegree == 0) {
-          queue.add(neighbor);
+    for (Map.Entry<String, ModInstance> entry : insts.entrySet()) {
+      for (Dependency dep : entry.getValue().mod().dependencies()) {
+        ModInstance inst = insts.getOrDefault(dep.modId(), null);
+        SemanticVersion detectedVer = inst.mod().version();
+        if (inst == null || !dep.isSatisfiedBy(detectedVer)) {
+          throw dep.createNotSatisfiedException(inst.mod().modId(), detectedVer);
         }
       }
     }
 
-    if (sorted.size() != modMap.size()) {
-      throw new ModException("Dependency cycle detected among mods");
-    }
-
-    for (Mod mod : sorted) {
-      if (mod.entrypoint() instanceof ModInitializer init) {
-        init.onPostLoad();
-      }
-    }
-
-    return List.copyOf(sorted);
-  }
-
-  private void scanSubscribers(Mod mod, Object entrypoint) {
-    Class<?> clazz = entrypoint.getClass();
-    for (Method method : clazz.getDeclaredMethods()) {
-      if (method.getAnnotation(Subscribe.class) == null) {
-        continue;
-      }
-      if (Modifier.isStatic(method.getModifiers())) {
-        continue;
-      }
-      mod.eventBus().register(entrypoint);
-      globalEventBus.register(entrypoint);
-      return;
+    try {
+      final Function<String, List<String>> depSolver =
+          id -> Arrays.stream(insts.get(id).mod().dependencies()).map(Dependency::modId).toList();
+      return Mutil.topologicalSort(insts.keySet(), depSolver).stream().map(insts::get).toList();
+    } catch (IllegalStateException exception) {
+      throw new ModException("Dependency cycle detected among mods", exception);
     }
   }
 }

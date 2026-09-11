@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.text.raster;
 
-import io.viki.momentum.gfx.color.Gradient;
+import io.viki.momentum.gfx.tint.Gradient;
 
 /**
  * A glyph positioned by the layout pass, ready for rendering.

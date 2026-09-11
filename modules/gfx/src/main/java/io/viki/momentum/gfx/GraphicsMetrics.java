@@ -48,7 +48,7 @@ public final class GraphicsMetrics {
    * drawIndexedInstanced, and compute dispatches) submitted to the GPU.
    * <p>This is the most critical metric for assessing GPU workload.
    */
-  public static final LongAdder DCPT = new LongAdder();
+  public static final LongAdder Drawcalls = new LongAdder();
 
   /**
    * Total number of commands (opcodes) <b>recorded</b> by the Encoder.
@@ -56,17 +56,17 @@ public final class GraphicsMetrics {
    * as well as draw commands. It reflects the workload of the <b>producer thread</b>
    * (CPU-side command generation).
    */
-  public static final LongAdder ECMDPT = new LongAdder();
+  public static final LongAdder EncoderSum = new LongAdder();
 
   /**
    * Total number of commands <b>actually queued and executed</b> by the Device
    * (render thread).
    * <p>This represents the actual workload dispatched to the OpenGL driver
    * from the render thread's command queue. It can be used to compare against
-   * {@link #ECMDPT} to detect queue overflows, drops, or synchronization stalls
+   * {@link #EncoderSum} to detect queue overflows, drops, or synchronization stalls
    * between the producer and the consumer threads.
    */
-  public static final LongAdder DCMDPT = new LongAdder();
+  public static final LongAdder DeviceQueueSize = new LongAdder();
 
   private static long frameCount = 0L;
 
@@ -92,9 +92,9 @@ public final class GraphicsMetrics {
    * and minimize system call overhead in a tight rendering loop.
    */
   public static void dump() {
-    long dCptTotal = DCPT.sum();
-    long eCmpDtTotal = ECMDPT.sum();
-    long dCmpDtTotal = DCMDPT.sum();
+    long dCptTotal = Drawcalls.sum();
+    long eCmpDtTotal = EncoderSum.sum();
+    long dCmpDtTotal = DeviceQueueSize.sum();
     long currentFrameCount = frameCount;
 
     // Prevent division by zero if no frames were recorded
@@ -111,9 +111,9 @@ public final class GraphicsMetrics {
     System.out.println();
 
     // Reset counters and frame count for the next interval
-    DCPT.reset();
-    ECMDPT.reset();
-    DCMDPT.reset();
+    Drawcalls.reset();
+    EncoderSum.reset();
+    DeviceQueueSize.reset();
     frameCount = 0L;
   }
 }
