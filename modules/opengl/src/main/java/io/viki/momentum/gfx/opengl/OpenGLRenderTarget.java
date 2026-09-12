@@ -30,7 +30,7 @@ import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
 import io.viki.momentum.gfx.texture.TextureFilter;
-import io.viki.momentum.math.Box3D;
+import io.viki.momentum.math.Cube;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
 
@@ -172,7 +172,7 @@ public final class OpenGLRenderTarget implements RenderTarget {
     }
 
     @Override
-    public void submit(ByteBuffer data, Box3D region) {
+    public void submit(ByteBuffer data, Cube region) {
       int x = (int) region.minX();
       int y = (int) region.minY();
       int w = (int) region.width();

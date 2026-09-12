@@ -34,7 +34,7 @@ import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.gfx.util.VertexBuilder2D;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -116,7 +116,7 @@ public abstract class Graphics extends VertexBuilder2D implements AutoCloseable 
    *
    * @return the viewport
    */
-  public abstract Box2D currentViewport();
+  public abstract Rectangle currentViewport();
 
   /**
    * Replays the sections of the given mesh with the current render state.
@@ -163,7 +163,7 @@ public abstract class Graphics extends VertexBuilder2D implements AutoCloseable 
    *
    * @param box the viewport rectangle
    */
-  public abstract void setViewport(Box2D box);
+  public abstract void setViewport(Rectangle box);
 
   /**
    * Pushes a scissor rectangle in world coordinates, flushing pending draws first.
@@ -173,7 +173,7 @@ public abstract class Graphics extends VertexBuilder2D implements AutoCloseable 
    *
    * @param box the scissor rectangle in world coordinates
    */
-  public abstract void pushScissor(Box2D box);
+  public abstract void pushScissor(Rectangle box);
 
   /**
    * Disables the scissor test, flushing pending draws first.

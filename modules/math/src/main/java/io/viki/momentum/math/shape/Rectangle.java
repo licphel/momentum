@@ -22,7 +22,9 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.math;
+package io.viki.momentum.math.shape;
+
+import io.viki.momentum.math.Vector2;
 
 /**
  * Immutable axis-aligned 2D bounding box defined by min and max corners.
@@ -31,9 +33,12 @@ package io.viki.momentum.math;
  * @param minY minimum y coordinate (bottom)
  * @param maxX maximum x coordinate (right)
  * @param maxY maximum y coordinate (top)
+ *             <p>
+ *             Instances are immutable and thread-safe.
  */
-public record Box2D(float minX, float minY, float maxX, float maxY) {
-  public static final Box2D ZERO = new Box2D(0.0F, 0.0F, 0.0F, 0.0F);
+public record Rectangle(float minX, float minY, float maxX, float maxY) implements Shape<Rectangle> {
+  /** A zero-area rectangle whose coordinates are all zero. */
+  public static final Rectangle ZERO = new Rectangle(0.0F, 0.0F, 0.0F, 0.0F);
 
   /**
    * Creates a box from min and max corners.
@@ -41,7 +46,7 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param min minimum corner (inclusive)
    * @param max maximum corner (inclusive)
    */
-  public Box2D(Vector2 min, Vector2 max) {
+  public Rectangle(Vector2 min, Vector2 max) {
     this(min.x(), min.y(), max.x(), max.y());
   }
 
@@ -53,8 +58,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param height   box height
    * @return new box
    */
-  public static Box2D create(Vector2 position, float width, float height) {
-    return new Box2D(position.x(), position.y(), position.x() + width, position.y() + height);
+  public static Rectangle create(Vector2 position, float width, float height) {
+    return new Rectangle(position.x(), position.y(), position.x() + width, position.y() + height);
   }
 
   /**
@@ -64,8 +69,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param size     box size (width, height)
    * @return new box
    */
-  public static Box2D create(Vector2 position, Vector2 size) {
-    return new Box2D(position.x(), position.y(), position.x() + size.x(), position.y() + size.y());
+  public static Rectangle create(Vector2 position, Vector2 size) {
+    return new Rectangle(position.x(), position.y(), position.x() + size.x(), position.y() + size.y());
   }
 
   /**
@@ -76,10 +81,10 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param height full height
    * @return new box
    */
-  public static Box2D createCentral(Vector2 center, float width, float height) {
+  public static Rectangle createCentral(Vector2 center, float width, float height) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
-    return new Box2D(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
+    return new Rectangle(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
   }
 
   /**
@@ -89,10 +94,10 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param size   full size (width, height)
    * @return new box
    */
-  public static Box2D createCentral(Vector2 center, Vector2 size) {
+  public static Rectangle createCentral(Vector2 center, Vector2 size) {
     float halfW = size.x() * 0.5F;
     float halfH = size.y() * 0.5F;
-    return new Box2D(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
+    return new Rectangle(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
   }
 
   /**
@@ -101,7 +106,7 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param points array of points
    * @return bounding box
    */
-  public static Box2D createByPoints(Vector2[] points) {
+  public static Rectangle createByPoints(Vector2[] points) {
     float mnX = points[0].x();
     float mxX = points[0].x();
     float mnY = points[0].y();
@@ -112,7 +117,7 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
       mnY = Math.min(mnY, p.y());
       mxY = Math.max(mxY, p.y());
     }
-    return new Box2D(mnX, mnY, mxX, mxY);
+    return new Rectangle(mnX, mnY, mxX, mxY);
   }
 
   /**
@@ -124,8 +129,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param height box height
    * @return new box
    */
-  public static Box2D create(float x, float y, float width, float height) {
-    return new Box2D(x, y, x + width, y + height);
+  public static Rectangle create(float x, float y, float width, float height) {
+    return new Rectangle(x, y, x + width, y + height);
   }
 
   /**
@@ -137,10 +142,10 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param height full height
    * @return new box
    */
-  public static Box2D createCentral(float cx, float cy, float width, float height) {
+  public static Rectangle createCentral(float cx, float cy, float width, float height) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
-    return new Box2D(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
+    return new Rectangle(cx - halfW, cy - halfH, cx + halfW, cy + halfH);
   }
 
   /**
@@ -150,8 +155,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param b second box
    * @return intersecting box, or an empty box if they do not intersect
    */
-  public static Box2D getIntersection(Box2D a, Box2D b) {
-    return new Box2D(Math.max(a.minX, b.minX), Math.max(a.minY, b.minY), Math.min(a.maxX, b.maxX), Math.min(a.maxY,
+  public static Rectangle getIntersection(Rectangle a, Rectangle b) {
+    return new Rectangle(Math.max(a.minX, b.minX), Math.max(a.minY, b.minY), Math.min(a.maxX, b.maxX), Math.min(a.maxY,
         b.maxY));
   }
 
@@ -162,8 +167,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param b second box
    * @return union box
    */
-  public static Box2D getUnion(Box2D a, Box2D b) {
-    return new Box2D(Math.min(a.minX, b.minX), Math.min(a.minY, b.minY), Math.max(a.maxX, b.maxX), Math.max(a.maxY,
+  public static Rectangle getUnion(Rectangle a, Rectangle b) {
+    return new Rectangle(Math.min(a.minX, b.minX), Math.min(a.minY, b.minY), Math.max(a.maxX, b.maxX), Math.max(a.maxY,
         b.maxY));
   }
 
@@ -185,40 +190,39 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
     return maxY - minY;
   }
 
-  /**
-   * Returns the area of this box (width * height).
-   *
-   * @return area
-   */
+  @Override
   public float area() {
     return width() * height();
   }
 
-  /**
-   * Returns the center x coordinate.
-   *
-   * @return (min x + max x) / 2
-   */
+  @Override
   public float centralX() {
     return (minX + maxX) * 0.5F;
   }
 
-  /**
-   * Returns the center y coordinate.
-   *
-   * @return (min y + max y) / 2
-   */
+  @Override
   public float centralY() {
     return (minY + maxY) * 0.5F;
   }
 
-  /**
-   * Returns the center point of this box.
-   *
-   * @return center vector
-   */
+  @Override
   public Vector2 center() {
     return new Vector2(centralX(), centralY());
+  }
+
+  @Override
+  public boolean contains(float x, float y) {
+    return x >= minX && x <= maxX && y >= minY && y <= maxY;
+  }
+
+  @Override
+  public Rectangle scale(float sx, float sy) {
+    return new Rectangle(minX * sx, minY * sy, maxX * sx, maxY * sy);
+  }
+
+  @Override
+  public Rectangle translate(float tx, float ty) {
+    return new Rectangle(minX + tx, minY + ty, maxX + tx, maxY + ty);
   }
 
   /**
@@ -236,29 +240,8 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param o the other box
    * @return true if they intersect
    */
-  public boolean intersects(Box2D o) {
+  public boolean intersects(Rectangle o) {
     return minX < o.maxX && maxX > o.minX && minY < o.maxY && maxY > o.minY;
-  }
-
-  /**
-   * Returns whether this box contains the given point.
-   *
-   * @param x x coordinate
-   * @param y y coordinate
-   * @return true if point is inside
-   */
-  public boolean contains(float x, float y) {
-    return x >= minX && x <= maxX && y >= minY && y <= maxY;
-  }
-
-  /**
-   * Returns whether this box contains the given point.
-   *
-   * @param v the point
-   * @return true if point is inside
-   */
-  public boolean contains(Vector2 v) {
-    return contains(v.x(), v.y());
   }
 
   /**
@@ -267,7 +250,7 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param o the other box
    * @return true if {@code o} is inside this box
    */
-  public boolean contains(Box2D o) {
+  public boolean contains(Rectangle o) {
     return o.minX >= minX && o.maxX <= maxX && o.minY >= minY && o.maxY <= maxY;
   }
 
@@ -278,39 +261,17 @@ public record Box2D(float minX, float minY, float maxX, float maxY) {
    * @param dy amount to add to bottom and top
    * @return inflated box
    */
-  public Box2D inflate(float dx, float dy) {
-    return new Box2D(minX - dx, minY - dy, maxX + dx, maxY + dy);
+  public Rectangle inflate(float dx, float dy) {
+    return new Rectangle(minX - dx, minY - dy, maxX + dx, maxY + dy);
   }
 
   /**
-   * Returns a new box scaled by the given factors.
+   * Returns a new box inflated by the given amounts on each side.
    *
-   * @param sx x scale factor
-   * @param sy y scale factor
-   * @return scaled box
+   * @param v inflating vector
+   * @return inflated box
    */
-  public Box2D scale(float sx, float sy) {
-    return new Box2D(minX * sx, minY * sy, maxX * sx, maxY * sy);
-  }
-
-  /**
-   * Returns a new box translated by the given amounts.
-   *
-   * @param tx x translation
-   * @param ty y translation
-   * @return translated box
-   */
-  public Box2D translate(float tx, float ty) {
-    return new Box2D(minX + tx, minY + ty, maxX + tx, maxY + ty);
-  }
-
-  /**
-   * Returns a new box translated by the given vector.
-   *
-   * @param v translation vector
-   * @return translated box
-   */
-  public Box2D translate(Vector2 v) {
-    return translate(v.x(), v.y());
+  public Rectangle inflate(Vector2 v) {
+    return inflate(v.x(), v.y());
   }
 }

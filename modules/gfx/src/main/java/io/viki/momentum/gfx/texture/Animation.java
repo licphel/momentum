@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.texture;
 
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -97,7 +97,7 @@ public record Animation(List<Frame> frames, boolean loop) {
       for (int col = 0; col < cols; col++) {
         int x = offsetX + col * frameWidth;
         int y = offsetY + row * frameHeight;
-        TexturePart region = new TexturePart(sheet, Box2D.create(x, y, frameWidth, frameHeight));
+        TexturePart region = new TexturePart(sheet, Rectangle.create(x, y, frameWidth, frameHeight));
         frames.add(new Frame(region, duration));
       }
     }
@@ -154,7 +154,7 @@ public record Animation(List<Frame> frames, boolean loop) {
       for (int col = 0; col < cols; col += 2) {
         int x = offsetX + col * frameWidth;
         int y = offsetY + row * frameHeight;
-        TexturePart region = new TexturePart(sheet, Box2D.create(x, y, frameWidth, frameHeight));
+        TexturePart region = new TexturePart(sheet, Rectangle.create(x, y, frameWidth, frameHeight));
         frames.add(new Frame(region, duration));
       }
     }

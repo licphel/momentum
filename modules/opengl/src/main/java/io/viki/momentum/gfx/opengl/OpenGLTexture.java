@@ -29,7 +29,7 @@ import io.viki.momentum.gfx.io.ImageUtil;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
 import io.viki.momentum.gfx.texture.TextureType;
-import io.viki.momentum.math.Box3D;
+import io.viki.momentum.math.Cube;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
 
@@ -123,7 +123,7 @@ public final class OpenGLTexture implements Texture, Handle {
   }
 
   @Override
-  public void submit(ByteBuffer bytes, Box3D region) {
+  public void submit(ByteBuffer bytes, Cube region) {
     int x = (int) region.minX();
     int y = (int) region.minY();
     int z = (int) region.minZ();

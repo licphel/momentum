@@ -32,7 +32,7 @@ import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.texture.Drawable2D;
 import io.viki.momentum.gfx.util.Alignment;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.gfx.tint.Color;
 import org.jspecify.annotations.Nullable;
 
@@ -63,7 +63,7 @@ public final class Button extends Element {
   private @Nullable KeyCode keyboardKey;
   private @Nullable Runnable onClick;
 
-  public Button(Box2D bounds, Look look) {
+  public Button(Rectangle bounds, Look look) {
     super(bounds, look);
   }
 
@@ -101,7 +101,7 @@ public final class Button extends Element {
   }
 
   @Override
-  protected void drawSelf(Graphics graphics, Box2D area) {
+  protected void drawSelf(Graphics graphics, Rectangle area) {
     Object background = look().get(backgroundKey());
     if (background == null) {
       background = look().get(IDLE_BACKGROUND);

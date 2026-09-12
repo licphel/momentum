@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.texture;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.io.ImageInfo;
-import io.viki.momentum.math.Box2D;
-import io.viki.momentum.math.Box3D;
+import io.viki.momentum.math.shape.Rectangle;
+import io.viki.momentum.math.Cube;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -114,8 +114,8 @@ public final class TextureAtlas implements AutoCloseable {
       expand();
     }
 
-    texture.submit(pixels, Box3D.create(dst.x, dst.y, 0, dst.w, dst.h, 1));
-    return new TexturePart(ref, Box2D.create(dst.x, dst.y, dst.w, dst.h));
+    texture.submit(pixels, Cube.create(dst.x, dst.y, 0, dst.w, dst.h, 1));
+    return new TexturePart(ref, Rectangle.create(dst.x, dst.y, dst.w, dst.h));
   }
 
   /**

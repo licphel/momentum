@@ -30,7 +30,7 @@ import io.viki.momentum.gfx.text.FontMetrics;
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.harfbuzz.HarfbuzzShaper;
 import io.viki.momentum.gfx.tint.Gradient;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -312,11 +312,11 @@ public final class Rasterizer {
                                   boolean flipY) {
     if ((flags & Font.UNDERLINE) != 0) {
       float uy = flipY ? baseline - offsetU : baseline + offsetU;
-      out.add(new Raster.Stroke(Box2D.create(x, uy, width, thicknessU), gradient));
+      out.add(new Raster.Stroke(Rectangle.create(x, uy, width, thicknessU), gradient));
     }
     if ((flags & Font.STRIKETHROUGH) != 0) {
       float sy = flipY ? baseline - offsetS : baseline + offsetS;
-      out.add(new Raster.Stroke(Box2D.create(x, sy, width, thicknessS), gradient));
+      out.add(new Raster.Stroke(Rectangle.create(x, sy, width, thicknessS), gradient));
     }
   }
 
@@ -440,7 +440,7 @@ public final class Rasterizer {
       }
     }
 
-    Box2D bounds;
+    Rectangle bounds;
     if (bMinX == Float.MAX_VALUE) {
       float totalH = 0;
       for (LayoutRun run : layoutRuns) {
@@ -450,9 +450,9 @@ public final class Rasterizer {
           totalH = Math.max(totalH, Math.abs(run.lineTop()));
         }
       }
-      bounds = Box2D.create(0, 0, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, totalH));
+      bounds = Rectangle.create(0, 0, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, totalH));
     } else {
-      bounds = Box2D.create(bMinX, bMinY, bMaxX - bMinX, Math.max(1, bMaxY - bMinY));
+      bounds = Rectangle.create(bMinX, bMinY, bMaxX - bMinX, Math.max(1, bMaxY - bMinY));
     }
 
     // Entry bounds stay in pen/layout space — no global shift applied.
@@ -464,7 +464,7 @@ public final class Rasterizer {
         Literal lit = literals.get(lg.ownerIndex());
         Glyph g = lit.format().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
         GlyphBound gb = layoutBounds.get(gbIdx++);
-        Box2D vb = Box2D.create(gb.gx, gb.gy, gb.gw, gb.gh);
+        Rectangle vb = Rectangle.create(gb.gx, gb.gy, gb.gw, gb.gh);
         // charIndex: absolute index in mergedText
         int absCharIndex = run.textStart() + lg.start();
         entries.add(new Raster.Entry(g, lit.format().tint(), vb, lg.scale(), lit.meta(), absCharIndex));
@@ -613,7 +613,7 @@ public final class Rasterizer {
   }
 
   private Raster empty() {
-    return new Raster(new Raster.Entry[0], new Raster.Stroke[0], Box2D.ZERO, 0, flipY, new LayoutRun[0], "");
+    return new Raster(new Raster.Entry[0], new Raster.Stroke[0], Rectangle.ZERO, 0, flipY, new LayoutRun[0], "");
   }
 
   private record BreakPoint(int charOffset, float lineWidth, boolean hard) {

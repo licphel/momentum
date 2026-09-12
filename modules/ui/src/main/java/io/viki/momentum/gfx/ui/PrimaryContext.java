@@ -19,7 +19,7 @@ import io.viki.momentum.input.event.ScrollEvent;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.gfx.view.View;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;
 
@@ -126,7 +126,7 @@ public final class PrimaryContext implements AutoCloseable {
 
     Element captured = firstCapture();
     if (captured != null) {
-      Box2D absolute = captured.absoluteBounds();
+      Rectangle absolute = captured.absoluteBounds();
       setHovered(absolute.contains(pointerX, pointerY) ? captured : null);
       captured.onMouseMove(pointerX - absolute.minX(), pointerY - absolute.minY());
       return;
@@ -166,7 +166,7 @@ public final class PrimaryContext implements AutoCloseable {
     if (target == null) {
       target = routeMouseButton(targetCanvas, pointerX, pointerY, button, action, modifiers);
     } else {
-      Box2D absolute = target.absoluteBounds();
+      Rectangle absolute = target.absoluteBounds();
       target.onMouseButton(pointerX - absolute.minX(), pointerY - absolute.minY(), button, action,
           modifiers);
     }

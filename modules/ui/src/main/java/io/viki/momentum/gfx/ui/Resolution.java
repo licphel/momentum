@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.ui;
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 
 /**
@@ -48,7 +48,7 @@ public final class Resolution {
   private int width;
   private int height;
   private float scale;
-  private Box2D viewport;
+  private Rectangle viewport;
   private final Camera2D camera;
 
   private Resolution(int width, int height, float logicalWidth, float logicalHeight,
@@ -120,11 +120,11 @@ public final class Resolution {
     return camera;
   }
 
-  public Box2D viewport() {
+  public Rectangle viewport() {
     return viewport;
   }
 
-  public Box2D framebufferViewport() {
+  public Rectangle framebufferViewport() {
     return viewport;
   }
 
@@ -175,10 +175,10 @@ public final class Resolution {
         (float) (screen.y() * inputHeight / height));
   }
 
-  public Box2D logicalToScreen(Box2D box) {
+  public Rectangle logicalToScreen(Rectangle box) {
     Vector2 min = logicalToScreen(new Vector2(box.minX(), box.minY()));
     Vector2 max = logicalToScreen(new Vector2(box.maxX(), box.maxY()));
-    return new Box2D(min.x(), min.y(), max.x(), max.y());
+    return new Rectangle(min.x(), min.y(), max.x(), max.y());
   }
 
   public Vector2 project(Vector2 logicalPoint) {
@@ -208,7 +208,7 @@ public final class Resolution {
     }
     float width = logicalWidth * scale;
     float height = logicalHeight * scale;
-    viewport = Box2D.create((this.width - width) * 0.5F, (this.height - height) * 0.5F, width, height);
+    viewport = Rectangle.create((this.width - width) * 0.5F, (this.height - height) * 0.5F, width, height);
     apply(camera);
   }
 

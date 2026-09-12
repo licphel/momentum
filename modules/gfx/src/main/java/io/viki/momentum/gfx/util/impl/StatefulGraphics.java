@@ -33,7 +33,7 @@ import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.util.VertexStore;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
@@ -56,7 +56,7 @@ abstract class StatefulGraphics extends Graphics {
   protected @Nullable Camera2D camera;
   protected @Nullable Sampler sampler;
   protected @Nullable RenderTarget renderTarget;
-  protected Box2D viewport = Box2D.ZERO;
+  protected Rectangle viewport = Rectangle.ZERO;
   protected Scissor scissor = Scissor.DISABLED;
 
   /**
@@ -116,12 +116,12 @@ abstract class StatefulGraphics extends Graphics {
   }
 
   @Override
-  public Box2D currentViewport() {
+  public Rectangle currentViewport() {
     return viewport;
   }
 
   @Override
-  public void setViewport(Box2D vp) {
+  public void setViewport(Rectangle vp) {
     viewport = vp;
   }
 
@@ -135,7 +135,7 @@ abstract class StatefulGraphics extends Graphics {
    * @throws GraphicsException if no camera is set
    */
   @Override
-  public void pushScissor(Box2D worldBox) {
+  public void pushScissor(Rectangle worldBox) {
     if (camera == null) {
       throw new GraphicsException("Cannot scissor without a camera set");
     }

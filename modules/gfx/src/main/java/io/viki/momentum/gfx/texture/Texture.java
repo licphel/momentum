@@ -28,7 +28,7 @@ import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.io.ImageInfo;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.shader.ResourceSet;
-import io.viki.momentum.math.Box3D;
+import io.viki.momentum.math.Cube;
 
 import java.nio.ByteBuffer;
 
@@ -42,7 +42,7 @@ import java.nio.ByteBuffer;
  * <p><b>Lifecycle:</b>
  * <ol>
  *   <li>Create with {@link Device#getTexture device.createTexture(desc)}.
- *   <li>Optionally upload pixel data with {@link #submit(byte[], Box3D)}.
+ *   <li>Optionally upload pixel data with {@link #submit(byte[], Cube)}.
  *   <li>Bind to a {@link ResourceSet} for use in draw calls.
  *   <li>Use {@link #blit} to copy regions between textures.
  *   <li>Call {@link #close()} when the texture is no longer needed.
@@ -155,7 +155,7 @@ public interface Texture extends FragileTexture, AutoCloseable {
    * @param data   raw pixel bytes in the texture's format
    * @param region the target sub-region in texel coordinates (x, y, z, width, height, depth)
    */
-  default void submit(byte[] data, Box3D region) {
+  default void submit(byte[] data, Cube region) {
     submit(ByteBuffer.wrap(data), region);
   }
 
@@ -171,7 +171,7 @@ public interface Texture extends FragileTexture, AutoCloseable {
    * @param data   raw pixel bytes in the texture's format
    * @param region the target sub-region in texel coordinates (x, y, z, width, height, depth)
    */
-  void submit(ByteBuffer data, Box3D region);
+  void submit(ByteBuffer data, Cube region);
 
   /**
    * Blits (copies) a rectangular region of this texture into another texture.

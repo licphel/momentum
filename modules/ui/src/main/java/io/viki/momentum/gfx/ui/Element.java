@@ -6,7 +6,7 @@
 package io.viki.momentum.gfx.ui;
 
 import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -20,7 +20,7 @@ import java.util.List;
  * drawing, tree mutation, and input callbacks must run on the owning view thread.
  */
 public abstract class Element implements InputListener {
-  private Box2D bounds;
+  private Rectangle bounds;
   private Look look;
   private final List<Element> children = new ArrayList<>();
   private final List<Element> parts = new ArrayList<>();
@@ -28,16 +28,16 @@ public abstract class Element implements InputListener {
   private final List<Element> partsView = Collections.unmodifiableList(parts);
   private @Nullable Element parent;
 
-  protected Element(Box2D bounds, Look look) {
+  protected Element(Rectangle bounds, Look look) {
     this.bounds = bounds;
     this.look = look;
   }
 
-  public Box2D bounds() {
+  public Rectangle bounds() {
     return bounds;
   }
 
-  public Box2D absoluteBounds() {
+  public Rectangle absoluteBounds() {
     float minX = bounds.minX();
     float minY = bounds.minY();
     @Nullable Element ancestor = parent;
@@ -46,10 +46,10 @@ public abstract class Element implements InputListener {
       minY += ancestor.bounds.minY();
       ancestor = ancestor.parent;
     }
-    return Box2D.create(minX, minY, bounds.width(), bounds.height());
+    return Rectangle.create(minX, minY, bounds.width(), bounds.height());
   }
 
-  public void setBounds(Box2D value) {
+  public void setBounds(Rectangle value) {
     bounds = value;
   }
 
@@ -68,15 +68,15 @@ public abstract class Element implements InputListener {
   }
 
   public void draw(Graphics graphics) {
-    Box2D absolute = absoluteBounds();
+    Rectangle absolute = absoluteBounds();
     drawAt(graphics, absolute.minX() - bounds.minX(), absolute.minY() - bounds.minY());
   }
 
-  protected void drawSelf(Graphics graphics, Box2D absoluteBounds) {
+  protected void drawSelf(Graphics graphics, Rectangle absoluteBounds) {
   }
 
   protected final void drawChildren(Graphics graphics) {
-    Box2D absolute = absoluteBounds();
+    Rectangle absolute = absoluteBounds();
     drawChildren(graphics, absolute.minX(), absolute.minY());
   }
 
@@ -152,7 +152,7 @@ public abstract class Element implements InputListener {
   }
 
   private void drawAt(Graphics graphics, float parentX, float parentY) {
-    Box2D absolute = Box2D.create(parentX + bounds.minX(), parentY + bounds.minY(),
+    Rectangle absolute = Rectangle.create(parentX + bounds.minX(), parentY + bounds.minY(),
         bounds.width(), bounds.height());
     drawSelf(graphics, absolute);
     drawChildren(graphics, absolute.minX(), absolute.minY());

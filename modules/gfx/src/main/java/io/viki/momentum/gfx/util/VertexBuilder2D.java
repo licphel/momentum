@@ -33,7 +33,8 @@ import io.viki.momentum.gfx.texture.Drawable2D;
 import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TexturePart;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Poly;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.util.FastTrigonometric;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.Vector3;
@@ -150,7 +151,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param dst the destination rectangle in world units
    * @param src the source region in texel coordinates
    */
-  public void drawTexture(@Nullable FragileTexture tex, Box2D dst, Box2D src) {
+  public void drawTexture(@Nullable FragileTexture tex, Rectangle dst, Rectangle src) {
     if (tex == null) {
       return;
     }
@@ -164,7 +165,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param tex the texture to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    */
-  public void drawTexture(@Nullable FragileTexture tex, Box2D dst) {
+  public void drawTexture(@Nullable FragileTexture tex, Rectangle dst) {
     if (tex == null) {
       return;
     }
@@ -172,7 +173,7 @@ public class VertexBuilder2D extends VertexBuilder {
     if (pinned == null) {
       return;
     }
-    drawTexture(tex, dst, Box2D.create(0.0F, 0.0F, pinned.width(), pinned.height()));
+    drawTexture(tex, dst, Rectangle.create(0.0F, 0.0F, pinned.width(), pinned.height()));
   }
 
   /**
@@ -201,7 +202,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param texPart the texture part providing the source texture and region
    * @param dst     the destination rectangle in world units
    */
-  public void drawTexture(@Nullable TexturePart texPart, Box2D dst) {
+  public void drawTexture(@Nullable TexturePart texPart, Rectangle dst) {
     if (texPart == null) {
       return;
     }
@@ -217,7 +218,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param dst     the destination rectangle in world units
    * @param src     the source region relative to the texture part's UV origin, in texels
    */
-  public void drawTexture(@Nullable TexturePart texPart, Box2D dst, Box2D src) {
+  public void drawTexture(@Nullable TexturePart texPart, Rectangle dst, Rectangle src) {
     if (texPart == null) {
       return;
     }
@@ -269,7 +270,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param t   the drawable to draw; does nothing if {@code null}
    * @param dst the destination rectangle in world units
    */
-  public void draw(@Nullable Drawable2D t, Box2D dst) {
+  public void draw(@Nullable Drawable2D t, Rectangle dst) {
     if (t == null) {
       return;
     }
@@ -283,7 +284,7 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param dst the destination rectangle in world units
    * @param src the source region in texel coordinates
    */
-  public void draw(@Nullable Drawable2D t, Box2D dst, Box2D src) {
+  public void draw(@Nullable Drawable2D t, Rectangle dst, Rectangle src) {
     if (t == null) {
       return;
     }
@@ -349,7 +350,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param dst the destination rectangle in world units
    */
-  public void drawRectangle(Box2D dst) {
+  public void drawRectangle(Rectangle dst) {
     drawRectangle(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
@@ -373,7 +374,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param dst the destination rectangle in world units
    */
-  public void drawRectangleFrame(Box2D dst) {
+  public void drawRectangleFrame(Rectangle dst) {
     drawRectangleFrame(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
@@ -516,7 +517,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param dst the bounding box in world units
    */
-  public void drawOval(Box2D dst) {
+  public void drawOval(Rectangle dst) {
     drawOval(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
@@ -558,7 +559,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param dst the bounding box in world units
    */
-  public void drawOvalFrame(Box2D dst) {
+  public void drawOvalFrame(Rectangle dst) {
     drawOvalFrame(dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
@@ -600,7 +601,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param vertices the polygon vertices in winding order
    */
-  public void drawPolygon(Vector2... vertices) {
+  public void drawPoly(Vector2... vertices) {
     if (vertices.length < 3) {
       return;
     }
@@ -617,7 +618,7 @@ public class VertexBuilder2D extends VertexBuilder {
    *
    * @param vertices the polygon vertices in winding order
    */
-  public void drawPolygonFrame(Vector2... vertices) {
+  public void drawPolyFrame(Vector2... vertices) {
     if (vertices.length < 2) {
       return;
     }
@@ -625,6 +626,55 @@ public class VertexBuilder2D extends VertexBuilder {
       Vector2 a = vertices[i];
       Vector2 b = vertices[(i + 1) % vertices.length];
       drawLine(a, b);
+    }
+  }
+
+  /**
+   * Draws a filled polygon from its convex components.
+   *
+   * <p>Each convex component is triangulated as a fan around its first vertex. Empty polygons
+   * produce no vertices.
+   *
+   * @param poly the polygon to draw
+   */
+  public void drawPoly(Poly poly) {
+    for (int convexIndex = 0; convexIndex < poly.convexCount(); convexIndex++) {
+      int vertexCount = poly.vertexCount(convexIndex);
+      if (vertexCount < 3) {
+        continue;
+      }
+
+      float firstX = poly.vertexX(convexIndex, 0);
+      float firstY = poly.vertexY(convexIndex, 0);
+      for (int vertexIndex = 1; vertexIndex < vertexCount - 1; vertexIndex++) {
+        drawTriangle(firstX, firstY,
+            poly.vertexX(convexIndex, vertexIndex), poly.vertexY(convexIndex, vertexIndex),
+            poly.vertexX(convexIndex, vertexIndex + 1), poly.vertexY(convexIndex, vertexIndex + 1));
+      }
+    }
+  }
+
+  /**
+   * Draws the outline of each convex component in a polygon as closed line loops.
+   *
+   * <p>For a concave or compound polygon, shared or decomposition edges are drawn as part of
+   * the individual component outlines.
+   *
+   * @param poly the polygon to outline
+   */
+  public void drawPolyFrame(Poly poly) {
+    for (int convexIndex = 0; convexIndex < poly.convexCount(); convexIndex++) {
+      int vertexCount = poly.vertexCount(convexIndex);
+      if (vertexCount < 2) {
+        continue;
+      }
+
+      for (int vertexIndex = 0; vertexIndex < vertexCount; vertexIndex++) {
+        int nextIndex = (vertexIndex + 1) % vertexCount;
+        drawLine(
+            poly.vertexX(convexIndex, vertexIndex), poly.vertexY(convexIndex, vertexIndex),
+            poly.vertexX(convexIndex, nextIndex), poly.vertexY(convexIndex, nextIndex));
+      }
     }
   }
 
@@ -646,7 +696,7 @@ public class VertexBuilder2D extends VertexBuilder {
     }
 
     Raster raster = text.raster();
-    Box2D rasterBd = raster.bounds();
+    Rectangle rasterBd = raster.bounds();
 
     float tx = x;
     float ty = y;
@@ -672,13 +722,13 @@ public class VertexBuilder2D extends VertexBuilder {
 
       // Bearings are baked in (gx, gy, pixelW, pixelH)
       setTint(entry.gradient());
-      Box2D bounds = entry.bounds();
+      Rectangle bounds = entry.bounds();
       drawTexture(cg.texPart(), tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
     }
 
     for (Raster.Stroke stroke : raster.strokes()) {
       setTint(stroke.gradient());
-      Box2D bounds = stroke.bounds();
+      Rectangle bounds = stroke.bounds();
       drawRectangle(tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
     }
 

@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.texture;
 
 import io.viki.momentum.gfx.util.VertexBuilder2D;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
  * A classic 9-patch image that scales to fill an arbitrary destination rectangle without distorting the borders.
@@ -115,7 +115,7 @@ public final class NinePatches implements Drawable2D {
   private static TexturePart slice(TexturePart texPart, float u, float v, float w, float h) {
     float w0 = texPart.width();
     float h0 = texPart.height();
-    return new TexturePart(texPart, Box2D.create(w0 * u, h0 * v, w0 * w, h0 * h));
+    return new TexturePart(texPart, Rectangle.create(w0 * u, h0 * v, w0 * w, h0 * h));
   }
 
   /**

@@ -213,14 +213,14 @@ public final class Frustum {
    *
    * @return bounding box
    */
-  public Box3D boundingBox() {
+  public Cube boundingBox() {
     Vector3 min = corners[0];
     Vector3 max = corners[0];
     for (int i = 1; i < 8; i++) {
       min = Vector3.min(min, corners[i]);
       max = Vector3.max(max, corners[i]);
     }
-    return new Box3D(min.x(), min.y(), min.z(), max.x(), max.y(), max.z());
+    return new Cube(min.x(), min.y(), min.z(), max.x(), max.y(), max.z());
   }
 
   /**
@@ -264,7 +264,7 @@ public final class Frustum {
    * @param box the box to test
    * @return {@code -1} if completely outside, {@code 0} if intersecting, {@code 1} if completely inside
    */
-  public int testBox(Box3D box) {
+  public int testBox(Cube box) {
     int result = 1;
     for (int i = 0; i < 6; i++) {
       Plane p = planes[i];
@@ -288,7 +288,7 @@ public final class Frustum {
    * @param box the box to test
    * @return true if the box is fully inside (not intersecting boundaries)
    */
-  public boolean containsBox(Box3D box) {
+  public boolean containsBox(Cube box) {
     for (int i = 0; i < 6; i++) {
       Plane p = planes[i];
       Vector3 pos = new Vector3(p.normal().x() > 0 ? box.maxX() : box.minX(), p.normal().y() > 0 ? box.maxY() :

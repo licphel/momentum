@@ -28,6 +28,7 @@ import io.viki.momentum.math.*;
 import io.viki.momentum.math.Frustum;
 import io.viki.momentum.math.Quaternion;
 import io.viki.momentum.math.Ray;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
  * Abstract base class for a 3D camera (Y-up convention).
@@ -285,7 +286,7 @@ public abstract class Camera3D {
    * @param out           receives {@code [screenX, screenY, depth]}; depth is in NDC Z range (0..1)
    * @return {@code true} if the point is within the NDC cube and the result is valid
    */
-  public boolean project(Vector3 worldPosition, Box2D viewport, float[] out) {
+  public boolean project(Vector3 worldPosition, Rectangle viewport, float[] out) {
     Matrix4x4 vp = getViewProjectionMatrix();
     Vector4 clip = vp.transform(new Vector4(worldPosition, 1.0F));
 
@@ -316,7 +317,7 @@ public abstract class Camera3D {
    * @param viewport       viewport rectangle (Y-down)
    * @return unprojected world ray
    */
-  public Ray unproject(Vector2 screenPosition, Box2D viewport) {
+  public Ray unproject(Vector2 screenPosition, Rectangle viewport) {
     return Ray.createFromScreen(screenPosition.x(), screenPosition.y(), viewport.width(), viewport.height(),
         getProjectionMatrix(), getViewMatrix());
   }

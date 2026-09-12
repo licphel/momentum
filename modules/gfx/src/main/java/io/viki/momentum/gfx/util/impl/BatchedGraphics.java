@@ -39,7 +39,7 @@ import io.viki.momentum.gfx.shader.*;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.util.VertexStore;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.resource.Resource;
 
@@ -174,7 +174,7 @@ public class BatchedGraphics extends StatefulGraphics {
       renderTarget = device.getSwapchain();
     }
     RenderTarget rt = renderTarget;
-    viewport = Box2D.create(0, 0, rt.width(), rt.height());
+    viewport = Rectangle.create(0, 0, rt.width(), rt.height());
     data.clear();
     currentPrimitive = null;
     currentTexture = null;

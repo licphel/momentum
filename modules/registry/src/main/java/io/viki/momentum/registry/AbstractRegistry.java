@@ -77,6 +77,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
     RegistryContext ctx = value.getRegistryContext();
     ctx.putId(id);
     ctx.putIndex(nextId.getAndIncrement());
+    ctx.putRegistry(this);
     return value;
   }
 

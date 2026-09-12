@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.texture;
 
 import io.viki.momentum.gfx.util.VertexBuilder2D;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -42,14 +42,14 @@ import org.jspecify.annotations.Nullable;
  * @param fragile the fragile reference to the source texture
  * @param region  the region within the texture in texel coordinates
  */
-public record TexturePart(FragileTexture fragile, Box2D region) implements Drawable2D {
+public record TexturePart(FragileTexture fragile, Rectangle region) implements Drawable2D {
   /**
    * Creates a {@code TexturePart} covering the entire texture.
    *
    * @param tex the source texture
    */
   public TexturePart(Texture tex) {
-    this(tex, Box2D.create(0, 0, tex.width(), tex.height()));
+    this(tex, Rectangle.create(0, 0, tex.width(), tex.height()));
   }
 
   /**
@@ -58,7 +58,7 @@ public record TexturePart(FragileTexture fragile, Box2D region) implements Drawa
    * @param parent         the parent texture part
    * @param relativeRegion the region relative to the parent's origin, in texels
    */
-  public TexturePart(TexturePart parent, Box2D relativeRegion) {
+  public TexturePart(TexturePart parent, Rectangle relativeRegion) {
     this(parent.fragile, relativeRegion.translate(parent.region.minX(), parent.region.minY()));
   }
 

@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.math;
 
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.Vector3;
@@ -243,7 +243,7 @@ public class Camera2D {
    * @param viewport screen rectangle (x, y, width, height)
    * @return screen-space position in pixels
    */
-  public Vector2 project(Vector2 worldPos, Box2D viewport) {
+  public Vector2 project(Vector2 worldPos, Rectangle viewport) {
     Vector3 clip = viewProjectionMatrix().transform(new Vector3(worldPos));
     float sx = (clip.x() * 0.5F + 0.5F) * viewport.width() + viewport.minX();
     float sy = (1.0F - (clip.y() * 0.5F + 0.5F)) * viewport.height() + viewport.minY();
@@ -257,7 +257,7 @@ public class Camera2D {
    * @param viewport  screen rectangle (x, y, width, height)
    * @return world-space position
    */
-  public Vector2 unproject(Vector2 screenPos, Box2D viewport) {
+  public Vector2 unproject(Vector2 screenPos, Rectangle viewport) {
     float ndcX = 2.0F * (screenPos.x() - viewport.minX()) / viewport.width() - 1.0F;
     float ndcY = -2.0F * (screenPos.y() - viewport.minY()) / viewport.height() + 1.0F;
     Vector3 world = viewProjectionMatrix().invert().transform(new Vector3(ndcX, ndcY, 0.0F));

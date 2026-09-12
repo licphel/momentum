@@ -98,7 +98,7 @@ public record Sphere(Vector3 center, float radius) {
    * @param box the box
    * @return bounding sphere
    */
-  public static Sphere createFromBox(Box3D box) {
+  public static Sphere createFromBox(Cube box) {
     return new Sphere(box.center(), box.size().length() * 0.5F);
   }
 
@@ -154,8 +154,8 @@ public record Sphere(Vector3 center, float radius) {
    *
    * @return bounding box
    */
-  public Box3D boundingBox() {
-    return new Box3D(center.x() - radius, center.y() - radius, center.z() - radius, center.x() + radius,
+  public Cube boundingBox() {
+    return new Cube(center.x() - radius, center.y() - radius, center.z() - radius, center.x() + radius,
         center.y() + radius, center.z() + radius);
   }
 
@@ -197,7 +197,7 @@ public record Sphere(Vector3 center, float radius) {
    * @param box the box
    * @return true if they intersect
    */
-  public boolean intersects(Box3D box) {
+  public boolean intersects(Cube box) {
     float dx = Math.max(0.0F, Math.max(box.minX() - center.x(), center.x() - box.maxX()));
     float dy = Math.max(0.0F, Math.max(box.minY() - center.y(), center.y() - box.maxY()));
     float dz = Math.max(0.0F, Math.max(box.minZ() - center.z(), center.z() - box.maxZ()));

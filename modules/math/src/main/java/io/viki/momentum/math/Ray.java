@@ -167,7 +167,7 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param box the box to test
    * @return ray parameter {@code t} at the entry, or {@code Float.NaN}
    */
-  public float intersectsBox(Box3D box) {
+  public float intersectsBox(Cube box) {
     float tmin = Float.NEGATIVE_INFINITY;
     float tmax = Float.POSITIVE_INFINITY;
 

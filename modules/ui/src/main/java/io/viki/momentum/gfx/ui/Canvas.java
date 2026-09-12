@@ -8,7 +8,7 @@ package io.viki.momentum.gfx.ui;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.gfx.view.View;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;
 
@@ -24,7 +24,7 @@ public final class Canvas extends Element implements AutoCloseable {
   private boolean closed;
 
   public Canvas(PrimaryContext context, Look look) {
-    super(Box2D.create(Vector2.ZERO, context.getLogicalSize()), look);
+    super(Rectangle.create(Vector2.ZERO, context.getLogicalSize()), look);
     this.context = context;
     context.bind(this);
   }

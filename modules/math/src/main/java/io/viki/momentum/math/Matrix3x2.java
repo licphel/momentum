@@ -24,6 +24,7 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
@@ -218,7 +219,7 @@ public record Matrix3x2(float m00, float m10, float m01, float m11, float m02, f
    * @param dst destination rectangle
    * @return mapping matrix
    */
-  public static Matrix3x2 createRectMapping(Box2D src, Box2D dst) {
+  public static Matrix3x2 createRectMapping(Rectangle src, Rectangle dst) {
     float sx = (dst.maxX() - dst.minX()) / (src.maxX() - src.minX());
     float sy = (dst.maxY() - dst.minY()) / (src.maxY() - src.minY());
     float tx = dst.minX() - src.minX() * sx;
@@ -367,7 +368,7 @@ public record Matrix3x2(float m00, float m10, float m01, float m11, float m02, f
    * @param box the box to transform
    * @return the transformed bounding box
    */
-  public Box2D transform(Box2D box) {
+  public Rectangle transform(Rectangle box) {
     float x1 = m00 * box.minX() + m01 * box.maxY() + m02;
     float y1 = m10 * box.minX() + m11 * box.maxY() + m12;
     float x2 = m00 * box.maxX() + m01 * box.maxY() + m02;
@@ -380,7 +381,7 @@ public record Matrix3x2(float m00, float m10, float m01, float m11, float m02, f
     float minY = Math.min(Math.min(y1, y2), Math.min(y3, y4));
     float maxX = Math.max(Math.max(x1, x2), Math.max(x3, x4));
     float maxY = Math.max(Math.max(y1, y2), Math.max(y3, y4));
-    return new Box2D(minX, minY, maxX, maxY);
+    return new Rectangle(minX, minY, maxX, maxY);
   }
 
   /**

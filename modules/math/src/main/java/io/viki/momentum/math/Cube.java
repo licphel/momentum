@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.shape.Rectangle;
+
 /**
  * Immutable axis-aligned 3D bounding box defined by min and max corners.
  *
@@ -34,8 +36,8 @@ package io.viki.momentum.math;
  * @param maxY maximum y coordinate
  * @param maxZ maximum z coordinate
  */
-public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
-  public static final Box3D ZERO = new Box3D(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
+public record Cube(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+  public static final Cube ZERO = new Cube(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
   /**
    * Creates a box from min and max corners.
@@ -43,7 +45,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param min minimum corner (inclusive)
    * @param max maximum corner (inclusive)
    */
-  public Box3D(Vector3 min, Vector3 max) {
+  public Cube(Vector3 min, Vector3 max) {
     this(min.x(), min.y(), min.z(), max.x(), max.y(), max.z());
   }
 
@@ -56,8 +58,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param depth    box depth
    * @return new box
    */
-  public static Box3D create(Vector3 position, float width, float height, float depth) {
-    return new Box3D(position.x(), position.y(), position.z(), position.x() + width, position.y() + height,
+  public static Cube create(Vector3 position, float width, float height, float depth) {
+    return new Cube(position.x(), position.y(), position.z(), position.x() + width, position.y() + height,
         position.z() + depth);
   }
 
@@ -68,8 +70,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param size     box size (width, height, depth)
    * @return new box
    */
-  public static Box3D create(Vector3 position, Vector3 size) {
-    return new Box3D(position.x(), position.y(), position.z(),
+  public static Cube create(Vector3 position, Vector3 size) {
+    return new Cube(position.x(), position.y(), position.z(),
         position.x() + size.x(), position.y() + size.y(), position.z() + size.z());
   }
 
@@ -82,11 +84,11 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param depth  full depth
    * @return new box
    */
-  public static Box3D createCentral(Vector3 center, float width, float height, float depth) {
+  public static Cube createCentral(Vector3 center, float width, float height, float depth) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     float halfD = depth * 0.5F;
-    return new Box3D(center.x() - halfW, center.y() - halfH, center.z() - halfD,
+    return new Cube(center.x() - halfW, center.y() - halfH, center.z() - halfD,
         center.x() + halfW, center.y() + halfH, center.z() + halfD);
   }
 
@@ -97,11 +99,11 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param size   full size (width, height, depth)
    * @return new box
    */
-  public static Box3D createCentral(Vector3 center, Vector3 size) {
+  public static Cube createCentral(Vector3 center, Vector3 size) {
     float halfW = size.x() * 0.5F;
     float halfH = size.y() * 0.5F;
     float halfD = size.z() * 0.5F;
-    return new Box3D(center.x() - halfW, center.y() - halfH, center.z() - halfD,
+    return new Cube(center.x() - halfW, center.y() - halfH, center.z() - halfD,
         center.x() + halfW, center.y() + halfH, center.z() + halfD);
   }
 
@@ -111,7 +113,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param points array of points
    * @return bounding box
    */
-  public static Box3D createByPoints(Vector3[] points) {
+  public static Cube createByPoints(Vector3[] points) {
     float mnX = points[0].x();
     float mxX = points[0].x();
     float mnY = points[0].y();
@@ -126,7 +128,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
       mnZ = Math.min(mnZ, p.z());
       mxZ = Math.max(mxZ, p.z());
     }
-    return new Box3D(mnX, mnY, mnZ, mxX, mxY, mxZ);
+    return new Cube(mnX, mnY, mnZ, mxX, mxY, mxZ);
   }
 
   /**
@@ -140,8 +142,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param depth  box depth
    * @return new box
    */
-  public static Box3D create(float x, float y, float z, float width, float height, float depth) {
-    return new Box3D(x, y, z, x + width, y + height, z + depth);
+  public static Cube create(float x, float y, float z, float width, float height, float depth) {
+    return new Cube(x, y, z, x + width, y + height, z + depth);
   }
 
   /**
@@ -155,11 +157,11 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param depth  full depth
    * @return new box
    */
-  public static Box3D createCentral(float cx, float cy, float cz, float width, float height, float depth) {
+  public static Cube createCentral(float cx, float cy, float cz, float width, float height, float depth) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     float halfD = depth * 0.5F;
-    return new Box3D(cx - halfW, cy - halfH, cz - halfD, cx + halfW, cy + halfH, cz + halfD);
+    return new Cube(cx - halfW, cy - halfH, cz - halfD, cx + halfW, cy + halfH, cz + halfD);
   }
 
   /**
@@ -169,8 +171,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param b second box
    * @return intersecting box, or an empty box if they do not intersect
    */
-  public static Box3D getIntersection(Box3D a, Box3D b) {
-    return new Box3D(Math.max(a.minX, b.minX), Math.max(a.minY, b.minY), Math.max(a.minZ, b.minZ), Math.min(a.maxX,
+  public static Cube getIntersection(Cube a, Cube b) {
+    return new Cube(Math.max(a.minX, b.minX), Math.max(a.minY, b.minY), Math.max(a.minZ, b.minZ), Math.min(a.maxX,
         b.maxX), Math.min(a.maxY, b.maxY), Math.min(a.maxZ, b.maxZ));
   }
 
@@ -181,8 +183,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param b second box
    * @return union box
    */
-  public static Box3D getUnion(Box3D a, Box3D b) {
-    return new Box3D(Math.min(a.minX, b.minX), Math.min(a.minY, b.minY), Math.min(a.minZ, b.minZ), Math.max(a.maxX,
+  public static Cube getUnion(Cube a, Cube b) {
+    return new Cube(Math.min(a.minX, b.minX), Math.min(a.minY, b.minY), Math.min(a.minZ, b.minZ), Math.max(a.maxX,
         b.maxX), Math.max(a.maxY, b.maxY), Math.max(a.maxZ, b.maxZ));
   }
 
@@ -291,7 +293,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param o the other box
    * @return true if they intersect
    */
-  public boolean intersects(Box3D o) {
+  public boolean intersects(Cube o) {
     return minX < o.maxX && maxX > o.minX && minY < o.maxY && maxY > o.minY && minZ < o.maxZ && maxZ > o.minZ;
   }
 
@@ -323,7 +325,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param o the other box
    * @return true if {@code o} is inside this box
    */
-  public boolean contains(Box3D o) {
+  public boolean contains(Cube o) {
     return o.minX >= minX && o.maxX <= maxX && o.minY >= minY && o.maxY <= maxY && o.minZ >= minZ && o.maxZ <= maxZ;
   }
 
@@ -335,8 +337,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param dz amount to add to back and front
    * @return inflated box
    */
-  public Box3D inflate(float dx, float dy, float dz) {
-    return new Box3D(minX - dx, minY - dy, minZ - dz, maxX + dx, maxY + dy, maxZ + dz);
+  public Cube inflate(float dx, float dy, float dz) {
+    return new Cube(minX - dx, minY - dy, minZ - dz, maxX + dx, maxY + dy, maxZ + dz);
   }
 
   /**
@@ -347,8 +349,8 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param tz z translation
    * @return translated box
    */
-  public Box3D translate(float tx, float ty, float tz) {
-    return new Box3D(minX + tx, minY + ty, minZ + tz, maxX + tx, maxY + ty, maxZ + tz);
+  public Cube translate(float tx, float ty, float tz) {
+    return new Cube(minX + tx, minY + ty, minZ + tz, maxX + tx, maxY + ty, maxZ + tz);
   }
 
   /**
@@ -357,7 +359,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    * @param v translation vector
    * @return translated box
    */
-  public Box3D translate(Vector3 v) {
+  public Cube translate(Vector3 v) {
     return translate(v.x(), v.y(), v.z());
   }
 
@@ -366,7 +368,7 @@ public record Box3D(float minX, float minY, float minZ, float maxX, float maxY, 
    *
    * @return 2D bounding box
    */
-  public Box2D toBox2() {
-    return new Box2D(minX, minY, maxX, maxY);
+  public Rectangle toBox2() {
+    return new Rectangle(minX, minY, maxX, maxY);
   }
 }

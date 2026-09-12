@@ -37,6 +37,7 @@ import org.jspecify.annotations.Nullable;
 public final class RegistryContext {
   private @Nullable Identifier id;
   private @Nullable Integer index;
+  private @Nullable Registry<?> registry;
 
   /**
    * Stores the identifier assigned to this object by the registry.
@@ -57,6 +58,15 @@ public final class RegistryContext {
   }
 
   /**
+   * Stores the parent registry.
+   *
+   * @param registry the parent registry to store
+   */
+  public void putRegistry(Registry<?> registry) {
+    this.registry = registry;
+  }
+
+  /**
    * Returns the identifier assigned at registration.
    *
    * @return the identifier, or {@code null} if not registered yet
@@ -72,5 +82,14 @@ public final class RegistryContext {
    */
   public @Nullable Integer index() {
     return index;
+  }
+
+  /**
+   * Returns the parent registry.
+   *
+   * @return the parent registry
+   */
+  public @Nullable Registry<?> registry() {
+    return registry;
   }
 }

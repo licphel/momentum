@@ -27,7 +27,7 @@ package io.viki.momentum.gfx.text.raster;
 import com.ibm.icu.text.BreakIterator;
 import io.viki.momentum.gfx.text.Meta;
 import io.viki.momentum.gfx.tint.Gradient;
-import io.viki.momentum.math.Box2D;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;
 
@@ -48,7 +48,7 @@ import java.util.Locale;
  * @param runs          the layout runs used for hit-testing
  * @param mergedText    the concatenated source text
  */
-public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float lastLineWidth, boolean flipY,
+public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float lastLineWidth, boolean flipY,
                      LayoutRun[] runs, String mergedText) {
   private static int hitRun(LayoutRun run, float x) {
     LayoutGlyph[] glyphs = run.glyphs();
@@ -195,7 +195,7 @@ public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float last
    * @param metaInfo  optional metadata, or {@code null} if none
    * @param charIndex the absolute character index in the merged source text
    */
-  public record Entry(@Nullable Glyph glyph, Gradient gradient, Box2D bounds, float scale, Meta @Nullable [] metaInfo,
+  public record Entry(@Nullable Glyph glyph, Gradient gradient, Rectangle bounds, float scale, Meta @Nullable [] metaInfo,
                       int charIndex) {
   }
 
@@ -205,6 +205,6 @@ public record Raster(Entry[] entries, Stroke[] strokes, Box2D bounds, float last
    * @param bounds   the bounding rectangle of the stroke
    * @param gradient the stroke gradient
    */
-  public record Stroke(Box2D bounds, Gradient gradient) {
+  public record Stroke(Rectangle bounds, Gradient gradient) {
   }
 }
