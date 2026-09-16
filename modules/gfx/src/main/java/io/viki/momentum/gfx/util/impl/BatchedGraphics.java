@@ -174,7 +174,7 @@ public class BatchedGraphics extends StatefulGraphics {
       renderTarget = device.getSwapchain();
     }
     RenderTarget rt = renderTarget;
-    viewport = Rectangle.create(0, 0, rt.width(), rt.height());
+    viewport = Rectangle.of(0, 0, rt.width(), rt.height());
     data.clear();
     currentPrimitive = null;
     currentTexture = null;

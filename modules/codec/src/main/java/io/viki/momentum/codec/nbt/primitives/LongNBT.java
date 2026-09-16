@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt.primitives;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * An NBT long tag wrapper — a type-safe alternative to storing a raw {@code long}
@@ -47,12 +45,12 @@ public final class LongNBT implements NumericNBT {
     }
 
     @Override
-    public void serialize(LongNBT value, CursorBuffer buffer) {
+    public void serialize(LongNBT value, BinaryBuffer buffer) {
       buffer.writeLong(value.get());
     }
 
     @Override
-    public LongNBT deserialize(CursorBuffer buffer) {
+    public LongNBT deserialize(BinaryBuffer buffer) {
       return new LongNBT(buffer.readLong());
     }
   };

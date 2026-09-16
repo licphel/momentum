@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt.primitives;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * An NBT short tag wrapper — a type-safe alternative to storing a raw {@code short}
@@ -47,12 +45,12 @@ public final class ShortNBT implements NumericNBT {
     }
 
     @Override
-    public void serialize(ShortNBT value, CursorBuffer buffer) {
+    public void serialize(ShortNBT value, BinaryBuffer buffer) {
       buffer.writeShort(value.get());
     }
 
     @Override
-    public ShortNBT deserialize(CursorBuffer buffer) {
+    public ShortNBT deserialize(BinaryBuffer buffer) {
       return new ShortNBT(buffer.readShort());
     }
   };

@@ -28,9 +28,7 @@ package io.viki.momentum.input;
  * A logical key binding that wraps a physical {@link KeyCode} with persistent press tracking and modifier-aware
  * queries.
  *
- * <p>Acquire instances via {@link InputSnapshot#key(KeyCode)} and release via
- * {@link InputSnapshot#destroy(Key)} (or {@link #destroy()}). Multiple {@code Key} instances may bind to the same physical
- * key simultaneously.
+ * <p>Acquire instances via {@link InputSnapshot#key(KeyCode)}.
  *
  * <p>This class is not thread-safe. All methods must be called from the
  * rendering thread.
@@ -66,15 +64,6 @@ public final class Key implements Transitable {
 
   InputSnapshot owner() {
     return owner;
-  }
-
-  /**
-   * Destroys this key, removing it from the owning {@link InputSnapshot}.
-   *
-   * <p>After destruction the key is no longer updated by input events.
-   */
-  public void destroy() {
-    owner.destroy(this);
   }
 
   /**

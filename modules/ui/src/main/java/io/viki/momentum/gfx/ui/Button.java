@@ -52,8 +52,8 @@ public final class Button extends Element {
   public static final StyleKey<Object> DISABLED_BACKGROUND = new StyleKey<>("button.disabled.background", Object.class);
   public static final StyleKey<Text> LABEL = new StyleKey<>("button.label", Text.class);
   public static final StyleKey<Color> LABEL_COLOR = new StyleKey<>("button.label.color", Color.class);
-  public static final StyleKey<KeyBinding> ACTIVATE_BINDING = new StyleKey<>("button.activate",
-      KeyBinding.class);
+  public static final StyleKey<KeyBinding> ACTIVATE_BINDING = new StyleKey<>("button.activate", KeyBinding.class);
+
   private State state = State.IDLE;
   private boolean enabled = true;
   private boolean hovered;
@@ -68,7 +68,7 @@ public final class Button extends Element {
   }
 
   /** Creates the conventional mouse, Enter, and Space activation binding for one input snapshot. */
-  public static KeyBinding defaultActivate(InputSnapshot snapshot) {
+  public static KeyBinding makeDefaultActivationKeyBinding(InputSnapshot snapshot) {
     return new KeyBinding("button.activate",
         KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
         KeyMatch.of(snapshot.key(KeyCode.ENTER)),

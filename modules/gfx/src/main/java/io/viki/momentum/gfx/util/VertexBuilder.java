@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.util;
 
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.gfx.tint.Color;
@@ -123,7 +123,7 @@ public class VertexBuilder {
    * @param packedColor the packed gradient color
    */
   public void putPosColor(float x, float y, float z, long packedColor) {
-    CursorBuffer buf = data.vertices();
+    BinaryBuffer buf = data.vertices();
     float[] arr = trCache;
     arr[0] = x;
     arr[1] = y;
@@ -149,7 +149,7 @@ public class VertexBuilder {
    * @param v           the texture V coordinate
    */
   public void putPosColorUv(float x, float y, float z, long packedColor, float u, float v) {
-    CursorBuffer buf = data.vertices();
+    BinaryBuffer buf = data.vertices();
     float[] arr = trCache;
     arr[0] = x;
     arr[1] = y;
@@ -170,7 +170,7 @@ public class VertexBuilder {
    * vertices must be written before calling this method.
    */
   public void endQuad() {
-    CursorBuffer idx = data.indices();
+    BinaryBuffer idx = data.indices();
     int baseVertex = data.vertexCount();
     idx.writeInt(baseVertex);
     idx.writeInt(baseVertex + 2);

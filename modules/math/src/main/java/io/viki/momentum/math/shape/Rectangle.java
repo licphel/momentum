@@ -58,7 +58,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param height   box height
    * @return new box
    */
-  public static Rectangle create(Vector2 position, float width, float height) {
+  public static Rectangle of(Vector2 position, float width, float height) {
     return new Rectangle(position.x(), position.y(), position.x() + width, position.y() + height);
   }
 
@@ -69,7 +69,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param size     box size (width, height)
    * @return new box
    */
-  public static Rectangle create(Vector2 position, Vector2 size) {
+  public static Rectangle of(Vector2 position, Vector2 size) {
     return new Rectangle(position.x(), position.y(), position.x() + size.x(), position.y() + size.y());
   }
 
@@ -81,7 +81,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param height full height
    * @return new box
    */
-  public static Rectangle createCentral(Vector2 center, float width, float height) {
+  public static Rectangle ofCentral(Vector2 center, float width, float height) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     return new Rectangle(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
@@ -94,7 +94,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param size   full size (width, height)
    * @return new box
    */
-  public static Rectangle createCentral(Vector2 center, Vector2 size) {
+  public static Rectangle ofCentral(Vector2 center, Vector2 size) {
     float halfW = size.x() * 0.5F;
     float halfH = size.y() * 0.5F;
     return new Rectangle(center.x() - halfW, center.y() - halfH, center.x() + halfW, center.y() + halfH);
@@ -129,7 +129,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param height box height
    * @return new box
    */
-  public static Rectangle create(float x, float y, float width, float height) {
+  public static Rectangle of(float x, float y, float width, float height) {
     return new Rectangle(x, y, x + width, y + height);
   }
 
@@ -142,7 +142,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * @param height full height
    * @return new box
    */
-  public static Rectangle createCentral(float cx, float cy, float width, float height) {
+  public static Rectangle ofCentral(float cx, float cy, float width, float height) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     return new Rectangle(cx - halfW, cy - halfH, cx + halfW, cy + halfH);

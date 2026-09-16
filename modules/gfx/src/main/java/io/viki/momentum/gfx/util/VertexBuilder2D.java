@@ -173,7 +173,7 @@ public class VertexBuilder2D extends VertexBuilder {
     if (pinned == null) {
       return;
     }
-    drawTexture(tex, dst, Rectangle.create(0.0F, 0.0F, pinned.width(), pinned.height()));
+    drawTexture(tex, dst, Rectangle.of(0.0F, 0.0F, pinned.width(), pinned.height()));
   }
 
   /**

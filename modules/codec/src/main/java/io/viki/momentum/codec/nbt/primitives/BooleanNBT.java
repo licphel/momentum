@@ -29,7 +29,7 @@ import io.viki.momentum.codec.nbt.CompoundNBT;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.ListNBT;
 import io.viki.momentum.codec.nbt.NBT;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * An NBT boolean tag wrapper — a type-safe alternative to storing a raw {@code boolean}
@@ -48,12 +48,12 @@ public final class BooleanNBT implements NBT {
     }
 
     @Override
-    public void serialize(BooleanNBT value, CursorBuffer buffer) {
+    public void serialize(BooleanNBT value, BinaryBuffer buffer) {
       buffer.writeBoolean(value.get());
     }
 
     @Override
-    public BooleanNBT deserialize(CursorBuffer buffer) {
+    public BooleanNBT deserialize(BinaryBuffer buffer) {
       return new BooleanNBT(buffer.read() != 0);
     }
   };

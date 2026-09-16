@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.util;
 
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * Staging area for vertex and index data being assembled for rendering.
@@ -35,14 +35,14 @@ public interface VertexStore {
    *
    * @return the vertex buffer
    */
-  CursorBuffer vertices();
+  BinaryBuffer vertices();
 
   /**
    * Returns the buffer holding index data.
    *
    * @return the index buffer
    */
-  CursorBuffer indices();
+  BinaryBuffer indices();
 
   /**
    * Returns the number of vertices written so far.

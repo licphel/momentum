@@ -131,8 +131,8 @@ public final class ResolutionTest {
     TestView view = new TestView(1600, 900, 800, 450);
     Look look = new Look();
     try (Canvas canvas = Canvas.open(view, HANDLER, look)) {
-      PartHost host = new PartHost(Rectangle.create(100, 100, 200, 100), look);
-      Probe probe = new Probe(Rectangle.create(10, 10, 80, 30), look);
+      PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100), look);
+      Probe probe = new Probe(Rectangle.of(10, 10, 80, 30), look);
       host.addChild(probe);
       canvas.add(host);
 
@@ -158,7 +158,7 @@ public final class ResolutionTest {
     AtomicInteger clicks = new AtomicInteger();
     Look look = interactiveLook(context);
     try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.create(10, 20, 100, 30), look);
+      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
 
@@ -179,7 +179,7 @@ public final class ResolutionTest {
     PrimaryContext context = new PrimaryContext(view, HANDLER);
     Look look = interactiveLook(context);
     try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.create(10, 20, 100, 30), look);
+      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
 
@@ -211,7 +211,7 @@ public final class ResolutionTest {
     look.put(Button.ACTIVATE_BINDING, activation);
     AtomicInteger clicks = new AtomicInteger();
     try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.create(10, 20, 100, 30), look);
+      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
       canvas.requestFocus(button);
@@ -242,8 +242,8 @@ public final class ResolutionTest {
     AtomicInteger firstClicks = new AtomicInteger();
     AtomicInteger secondClicks = new AtomicInteger();
     try (Canvas canvas = new Canvas(context, look)) {
-      Button first = new Button(Rectangle.create(10, 20, 100, 30), look);
-      Button second = new Button(Rectangle.create(120, 20, 100, 30), look);
+      Button first = new Button(Rectangle.of(10, 20, 100, 30), look);
+      Button second = new Button(Rectangle.of(120, 20, 100, 30), look);
       first.setOnClick(firstClicks::incrementAndGet);
       second.setOnClick(secondClicks::incrementAndGet);
       canvas.add(first);
@@ -266,9 +266,9 @@ public final class ResolutionTest {
     Look look = interactiveLook(context);
     AtomicInteger partClicks = new AtomicInteger();
     AtomicInteger childClicks = new AtomicInteger();
-    PartHost host = new PartHost(Rectangle.create(100, 100, 200, 100), look);
-    Button part = new Button(Rectangle.create(10, 10, 80, 30), look);
-    Button child = new Button(Rectangle.create(10, 10, 80, 30), look);
+    PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100), look);
+    Button part = new Button(Rectangle.of(10, 10, 80, 30), look);
+    Button child = new Button(Rectangle.of(10, 10, 80, 30), look);
     part.setOnClick(partClicks::incrementAndGet);
     child.setOnClick(childClicks::incrementAndGet);
     host.attachPart(part);
@@ -300,7 +300,7 @@ public final class ResolutionTest {
 
   private static Look interactiveLook(PrimaryContext context) {
     Look look = new Look();
-    look.put(Button.ACTIVATE_BINDING, Button.defaultActivate(context.snapshot()));
+    look.put(Button.ACTIVATE_BINDING, Button.makeDefaultActivationKeyBinding(context.snapshot()));
     return look;
   }
 

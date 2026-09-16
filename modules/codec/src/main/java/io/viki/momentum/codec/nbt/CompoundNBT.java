@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
@@ -83,7 +81,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
     }
 
     @Override
-    public void serialize(CompoundNBT value, CursorBuffer buffer) {
+    public void serialize(CompoundNBT value, BinaryBuffer buffer) {
       for (Map.Entry<String, NBT> entry : value.entrySet()) {
         NBT child = entry.getValue();
         buffer.write(child.dataType().id());
@@ -94,7 +92,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
     }
 
     @Override
-    public CompoundNBT deserialize(CursorBuffer buffer) {
+    public CompoundNBT deserialize(BinaryBuffer buffer) {
       CompoundNBT compound = new CompoundNBT();
       while (true) {
         DataType tagClass = DataType.fromID(buffer.read());

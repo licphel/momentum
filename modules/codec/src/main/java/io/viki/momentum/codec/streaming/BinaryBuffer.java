@@ -56,9 +56,9 @@ import java.util.UUID;
  *
  * <p>This class is <strong>not</strong> thread-safe.
  *
- * @see HeapCursorBuffer
+ * @see HeapBinaryBuffer
  */
-public abstract class CursorBuffer implements AutoCloseable {
+public abstract class BinaryBuffer implements AutoCloseable {
   /** Default initial capacity: {@value} bytes. */
   public static final int DEFAULT_CAPACITY = 128;
 
@@ -70,7 +70,7 @@ public abstract class CursorBuffer implements AutoCloseable {
   /**
    * Creates a buffer with both cursors at zero.
    */
-  protected CursorBuffer() {
+  protected BinaryBuffer() {
     this.readerIndex = 0;
     this.writerIndex = 0;
   }
@@ -83,8 +83,8 @@ public abstract class CursorBuffer implements AutoCloseable {
    * @param capacity initial capacity in bytes
    * @return a new heap-backed buffer
    */
-  public static CursorBuffer heap(int capacity) {
-    return new HeapCursorBuffer(capacity);
+  public static BinaryBuffer heap(int capacity) {
+    return new HeapBinaryBuffer(capacity);
   }
 
   /**
@@ -94,8 +94,8 @@ public abstract class CursorBuffer implements AutoCloseable {
    *
    * @return a new heap-backed buffer
    */
-  public static CursorBuffer heap() {
-    return new HeapCursorBuffer(DEFAULT_CAPACITY);
+  public static BinaryBuffer heap() {
+    return new HeapBinaryBuffer(DEFAULT_CAPACITY);
   }
 
   /**
@@ -109,8 +109,8 @@ public abstract class CursorBuffer implements AutoCloseable {
    * @param data the byte array to wrap
    * @return a buffer backed by the given data
    */
-  public static CursorBuffer wrap(byte[] data) {
-    return new HeapCursorBuffer(data);
+  public static BinaryBuffer wrap(byte[] data) {
+    return new HeapBinaryBuffer(data);
   }
 
   /**
@@ -371,7 +371,7 @@ public abstract class CursorBuffer implements AutoCloseable {
    *                                   readable bytes or this buffer has insufficient
    *                                   writable space
    */
-  public abstract void writeBuf(CursorBuffer src, int length);
+  public abstract void writeBuf(BinaryBuffer src, int length);
 
   /**
    * Encodes a string using the given charset and writes it with a 4-byte
@@ -596,7 +596,7 @@ public abstract class CursorBuffer implements AutoCloseable {
    *                                   readable bytes or {@code dst} has insufficient
    *                                   writable space
    */
-  public abstract void readBuf(CursorBuffer dst, int length);
+  public abstract void readBuf(BinaryBuffer dst, int length);
 
   /**
    * Reads a length-prefixed string from the current read-cursor position.

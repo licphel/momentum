@@ -27,9 +27,7 @@ package io.viki.momentum.input;
 import io.viki.momentum.input.event.KeyEvent;
 import io.viki.momentum.input.event.MouseButtonEvent;
 
-import java.util.EnumMap;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Per-frame pollable input state for game-fmt queries.
@@ -39,8 +37,7 @@ import java.util.Set;
  * remains {@link KeyAction#PRESS} until the platform reports a release.
  *
  * <p>For higher-level key binding support, use {@link #key(KeyCode)} to create
- * a {@link Key} instance with persistent press tracking, transition detection, and modifier-aware queries. Release it
- * with {@link #destroy(Key)} (or via {@link Key#destroy()}) when no longer needed.
+ * a {@link Key} instance with persistent press tracking, transition detection, and modifier-aware queries.
  *
  * <p>This class is not thread-safe. All methods must be called from the rendering
  * thread.
@@ -51,7 +48,7 @@ public final class InputSnapshot {
 
   private final EnumMap<KeyCode, KeyAction> keyStates = new EnumMap<>(KeyCode.class);
   private final EnumMap<KeyCode, Integer> keyMods = new EnumMap<>(KeyCode.class);
-  private final Set<Key> keys = new HashSet<>();
+  private final Map<KeyCode, Key> keys = new EnumMap<>(KeyCode.class);
   private double cursorX;
   private double cursorY;
   private double scrollX;
@@ -153,25 +150,13 @@ public final class InputSnapshot {
    * Creates a new {@link Key} bound to the given physical key code and registers it for per-frame updates.
    *
    * <p>Each call returns a new instance — multiple keys may bind to the same
-   * physical key simultaneously. Release with {@link #destroy(Key)} (or {@link Key#destroy()}) when the key is no
-   * longer needed.
+   * physical key simultaneously.
    *
    * @param code the physical key code to bind
    * @return a newly created {@code Key}
    */
   public Key key(KeyCode code) {
-    Key key = new Key(code, this);
-    keys.add(key);
-    return key;
-  }
-
-  /**
-   * Removes a key from this snapshot. The key will no longer receive input events.
-   *
-   * @param key the key to destroy
-   */
-  public void destroy(Key key) {
-    keys.remove(key);
+    return keys.computeIfAbsent(code, k -> new Key(k, this));
   }
 
   /**
@@ -244,7 +229,7 @@ public final class InputSnapshot {
   private void applyKeyState(KeyCode code, KeyAction action, int modifiers) {
     keyStates.put(code, action);
     keyMods.put(code, modifiers);
-    for (Key key : keys) {
+    for (Key key : keys.values()) {
       if (key.code() == code) {
         key.apply(action, modifiers);
       }
@@ -298,7 +283,7 @@ public final class InputSnapshot {
     scrollX = 0;
     scrollY = 0;
 
-    for (Key key : keys) {
+    for (Key key : keys.values()) {
       key.endFrame();
     }
   }
@@ -309,7 +294,7 @@ public final class InputSnapshot {
     keyMods.clear();
     currentMods = InputModifiers.NONE;
     lockMods = InputModifiers.NONE;
-    for (Key key : keys) {
+    for (Key key : keys.values()) {
       key.apply(KeyAction.RELEASE, InputModifiers.NONE);
     }
   }

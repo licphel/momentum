@@ -114,8 +114,8 @@ public final class TextureAtlas implements AutoCloseable {
       expand();
     }
 
-    texture.submit(pixels, Cube.create(dst.x, dst.y, 0, dst.w, dst.h, 1));
-    return new TexturePart(ref, Rectangle.create(dst.x, dst.y, dst.w, dst.h));
+    texture.submit(pixels, Cube.of(dst.x, dst.y, 0, dst.w, dst.h, 1));
+    return new TexturePart(ref, Rectangle.of(dst.x, dst.y, dst.w, dst.h));
   }
 
   /**

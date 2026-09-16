@@ -29,7 +29,7 @@ import io.viki.momentum.codec.nbt.CompoundNBT;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.ListNBT;
 import io.viki.momentum.codec.nbt.NBT;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 import java.util.Arrays;
 
@@ -51,14 +51,14 @@ public final class ByteArrayNBT implements NBT {
     }
 
     @Override
-    public void serialize(ByteArrayNBT value, CursorBuffer buffer) {
+    public void serialize(ByteArrayNBT value, BinaryBuffer buffer) {
       byte[] bytes = value.get();
       buffer.writeInt(bytes.length);
       buffer.writeBytes(bytes);
     }
 
     @Override
-    public ByteArrayNBT deserialize(CursorBuffer buffer) {
+    public ByteArrayNBT deserialize(BinaryBuffer buffer) {
       return new ByteArrayNBT(buffer.readBytes(buffer.readInt()));
     }
   };

@@ -29,7 +29,7 @@ import io.viki.momentum.codec.nbt.CompoundNBT;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.ListNBT;
 import io.viki.momentum.codec.nbt.NBT;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 import java.util.Objects;
 
@@ -50,12 +50,12 @@ public final class StringNBT implements NBT {
     }
 
     @Override
-    public void serialize(StringNBT value, CursorBuffer buffer) {
+    public void serialize(StringNBT value, BinaryBuffer buffer) {
       buffer.writeUTF8(value.get());
     }
 
     @Override
-    public StringNBT deserialize(CursorBuffer buffer) {
+    public StringNBT deserialize(BinaryBuffer buffer) {
       return new StringNBT(buffer.readUTF8());
     }
   };

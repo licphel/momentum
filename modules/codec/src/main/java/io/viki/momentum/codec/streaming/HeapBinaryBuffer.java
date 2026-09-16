@@ -29,15 +29,15 @@ import io.viki.momentum.util.InternalApi;
 import java.nio.ByteOrder;
 
 @InternalApi
-final class HeapCursorBuffer extends CursorBuffer {
+final class HeapBinaryBuffer extends BinaryBuffer {
   private byte[] data;
   private boolean bigEndian; // LE by default
 
-  public HeapCursorBuffer(int capacity) {
+  public HeapBinaryBuffer(int capacity) {
     data = new byte[capacity];
   }
 
-  public HeapCursorBuffer(byte[] initial) {
+  public HeapBinaryBuffer(byte[] initial) {
     data = initial;
     writerIndex = data.length;
   }
@@ -137,7 +137,7 @@ final class HeapCursorBuffer extends CursorBuffer {
   }
 
   @Override
-  public void writeBuf(CursorBuffer src, int length) {
+  public void writeBuf(BinaryBuffer src, int length) {
     src.ensureReadable(length);
     ensureWritable(length);
     src.readBytes(data, writerIndex, length);
@@ -222,7 +222,7 @@ final class HeapCursorBuffer extends CursorBuffer {
   }
 
   @Override
-  public void readBuf(CursorBuffer dst, int length) {
+  public void readBuf(BinaryBuffer dst, int length) {
     ensureReadable(length);
     dst.writeBytes(data, readerIndex, length);
     readerIndex += length;

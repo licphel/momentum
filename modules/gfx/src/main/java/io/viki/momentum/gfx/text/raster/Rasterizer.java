@@ -312,11 +312,11 @@ public final class Rasterizer {
                                   boolean flipY) {
     if ((flags & Font.UNDERLINE) != 0) {
       float uy = flipY ? baseline - offsetU : baseline + offsetU;
-      out.add(new Raster.Stroke(Rectangle.create(x, uy, width, thicknessU), gradient));
+      out.add(new Raster.Stroke(Rectangle.of(x, uy, width, thicknessU), gradient));
     }
     if ((flags & Font.STRIKETHROUGH) != 0) {
       float sy = flipY ? baseline - offsetS : baseline + offsetS;
-      out.add(new Raster.Stroke(Rectangle.create(x, sy, width, thicknessS), gradient));
+      out.add(new Raster.Stroke(Rectangle.of(x, sy, width, thicknessS), gradient));
     }
   }
 
@@ -450,9 +450,9 @@ public final class Rasterizer {
           totalH = Math.max(totalH, Math.abs(run.lineTop()));
         }
       }
-      bounds = Rectangle.create(0, 0, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, totalH));
+      bounds = Rectangle.of(0, 0, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, totalH));
     } else {
-      bounds = Rectangle.create(bMinX, bMinY, bMaxX - bMinX, Math.max(1, bMaxY - bMinY));
+      bounds = Rectangle.of(bMinX, bMinY, bMaxX - bMinX, Math.max(1, bMaxY - bMinY));
     }
 
     // Entry bounds stay in pen/layout space — no global shift applied.
@@ -464,7 +464,7 @@ public final class Rasterizer {
         Literal lit = literals.get(lg.ownerIndex());
         Glyph g = lit.format().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
         GlyphBound gb = layoutBounds.get(gbIdx++);
-        Rectangle vb = Rectangle.create(gb.gx, gb.gy, gb.gw, gb.gh);
+        Rectangle vb = Rectangle.of(gb.gx, gb.gy, gb.gw, gb.gh);
         // charIndex: absolute index in mergedText
         int absCharIndex = run.textStart() + lg.start();
         entries.add(new Raster.Entry(g, lit.format().tint(), vb, lg.scale(), lit.meta(), absCharIndex));

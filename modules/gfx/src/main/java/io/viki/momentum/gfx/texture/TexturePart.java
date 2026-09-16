@@ -49,7 +49,7 @@ public record TexturePart(FragileTexture fragile, Rectangle region) implements D
    * @param tex the source texture
    */
   public TexturePart(Texture tex) {
-    this(tex, Rectangle.create(0, 0, tex.width(), tex.height()));
+    this(tex, Rectangle.of(0, 0, tex.width(), tex.height()));
   }
 
   /**

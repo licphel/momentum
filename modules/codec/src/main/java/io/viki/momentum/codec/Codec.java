@@ -27,7 +27,7 @@ package io.viki.momentum.codec;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.ListNBT;
 import io.viki.momentum.codec.nbt.NBT;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -124,7 +124,7 @@ public interface Codec<A> {
    * @param value  the value to encode
    * @param buffer the destination buffer
    */
-  default void serialize(A value, CursorBuffer buffer) {
+  default void serialize(A value, BinaryBuffer buffer) {
     NBT nbt = serialize(value);
     buffer.write(nbt.dataType().id());
     buffer.writeNBT(nbt);
@@ -136,7 +136,7 @@ public interface Codec<A> {
    * @param buffer the source buffer
    * @return the decoded value
    */
-  default A deserialize(CursorBuffer buffer) {
+  default A deserialize(BinaryBuffer buffer) {
     return deserialize(buffer.readNBT(DataType.fromID(buffer.read())));
   }
 

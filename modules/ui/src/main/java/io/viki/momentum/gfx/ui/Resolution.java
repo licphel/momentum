@@ -208,7 +208,7 @@ public final class Resolution {
     }
     float width = logicalWidth * scale;
     float height = logicalHeight * scale;
-    viewport = Rectangle.create((this.width - width) * 0.5F, (this.height - height) * 0.5F, width, height);
+    viewport = Rectangle.of((this.width - width) * 0.5F, (this.height - height) * 0.5F, width, height);
     apply(camera);
   }
 

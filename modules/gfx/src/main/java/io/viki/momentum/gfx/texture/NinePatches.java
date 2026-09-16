@@ -115,7 +115,7 @@ public final class NinePatches implements Drawable2D {
   private static TexturePart slice(TexturePart texPart, float u, float v, float w, float h) {
     float w0 = texPart.width();
     float h0 = texPart.height();
-    return new TexturePart(texPart, Rectangle.create(w0 * u, h0 * v, w0 * w, h0 * h));
+    return new TexturePart(texPart, Rectangle.of(w0 * u, h0 * v, w0 * w, h0 * h));
   }
 
   /**

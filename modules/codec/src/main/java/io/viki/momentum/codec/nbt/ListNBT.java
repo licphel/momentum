@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.nbt.primitives.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -69,7 +67,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
     }
 
     @Override
-    public void serialize(ListNBT value, CursorBuffer buffer) {
+    public void serialize(ListNBT value, BinaryBuffer buffer) {
       buffer.writeInt(value.size());
       for (NBT child : value) {
         buffer.write(child.dataType().id());
@@ -78,7 +76,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
     }
 
     @Override
-    public ListNBT deserialize(CursorBuffer buffer) {
+    public ListNBT deserialize(BinaryBuffer buffer) {
       ListNBT list = new ListNBT();
       int size = buffer.readInt();
       for (int i = 0; i < size; i++) {

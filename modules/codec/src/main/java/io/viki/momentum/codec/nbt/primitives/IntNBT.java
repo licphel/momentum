@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt.primitives;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * An NBT int tag wrapper — a type-safe alternative to storing a raw {@code int}
@@ -47,12 +45,12 @@ public final class IntNBT implements NumericNBT {
     }
 
     @Override
-    public void serialize(IntNBT value, CursorBuffer buffer) {
+    public void serialize(IntNBT value, BinaryBuffer buffer) {
       buffer.writeInt(value.get());
     }
 
     @Override
-    public IntNBT deserialize(CursorBuffer buffer) {
+    public IntNBT deserialize(BinaryBuffer buffer) {
       return new IntNBT(buffer.readInt());
     }
   };

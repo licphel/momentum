@@ -46,7 +46,7 @@ public abstract class Element implements InputListener {
       minY += ancestor.bounds.minY();
       ancestor = ancestor.parent;
     }
-    return Rectangle.create(minX, minY, bounds.width(), bounds.height());
+    return Rectangle.of(minX, minY, bounds.width(), bounds.height());
   }
 
   public void setBounds(Rectangle value) {
@@ -152,7 +152,7 @@ public abstract class Element implements InputListener {
   }
 
   private void drawAt(Graphics graphics, float parentX, float parentY) {
-    Rectangle absolute = Rectangle.create(parentX + bounds.minX(), parentY + bounds.minY(),
+    Rectangle absolute = Rectangle.of(parentX + bounds.minX(), parentY + bounds.minY(),
         bounds.width(), bounds.height());
     drawSelf(graphics, absolute);
     drawChildren(graphics, absolute.minX(), absolute.minY());

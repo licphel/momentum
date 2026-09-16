@@ -27,7 +27,7 @@ package io.viki.momentum.codec.nbt.primitives;
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.NBT;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -47,11 +47,11 @@ public final class NullNBT implements NBT {
     }
 
     @Override
-    public void serialize(NullNBT value, CursorBuffer buffer) {
+    public void serialize(NullNBT value, BinaryBuffer buffer) {
     }
 
     @Override
-    public NullNBT deserialize(CursorBuffer buffer) {
+    public NullNBT deserialize(BinaryBuffer buffer) {
       return INSTANCE;
     }
   };

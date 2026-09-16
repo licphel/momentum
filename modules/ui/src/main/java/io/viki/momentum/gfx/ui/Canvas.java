@@ -24,7 +24,7 @@ public final class Canvas extends Element implements AutoCloseable {
   private boolean closed;
 
   public Canvas(PrimaryContext context, Look look) {
-    super(Rectangle.create(Vector2.ZERO, context.getLogicalSize()), look);
+    super(Rectangle.of(Vector2.ZERO, context.getLogicalSize()), look);
     this.context = context;
     context.bind(this);
   }

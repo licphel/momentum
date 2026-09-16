@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.util;
 
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * Zero-copy staging area that hands out the buffers' live backing arrays.
@@ -33,8 +33,8 @@ import io.viki.momentum.codec.streaming.CursorBuffer;
  */
 public class ZeroCopyVertexStore implements VertexStore {
   private final boolean volatileData;
-  private CursorBuffer vertexBuf;
-  private CursorBuffer indexBuf;
+  private BinaryBuffer vertexBuf;
+  private BinaryBuffer indexBuf;
   private int vertexCount;
   private int indexCount;
 
@@ -45,8 +45,8 @@ public class ZeroCopyVertexStore implements VertexStore {
    */
   public ZeroCopyVertexStore(boolean volatileData) {
     // LE
-    this.vertexBuf = CursorBuffer.heap();
-    this.indexBuf = CursorBuffer.heap();
+    this.vertexBuf = BinaryBuffer.heap();
+    this.indexBuf = BinaryBuffer.heap();
     this.volatileData = volatileData;
   }
 
@@ -58,12 +58,12 @@ public class ZeroCopyVertexStore implements VertexStore {
   }
 
   @Override
-  public CursorBuffer vertices() {
+  public BinaryBuffer vertices() {
     return vertexBuf;
   }
 
   @Override
-  public CursorBuffer indices() {
+  public BinaryBuffer indices() {
     return indexBuf;
   }
 
@@ -99,8 +99,8 @@ public class ZeroCopyVertexStore implements VertexStore {
     } else {
       // Create new buffers to release references to old backing arrays.
       // This prevents accidental mutation of data that may still be in use.
-      vertexBuf = CursorBuffer.heap(vertexBuf.capacity());
-      indexBuf = CursorBuffer.heap(indexBuf.capacity());
+      vertexBuf = BinaryBuffer.heap(vertexBuf.capacity());
+      indexBuf = BinaryBuffer.heap(indexBuf.capacity());
     }
   }
 

@@ -58,7 +58,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param depth    box depth
    * @return new box
    */
-  public static Cube create(Vector3 position, float width, float height, float depth) {
+  public static Cube of(Vector3 position, float width, float height, float depth) {
     return new Cube(position.x(), position.y(), position.z(), position.x() + width, position.y() + height,
         position.z() + depth);
   }
@@ -70,7 +70,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param size     box size (width, height, depth)
    * @return new box
    */
-  public static Cube create(Vector3 position, Vector3 size) {
+  public static Cube of(Vector3 position, Vector3 size) {
     return new Cube(position.x(), position.y(), position.z(),
         position.x() + size.x(), position.y() + size.y(), position.z() + size.z());
   }
@@ -84,7 +84,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param depth  full depth
    * @return new box
    */
-  public static Cube createCentral(Vector3 center, float width, float height, float depth) {
+  public static Cube ofCentral(Vector3 center, float width, float height, float depth) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     float halfD = depth * 0.5F;
@@ -99,7 +99,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param size   full size (width, height, depth)
    * @return new box
    */
-  public static Cube createCentral(Vector3 center, Vector3 size) {
+  public static Cube ofCentral(Vector3 center, Vector3 size) {
     float halfW = size.x() * 0.5F;
     float halfH = size.y() * 0.5F;
     float halfD = size.z() * 0.5F;
@@ -113,7 +113,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param points array of points
    * @return bounding box
    */
-  public static Cube createByPoints(Vector3[] points) {
+  public static Cube ofPoints(Vector3[] points) {
     float mnX = points[0].x();
     float mxX = points[0].x();
     float mnY = points[0].y();
@@ -142,7 +142,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param depth  box depth
    * @return new box
    */
-  public static Cube create(float x, float y, float z, float width, float height, float depth) {
+  public static Cube of(float x, float y, float z, float width, float height, float depth) {
     return new Cube(x, y, z, x + width, y + height, z + depth);
   }
 
@@ -157,7 +157,7 @@ public record Cube(float minX, float minY, float minZ, float maxX, float maxY, f
    * @param depth  full depth
    * @return new box
    */
-  public static Cube createCentral(float cx, float cy, float cz, float width, float height, float depth) {
+  public static Cube ofCentral(float cx, float cy, float cz, float width, float height, float depth) {
     float halfW = width * 0.5F;
     float halfH = height * 0.5F;
     float halfD = depth * 0.5F;

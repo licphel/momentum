@@ -26,9 +26,7 @@ package io.viki.momentum.codec.nbt.primitives;
 
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.nbt.*;
-import io.viki.momentum.codec.streaming.CursorBuffer;
+import io.viki.momentum.codec.streaming.BinaryBuffer;
 
 /**
  * An NBT double tag wrapper — a type-safe alternative to storing a raw {@code double}
@@ -47,12 +45,12 @@ public final class DoubleNBT implements NumericNBT {
     }
 
     @Override
-    public void serialize(DoubleNBT value, CursorBuffer buffer) {
+    public void serialize(DoubleNBT value, BinaryBuffer buffer) {
       buffer.writeDouble(value.get());
     }
 
     @Override
-    public DoubleNBT deserialize(CursorBuffer buffer) {
+    public DoubleNBT deserialize(BinaryBuffer buffer) {
       return new DoubleNBT(buffer.readDouble());
     }
   };
