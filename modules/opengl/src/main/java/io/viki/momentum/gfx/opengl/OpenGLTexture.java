@@ -173,15 +173,23 @@ public final class OpenGLTexture implements Texture, Handle {
   @Override
   public void blit(Texture target2, int sx, int sy, int sw, int sh, int dx, int dy, int dw, int dh) {
     ctx.submit(() -> {
+      OpenGLCache cache = ctx.cache;
+      int previousReadFramebuffer = cache.fboR;
+      int previousDrawFramebuffer = cache.fboW;
+      boolean previousScissorEnabled = cache.scissorTest;
       int[] fbos = new int[2];
       fbos[0] = glGenFramebuffers();
       fbos[1] = glGenFramebuffers();
       try {
-        ctx.cache.bindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
+        // Framebuffer blits are affected by GL_SCISSOR_TEST. UI rendering may
+        // leave a control-sized scissor active, which would otherwise copy only
+        // part of a growing texture atlas.
+        cache.setScissorEnabled(false);
+        cache.bindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
         glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, handle, 0);
 
         OpenGLTexture dstTex = (OpenGLTexture) target2;
-        ctx.cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
+        cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstTex.handle, 0);
 
         int srcH = OpenGLTexture.this.height();
@@ -198,7 +206,13 @@ public final class OpenGLTexture implements Texture, Handle {
       } finally {
         glDeleteFramebuffers(fbos[0]);
         glDeleteFramebuffers(fbos[1]);
-        ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, 0);
+        if (previousReadFramebuffer == previousDrawFramebuffer) {
+          cache.bindFramebuffer(GL_FRAMEBUFFER, previousReadFramebuffer);
+        } else {
+          cache.bindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+          cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        }
+        cache.setScissorEnabled(previousScissorEnabled);
       }
     });
   }

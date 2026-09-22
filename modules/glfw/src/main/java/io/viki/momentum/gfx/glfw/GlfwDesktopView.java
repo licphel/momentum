@@ -214,7 +214,11 @@ public final class GlfwDesktopView extends DesktopView {
   /** Polls pending GLFW events. */
   @Override
   protected void onPollEvents() {
-    glfwPollEvents();
+    try {
+      glfwPollEvents();
+    } catch (Exception _) {
+      // Ignored
+    }
   }
 
   @Override

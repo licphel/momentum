@@ -5,6 +5,9 @@
  */
 package io.viki.momentum.gfx.ui;
 
+import io.viki.momentum.gfx.ui.render.ElementRenderer;
+import io.viki.momentum.gfx.ui.render.EmptyRenderer;
+import io.viki.momentum.gfx.ui.render.UIRenderDispatcher;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -20,17 +23,21 @@ import java.util.List;
  * drawing, tree mutation, and input callbacks must run on the owning view thread.
  */
 public abstract class Element implements InputListener {
+  private static final long DEFAULT_TOOLTIP_DELAY_MILLIS = 500L;
+
   private Rectangle bounds;
-  private Look look;
   private final List<Element> children = new ArrayList<>();
   private final List<Element> parts = new ArrayList<>();
   private final List<Element> childrenView = Collections.unmodifiableList(children);
   private final List<Element> partsView = Collections.unmodifiableList(parts);
   private @Nullable Element parent;
+  private @Nullable ElementRenderer rendererOverride;
+  private @Nullable String tooltip;
+  private @Nullable Long tooltipDelayMillis;
+  private boolean visible = true;
 
-  protected Element(Rectangle bounds, Look look) {
+  protected Element(Rectangle bounds) {
     this.bounds = bounds;
-    this.look = look;
   }
 
   public Rectangle bounds() {
@@ -53,31 +60,38 @@ public abstract class Element implements InputListener {
     bounds = value;
   }
 
-  public Look look() {
-    return look;
-  }
-
-  public void setLook(Look value) {
-    look = value;
-    for (Element child : children) {
-      child.setLook(value);
-    }
-    for (Element part : parts) {
-      part.setLook(value);
-    }
-  }
-
   public void draw(Graphics graphics) {
-    Rectangle absolute = absoluteBounds();
-    drawAt(graphics, absolute.minX() - bounds.minX(), absolute.minY() - bounds.minY());
+    UIRenderDispatcher.INSTANCE.render(graphics, this);
   }
 
-  protected void drawSelf(Graphics graphics, Rectangle absoluteBounds) {
+  /** Returns the rendering strategy used by {@link UIRenderDispatcher}. */
+  public ElementRenderer renderer() {
+    @Nullable ElementRenderer override = rendererOverride;
+    return override == null ? defaultRenderer() : override;
   }
 
-  protected final void drawChildren(Graphics graphics) {
-    Rectangle absolute = absoluteBounds();
-    drawChildren(graphics, absolute.minX(), absolute.minY());
+  /** Replaces this element's built-in renderer with a caller-owned renderer. */
+  public final void setRenderer(ElementRenderer value) {
+    rendererOverride = java.util.Objects.requireNonNull(value, "value");
+  }
+
+  /** Restores the renderer supplied by the element implementation. */
+  public final void clearRendererOverride() {
+    rendererOverride = null;
+  }
+
+  /** Returns whether this element must be rendered atomically with its parts. */
+  public boolean isRenderLayerBoundary() {
+    return false;
+  }
+
+  /** Returns this element's built-in renderer when no override is installed. */
+  protected ElementRenderer defaultRenderer() {
+    return EmptyRenderer.INSTANCE;
+  }
+
+  protected @Nullable Rectangle childrenClip(Rectangle absoluteBounds) {
+    return null;
   }
 
   public void addChild(Element child) {
@@ -103,6 +117,15 @@ public abstract class Element implements InputListener {
     return childrenView;
   }
 
+  /** Moves a direct child to the end of this container's draw and hit-test order. */
+  final boolean bringChildToFront(Element child) {
+    if (!children.remove(child)) {
+      return false;
+    }
+    children.add(child);
+    return true;
+  }
+
   protected final void addPart(Element part) {
     attach(part, parts);
   }
@@ -115,8 +138,13 @@ public abstract class Element implements InputListener {
     return true;
   }
 
-  protected final List<Element> parts() {
+  public final List<Element> parts() {
     return partsView;
+  }
+
+  /** Exposes the element's clipping policy to the renderer dispatcher. */
+  public final @Nullable Rectangle childrenClipForRender(Rectangle absoluteBounds) {
+    return childrenClip(absoluteBounds);
   }
 
   public boolean contains(float x, float y) {
@@ -129,6 +157,47 @@ public abstract class Element implements InputListener {
 
   public final @Nullable Element parent() {
     return parent;
+  }
+
+  protected final @Nullable Canvas owningCanvas() {
+    @Nullable Element current = this;
+    while (current != null) {
+      if (current instanceof Canvas canvas) {
+        return canvas;
+      }
+      current = current.parent;
+    }
+    return null;
+  }
+
+  public final @Nullable String tooltip() {
+    return tooltip;
+  }
+
+  public final void setTooltip(@Nullable String value) {
+    tooltip = value == null || value.isEmpty() ? null : value;
+  }
+
+  public final long tooltipDelayMillis() {
+    if (tooltipDelayMillis != null) {
+      return tooltipDelayMillis;
+    }
+    return DEFAULT_TOOLTIP_DELAY_MILLIS;
+  }
+
+  public final boolean visible() {
+    return visible;
+  }
+
+  public final void setVisible(boolean value) {
+    visible = value;
+  }
+
+  public final void setTooltipDelayMillis(long value) {
+    if (value < 0L) {
+      throw new IllegalArgumentException("Tooltip delay must not be negative: " + value);
+    }
+    tooltipDelayMillis = value;
   }
 
   private void attach(Element child, List<Element> destination) {
@@ -147,23 +216,7 @@ public abstract class Element implements InputListener {
           + child.getClass().getName());
     }
     child.parent = this;
-    child.setLook(look);
     destination.add(child);
   }
 
-  private void drawAt(Graphics graphics, float parentX, float parentY) {
-    Rectangle absolute = Rectangle.of(parentX + bounds.minX(), parentY + bounds.minY(),
-        bounds.width(), bounds.height());
-    drawSelf(graphics, absolute);
-    drawChildren(graphics, absolute.minX(), absolute.minY());
-  }
-
-  private void drawChildren(Graphics graphics, float absoluteX, float absoluteY) {
-    for (Element child : children) {
-      child.drawAt(graphics, absoluteX, absoluteY);
-    }
-    for (Element part : parts) {
-      part.drawAt(graphics, absoluteX, absoluteY);
-    }
-  }
 }

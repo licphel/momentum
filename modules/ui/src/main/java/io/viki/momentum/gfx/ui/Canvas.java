@@ -7,10 +7,14 @@ package io.viki.momentum.gfx.ui;
 
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.gfx.ui.render.ElementRenderer;
+import io.viki.momentum.gfx.ui.render.EmptyRenderer;
 import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;
+
+import java.util.List;
 
 /**
  * Root UI surface containing the element tree and its single global keyboard focus.
@@ -23,28 +27,33 @@ public final class Canvas extends Element implements AutoCloseable {
   private @Nullable Element focusedElement;
   private boolean closed;
 
-  public Canvas(PrimaryContext context, Look look) {
-    super(Rectangle.of(Vector2.ZERO, context.getLogicalSize()), look);
+  public Canvas(PrimaryContext context) {
+    super(Rectangle.of(Vector2.ZERO, context.getLogicalSize()));
     this.context = context;
     context.bind(this);
   }
 
-  public static Canvas open(View view, TransformHandler transformHandler, Look look) {
-    return new Canvas(new PrimaryContext(view, transformHandler), look);
+  public static Canvas open(View view, TransformHandler transformHandler) {
+    return new Canvas(new PrimaryContext(view, transformHandler));
   }
 
-  public static Canvas open(View view, TransformHandler transformHandler, Look look,
-                            float logicalWidth, float logicalHeight, boolean onlyIntegerScale) {
+  public static Canvas open(PrimaryContext context) {
+    return new Canvas(context);
+  }
+
+  public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
+                            float logicalHeight, boolean onlyIntegerScale) {
     return new Canvas(new PrimaryContext(view, logicalWidth, logicalHeight, onlyIntegerScale,
-        transformHandler), look);
-  }
-
-  public static Canvas open(PrimaryContext context, Look look) {
-    return new Canvas(context, look);
+        transformHandler));
   }
 
   public PrimaryContext context() {
     return context;
+  }
+
+  @Override
+  protected ElementRenderer defaultRenderer() {
+    return EmptyRenderer.INSTANCE;
   }
 
   public Resolution resolution() {
@@ -66,6 +75,20 @@ public final class Canvas extends Element implements AutoCloseable {
     return removed;
   }
 
+  /** Brings the direct window under a logical pointer position above its sibling windows. */
+  void bringWindowToFrontAt(float x, float y) {
+    ensureOpen();
+    List<Element> elements = children();
+    for (int i = elements.size() - 1; i >= 0; i--) {
+      Element element = elements.get(i);
+      if (element instanceof Window window && window.visible()
+          && window.absoluteBounds().contains(x, y)) {
+        bringChildToFront(window);
+        return;
+      }
+    }
+  }
+
   public void clear() {
     ensureOpen();
     context.clearAllInputState();
@@ -78,12 +101,16 @@ public final class Canvas extends Element implements AutoCloseable {
     ensureOpen();
     context.apply(graphics);
     super.draw(graphics);
+    context.drawTooltip(graphics);
   }
 
   public void requestFocus(Element element) {
     ensureOpen();
     if (!isAttached(element)) {
       throw new IllegalArgumentException("Cannot focus an element outside this Canvas");
+    }
+    if (!isEffectivelyVisible(element)) {
+      throw new IllegalArgumentException("Cannot focus a hidden element");
     }
     if (!element.acceptsFocus()) {
       throw new IllegalArgumentException("Element does not accept keyboard focus: "
@@ -134,6 +161,14 @@ public final class Canvas extends Element implements AutoCloseable {
     return false;
   }
 
+  void copyToClipboard(String value) {
+    context.setClipboardText(value);
+  }
+
+  String pasteFromClipboard() {
+    return context.getClipboardText();
+  }
+
   private void setFocusedElement(@Nullable Element target) {
     if (focusedElement == target) {
       return;
@@ -148,10 +183,22 @@ public final class Canvas extends Element implements AutoCloseable {
   }
 
   private @Nullable Element validFocusedElement() {
-    if (focusedElement != null && !isAttached(focusedElement)) {
+    if (focusedElement != null
+        && (!isAttached(focusedElement) || !isEffectivelyVisible(focusedElement))) {
       setFocusedElement(null);
     }
     return focusedElement;
+  }
+
+  private static boolean isEffectivelyVisible(Element element) {
+    @Nullable Element current = element;
+    while (current != null) {
+      if (!current.visible()) {
+        return false;
+      }
+      current = current.parent();
+    }
+    return true;
   }
 
   private void ensureOpen() {

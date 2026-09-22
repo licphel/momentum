@@ -139,10 +139,23 @@ abstract class StatefulGraphics extends Graphics {
     if (camera == null) {
       throw new GraphicsException("Cannot scissor without a camera set");
     }
+    flush();
     Vector2 min = camera.project(new Vector2(worldBox.minX(), worldBox.minY()), viewport);
     Vector2 max = camera.project(new Vector2(worldBox.maxX(), worldBox.maxY()), viewport);
     scissorStack.push(scissor);
-    scissor = new Scissor((int) min.x(), (int) min.y(), (int) (max.x() - min.x()), (int) (max.y() - min.y()), true);
+    int x = (int) Math.min(min.x(), max.x());
+    int y = (int) Math.min(min.y(), max.y());
+    int width = (int) Math.abs(max.x() - min.x());
+    int height = (int) Math.abs(max.y() - min.y());
+    if (scissor.enable()) {
+      int maxX = Math.min(x + width, scissor.x() + scissor.width());
+      int maxY = Math.min(y + height, scissor.y() + scissor.height());
+      x = Math.max(x, scissor.x());
+      y = Math.max(y, scissor.y());
+      width = Math.max(0, maxX - x);
+      height = Math.max(0, maxY - y);
+    }
+    scissor = new Scissor(x, y, width, height, true);
   }
 
   /**
@@ -151,6 +164,7 @@ abstract class StatefulGraphics extends Graphics {
    */
   @Override
   public void popScissor() {
+    flush();
     scissor = !scissorStack.isEmpty() ? scissorStack.pop() : Scissor.DISABLED;
   }
 

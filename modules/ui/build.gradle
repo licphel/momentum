@@ -2,6 +2,23 @@ plugins {
   id 'java-library'
 }
 
+sourceSets {
+  main {
+    resources {
+      srcDir 'src/main/java'
+      include 'io/viki/momentum/gfx/ui/sample.jpg'
+    }
+  }
+}
+
+def nativeOs = System.getProperty('os.name').toLowerCase()
+def nativeArch = System.getProperty('os.arch').toLowerCase()
+def lwjglNatives = nativeOs.contains('win')
+    ? (nativeArch.contains('aarch64') ? 'natives-windows-arm64' : 'natives-windows')
+    : nativeOs.contains('mac')
+    ? (nativeArch.contains('aarch64') ? 'natives-macos-arm64' : 'natives-macos')
+    : (nativeArch.contains('aarch64') ? 'natives-linux-arm64' : 'natives-linux')
+
 dependencies {
   api project(':momentum-gfx')
   api project(':momentum-asset')
@@ -10,10 +27,31 @@ dependencies {
 
   testImplementation platform('org.junit:junit-bom:5.10.0')
   testImplementation 'org.junit.jupiter:junit-jupiter'
+  testImplementation project(':momentum-glfw')
+  testImplementation project(':momentum-opengl')
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+  testRuntimeOnly "org.lwjgl:lwjgl:${lwjgl_version}"
+  testRuntimeOnly "org.lwjgl:lwjgl-glfw:${lwjgl_version}"
+  testRuntimeOnly "org.lwjgl:lwjgl-opengl:${lwjgl_version}"
+  testRuntimeOnly "org.lwjgl:lwjgl-shaderc:${lwjgl_version}"
+  testRuntimeOnly "org.lwjgl:lwjgl-spvc:${lwjgl_version}"
+  testRuntimeOnly "org.lwjgl:lwjgl-freetype:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl-harfbuzz:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl-glfw:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl-opengl:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl-shaderc:${lwjgl_version}:${lwjglNatives}"
+  testRuntimeOnly "org.lwjgl:lwjgl-spvc:${lwjgl_version}:${lwjglNatives}"
 }
 
 test {
   useJUnitPlatform()
   failOnNoDiscoveredTests = false
+}
+
+tasks.register('runControlsDemo', JavaExec) {
+  group = 'verification'
+  description = 'Opens an interactive window demonstrating every standard UI control.'
+  classpath = sourceSets.test.runtimeClasspath
+  mainClass = 'io.viki.momentum.gfx.ui.ControlsRenderDemo'
 }

@@ -23,48 +23,44 @@
  */
 package io.viki.momentum.gfx.ui;
 
-import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyBinding;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.input.KeyMatch;
 import io.viki.momentum.input.InputSnapshot;
-import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.texture.Drawable2D;
-import io.viki.momentum.gfx.util.Alignment;
 import io.viki.momentum.math.shape.Rectangle;
-import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.render.ButtonRenderer;
+import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Minimal logical-space button with injected look, hit testing, and click handling.
- *
- * <p>The background keys deliberately use {@code StyleKey<Object>} because a background may be
- * either a {@link Color} or a {@link Drawable2D}; Button performs the small supported union
- * dispatch while ownership and loading remain outside this module.
+ * Minimal logical-space button with hit testing and click handling.
  *
  * <p>Button state is mutable and not thread-safe; use it on the owning UI/render thread.
  */
 public final class Button extends Element {
-  public static final StyleKey<Object> IDLE_BACKGROUND = new StyleKey<>("button.idle.background", Object.class);
-  public static final StyleKey<Object> HOVERED_BACKGROUND = new StyleKey<>("button.hovered.background", Object.class);
-  public static final StyleKey<Object> PRESSED_BACKGROUND = new StyleKey<>("button.pressed.background", Object.class);
-  public static final StyleKey<Object> DISABLED_BACKGROUND = new StyleKey<>("button.disabled.background", Object.class);
-  public static final StyleKey<Text> LABEL = new StyleKey<>("button.label", Text.class);
-  public static final StyleKey<Color> LABEL_COLOR = new StyleKey<>("button.label.color", Color.class);
-  public static final StyleKey<KeyBinding> ACTIVATE_BINDING = new StyleKey<>("button.activate", KeyBinding.class);
-
   private State state = State.IDLE;
+  private String label = "Action button";
   private boolean enabled = true;
   private boolean hovered;
+  private boolean focused;
   private boolean pointerPressed;
   private boolean keyboardPressed;
   private @Nullable KeyCode pointerKey;
   private @Nullable KeyCode keyboardKey;
+  private @Nullable KeyBinding activationBinding;
   private @Nullable Runnable onClick;
 
-  public Button(Rectangle bounds, Look look) {
-    super(bounds, look);
+  public Button(Rectangle bounds) {
+    super(bounds);
+  }
+
+  public String label() {
+    return label;
+  }
+
+  public void setLabel(String value) {
+    label = java.util.Objects.requireNonNull(value, "value");
   }
 
   /** Creates the conventional mouse, Enter, and Space activation binding for one input snapshot. */
@@ -84,6 +80,15 @@ public final class Button extends Element {
     return enabled;
   }
 
+  public boolean focused() {
+    return focused;
+  }
+
+  @Override
+  protected ElementRenderer defaultRenderer() {
+    return ButtonRenderer.INSTANCE;
+  }
+
   public void setEnabled(boolean value) {
     enabled = value;
     if (!value) {
@@ -100,25 +105,8 @@ public final class Button extends Element {
     onClick = value;
   }
 
-  @Override
-  protected void drawSelf(Graphics graphics, Rectangle area) {
-    Object background = look().get(backgroundKey());
-    if (background == null) {
-      background = look().get(IDLE_BACKGROUND);
-    }
-    if (background instanceof Color color) {
-      graphics.setTint(color);
-      graphics.drawRectangle(area);
-    } else if (background instanceof Drawable2D drawable) {
-      graphics.draw(drawable, area);
-    }
-    Text label = look().get(LABEL);
-    if (label != null) {
-      Color labelColor = look().get(LABEL_COLOR);
-      graphics.setTint(labelColor == null ? Color.WHITE : labelColor);
-      graphics.drawText(label, area.center(), Alignment.CENTRAL);
-    }
-    graphics.setTint(Color.WHITE);
+  public void setActivationBinding(@Nullable KeyBinding value) {
+    activationBinding = value;
   }
 
   @Override
@@ -133,7 +121,9 @@ public final class Button extends Element {
     }
     if (action == KeyAction.PRESS) {
       KeyBinding binding = activationBinding();
-      if (binding == null || !binding.transitioned()) {
+      if (binding == null
+          ? button != KeyCode.MOUSE_LEFT
+          : !binding.transitioned()) {
         return false;
       }
       pointerPressed = true;
@@ -159,7 +149,9 @@ public final class Button extends Element {
     }
     if (action == KeyAction.PRESS) {
       KeyBinding binding = activationBinding();
-      if (binding == null || !binding.transitioned()) {
+      if (binding == null
+          ? !isDefaultKeyboardActivation(key)
+          : !binding.transitioned()) {
         return false;
       }
       keyboardPressed = true;
@@ -207,6 +199,7 @@ public final class Button extends Element {
 
   @Override
   public void onFocusChanged(boolean focused) {
+    this.focused = focused;
   }
 
   @Override
@@ -216,15 +209,6 @@ public final class Button extends Element {
       keyboardKey = null;
       refreshState();
     }
-  }
-
-  private StyleKey<Object> backgroundKey() {
-    return switch (state()) {
-      case IDLE -> IDLE_BACKGROUND;
-      case HOVERED -> HOVERED_BACKGROUND;
-      case PRESSED -> PRESSED_BACKGROUND;
-      case DISABLED -> DISABLED_BACKGROUND;
-    };
   }
 
   private void refreshState() {
@@ -242,7 +226,11 @@ public final class Button extends Element {
   }
 
   private @Nullable KeyBinding activationBinding() {
-    return look().get(ACTIVATE_BINDING);
+    return activationBinding;
+  }
+
+  private static boolean isDefaultKeyboardActivation(KeyCode key) {
+    return key == KeyCode.ENTER || key == KeyCode.KP_ENTER || key == KeyCode.SPACE;
   }
 
   public enum State {

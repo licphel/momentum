@@ -145,26 +145,18 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       ByteBuffer buf = bitmap.buffer(pitch * h);
       assert buf != null;
       byte[] rgba = new byte[w * h * 4];
-      if (bitmap.pitch() < 0) {
-        for (int row = 0; row < h; row++) {
-          for (int col = 0; col < w; col++) {
-            int src = (h - 1 - row) * pitch + col;
-            int dst = (row * w + col) * 4;
-            byte grey = buf.get(src);
-            rgba[dst] = (byte) 255;
-            rgba[dst + 1] = (byte) 255;
-            rgba[dst + 2] = (byte) 255;
-            rgba[dst + 3] = grey;
-          }
-        }
-      } else {
-        for (int i = 0; i < w * h; i++) {
-          byte grey = buf.get(i);
-          int off = i * 4;
-          rgba[off] = (byte) 255;
-          rgba[off + 1] = (byte) 255;
-          rgba[off + 2] = (byte) 255;
-          rgba[off + 3] = grey;
+      boolean bottomUp = bitmap.pitch() < 0;
+      for (int row = 0; row < h; row++) {
+        int srcRow = bottomUp ? h - 1 - row : row;
+        int srcBase = srcRow * pitch;
+        int dstBase = row * w * 4;
+        for (int col = 0; col < w; col++) {
+          byte grey = buf.get(srcBase + col);
+          int dst = dstBase + col * 4;
+          rgba[dst] = (byte) 255;
+          rgba[dst + 1] = (byte) 255;
+          rgba[dst + 2] = (byte) 255;
+          rgba[dst + 3] = grey;
         }
       }
 

@@ -52,6 +52,7 @@ public final class TextureAtlas implements AutoCloseable {
   private final int padding;
   private final AtlasRef ref = new AtlasRef();
   private final List<Rect> freeRects = new ArrayList<>();
+  private final List<Texture> retiredTextures = new ArrayList<>();
   private Texture texture;
   private int size;
   private boolean disposed;
@@ -143,6 +144,10 @@ public final class TextureAtlas implements AutoCloseable {
     }
     disposed = true;
     texture.close();
+    for (Texture retired : retiredTextures) {
+      retired.close();
+    }
+    retiredTextures.clear();
   }
 
   /**
@@ -276,9 +281,13 @@ public final class TextureAtlas implements AutoCloseable {
     size *= 2;
 
     Texture newTex = createTexture(size);
-    texture.blit(newTex, 0, 0, oldSize, oldSize, 0, 0, oldSize, oldSize);
+    Texture oldTex = texture;
+    oldTex.blit(newTex, 0, 0, oldSize, oldSize, 0, 0, oldSize, oldSize);
     ref.set(newTex);
-    texture.close();
+    // Draw batches recorded before this expansion may still reference oldTex
+    // when the asynchronous render queue eventually executes. Keep it alive
+    // until the atlas closes instead of deleting it ahead of those draws.
+    retiredTextures.add(oldTex);
     texture = newTex;
 
     freeRects.add(new Rect(oldSize, 0, oldSize, oldSize));

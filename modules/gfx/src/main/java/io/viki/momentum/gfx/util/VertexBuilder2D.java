@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.util;
 
-import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.raster.Glyph;
@@ -33,12 +32,13 @@ import io.viki.momentum.gfx.texture.Drawable2D;
 import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TexturePart;
-import io.viki.momentum.math.shape.Poly;
-import io.viki.momentum.math.shape.Rectangle;
-import io.viki.momentum.math.util.FastTrigonometric;
+import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.Vector3;
 import io.viki.momentum.math.curve.Curve;
+import io.viki.momentum.math.shape.Poly;
+import io.viki.momentum.math.shape.Rectangle;
+import io.viki.momentum.math.util.FastTrigonometric;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,8 +52,21 @@ import org.jspecify.annotations.Nullable;
  * @see VertexBuilder
  */
 public class VertexBuilder2D extends VertexBuilder {
+  /**
+   * Sentinel passed to {@link #setPointSize(float)} and {@link #setStrokeWidth(float)} to use
+   * the backend's native point and line rasterization.
+   */
+  public static final float SYSTEM_WIDTH = 0.0F;
+
+  private static final int MIN_ROUND_SEGMENTS = 3;
+  private static final int MAX_ROUND_SEGMENTS = 16;
+  private static final float ROUND_SEGMENT_LENGTH = 4.0F;
+  private static final float DEGENERATE_LENGTH_EPSILON = 1.0E-7F;
+
   protected @Nullable Primitive2D currentPrimitive;
   protected @Nullable Texture currentTexture;
+  private float pointSize = SYSTEM_WIDTH;
+  private float strokeWidth = SYSTEM_WIDTH;
   /** Whether subsequent texture vertices use the active camera's vertically flipped convention. */
   protected boolean uvYFlipped;
 
@@ -65,6 +78,54 @@ public class VertexBuilder2D extends VertexBuilder {
    */
   public VertexBuilder2D(VertexStore data, TransformHandler transformHandler) {
     super(data, transformHandler);
+  }
+
+  /**
+   * Returns the software point diameter used by subsequent {@link #drawPoint(float, float)} calls.
+   * A value of {@link #SYSTEM_WIDTH} selects the backend's native point primitive.
+   *
+   * @return the configured point diameter, or {@link #SYSTEM_WIDTH} for native rasterization
+   */
+  public float pointSize() {
+    return pointSize;
+  }
+
+  /**
+   * Sets the software point diameter used by subsequent point draws. Positive values expand a
+   * point into a filled oval; {@link #SYSTEM_WIDTH} restores the backend's native point primitive.
+   *
+   * @param value the point diameter in world units, or {@link #SYSTEM_WIDTH}
+   */
+  public void setPointSize(float value) {
+    validateWidth(value, "Point size");
+    pointSize = value;
+  }
+
+  /**
+   * Returns the software stroke width used by subsequent {@link #drawLine(float, float, float, float)} calls.
+   * A value of {@link #SYSTEM_WIDTH} selects the backend's native line rasterization.
+   *
+   * @return the configured stroke width, or {@link #SYSTEM_WIDTH} for native rasterization
+   */
+  public float strokeWidth() {
+    return strokeWidth;
+  }
+
+  /**
+   * Sets the software stroke width used by subsequent path draws. Positive values expand a line
+   * into a filled quadrilateral; {@link #SYSTEM_WIDTH} restores the backend's native line primitive.
+   *
+   * @param value the stroke width in world units, or {@link #SYSTEM_WIDTH}
+   */
+  public void setStrokeWidth(float value) {
+    validateWidth(value, "Stroke width");
+    strokeWidth = value;
+  }
+
+  private static void validateWidth(float value, String name) {
+    if (!Float.isFinite(value) || value < SYSTEM_WIDTH) {
+      throw new IllegalArgumentException(name + " must be finite and non-negative: " + value);
+    }
   }
 
   /**
@@ -355,6 +416,42 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   /**
+   * Draws a filled, round-cornered rectangle with the given dimensions.
+   *
+   * @param x      the X position in world units
+   * @param y      the Y position in world units
+   * @param w      the width in world units
+   * @param h      the height in world units
+   * @param radius the round radius
+   */
+  public void drawRoundRect(float x, float y, float w, float h, float radius) {
+    float r = clampRoundRadius(w, h, radius);
+    if (r <= 1.0E-7F) {
+      drawRectangle(x, y, w, h);
+      return;
+    }
+    float innerWidth = w - r * 2.0F;
+    float innerHeight = h - r * 2.0F;
+    drawRectangle(x + r, y, innerWidth, h);
+    drawRectangle(x, y + r, r, innerHeight);
+    drawRectangle(x + w - r, y + r, r, innerHeight);
+    drawRoundCorner(x + r, y + r, r, (float) Math.PI, (float) (Math.PI * 1.5));
+    drawRoundCorner(x + w - r, y + r, r, (float) (Math.PI * 1.5), (float) (Math.PI * 2.0));
+    drawRoundCorner(x + w - r, y + h - r, r, 0.0F, (float) (Math.PI * 0.5));
+    drawRoundCorner(x + r, y + h - r, r, (float) (Math.PI * 0.5), (float) Math.PI);
+  }
+
+  /**
+   * Draws a filled, round-cornered rectangle with the given dimensions.
+   *
+   * @param dst    the destination rectangle in world units
+   * @param radius the round radius
+   */
+  public void drawRoundRect(Rectangle dst, float radius) {
+    drawRoundRect(dst.minX(), dst.minY(), dst.width(), dst.height(), radius);
+  }
+
+  /**
    * Draws the outline of a rectangle as four connected line segments.
    *
    * @param x the X position in world units
@@ -379,6 +476,41 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   /**
+   * Draws the outline of a round-cornered rectangle as connected line segments.
+   *
+   * @param x      the X position in world units
+   * @param y      the Y position in world units
+   * @param w      the width in world units
+   * @param h      the height in world units
+   * @param radius the round radius
+   */
+  public void drawRoundRectFrame(float x, float y, float w, float h, float radius) {
+    float r = clampRoundRadius(w, h, radius);
+    if (r == 0.0F) {
+      drawRectangleFrame(x, y, w, h);
+      return;
+    }
+    drawLine(x + r, y, x + w - r, y);
+    drawRoundCornerFrame(x + w - r, y + r, r, (float) (Math.PI * 1.5), (float) (Math.PI * 2.0));
+    drawLine(x + w, y + r, x + w, y + h - r);
+    drawRoundCornerFrame(x + w - r, y + h - r, r, 0.0F, (float) (Math.PI * 0.5));
+    drawLine(x + w - r, y + h, x + r, y + h);
+    drawRoundCornerFrame(x + r, y + h - r, r, (float) (Math.PI * 0.5), (float) Math.PI);
+    drawLine(x, y + h - r, x, y + r);
+    drawRoundCornerFrame(x + r, y + r, r, (float) Math.PI, (float) (Math.PI * 1.5));
+  }
+
+  /**
+   * Draws the outline of a round-cornered rectangle as connected line segments.
+   *
+   * @param dst    the destination rectangle in world units
+   * @param radius the round radius
+   */
+  public void drawRoundRectFrame(Rectangle dst, float radius) {
+    drawRoundRectFrame(dst.minX(), dst.minY(), dst.width(), dst.height(), radius);
+  }
+
+  /**
    * Draws a line segment between two endpoints.
    *
    * @param x1 the X coordinate of the first endpoint
@@ -387,6 +519,10 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param y2 the Y coordinate of the second endpoint
    */
   public void drawLine(float x1, float y1, float x2, float y2) {
+    if (strokeWidth > SYSTEM_WIDTH) {
+      drawSoftwareLine(x1, y1, x2, y2);
+      return;
+    }
     setPrimitive(Primitive2D.COLOR_LINE);
 
     putPosColor(x1, y1, 0, gradient.getColor(0));
@@ -411,10 +547,40 @@ public class VertexBuilder2D extends VertexBuilder {
    * @param y the Y coordinate in world units
    */
   public void drawPoint(float x, float y) {
+    if (pointSize > SYSTEM_WIDTH) {
+      drawOval(x - pointSize * 0.5F, y - pointSize * 0.5F, pointSize, pointSize);
+      return;
+    }
     setPrimitive(Primitive2D.COLOR_POINT);
 
     putPosColor(x, y, 0, gradient.getColor(0));
     data.addVertex(1);
+  }
+
+  /**
+   * Expands a line into a filled quadrilateral for a deterministic software stroke.
+   *
+   * <p>Keeping this path separate from the native line primitive is intentional: a width of
+   * {@link #SYSTEM_WIDTH} must retain the backend's point/line rasterization, while positive
+   * widths are rendered from ordinary triangles and therefore work consistently across backends.
+   */
+  private void drawSoftwareLine(float x1, float y1, float x2, float y2) {
+    float dx = x2 - x1;
+    float dy = y2 - y1;
+    float length = (float) Math.sqrt(dx * dx + dy * dy);
+    if (length <= DEGENERATE_LENGTH_EPSILON) {
+      drawOval(x1 - strokeWidth * 0.5F, y1 - strokeWidth * 0.5F, strokeWidth, strokeWidth);
+      return;
+    }
+
+    float halfWidth = strokeWidth * 0.5F;
+    float nx = -dy / length * halfWidth;
+    float ny = dx / length * halfWidth;
+    drawPoly(
+        new Vector2(x1 + nx, y1 + ny),
+        new Vector2(x2 + nx, y2 + ny),
+        new Vector2(x2 - nx, y2 - ny),
+        new Vector2(x1 - nx, y1 - ny));
   }
 
   /**
@@ -768,30 +934,6 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   /**
-   * Computes the segment count for an oval from its transformed radius, so that detail
-   * scales with the on-screen size.
-   *
-   * @param x the X position of the bounding box
-   * @param y the Y position of the bounding box
-   * @param w the width
-   * @param h the height
-   * @return the segment count, clamped to {@code [8, 128]}
-   */
-  private int computeOvalSegments(float x, float y, float w, float h) {
-    float rx = w / 2.0F;
-    float ry = h / 2.0F;
-    float cx = x + rx;
-    float cy = y + ry;
-    Vector3 tc = transform().top().transform(new Vector3(cx, cy, 0));
-    Vector3 tr = transform().top().transform(new Vector3(cx + rx, cy, 0));
-    float dx = tr.x() - tc.x();
-    float dy = tr.y() - tc.y();
-    float screenRx = (float) Math.sqrt(dx * dx + dy * dy);
-    int segments = (int) (screenRx * Math.PI * 0.5F);
-    return Math.clamp(segments, 8, 128);
-  }
-
-  /**
    * Hook invoked just before the current primitive or texture is replaced, allowing
    * subclasses to flush pending state tied to the previous values.
    */
@@ -826,5 +968,57 @@ public class VertexBuilder2D extends VertexBuilder {
       flush0();
       currentTexture = tex;
     }
+  }
+
+  private int computeOvalSegments(float x, float y, float w, float h) {
+    float rx = w / 2.0F;
+    float ry = h / 2.0F;
+    float cx = x + rx;
+    float cy = y + ry;
+    Vector3 tc = transform().top().transform(new Vector3(cx, cy, 0));
+    Vector3 tr = transform().top().transform(new Vector3(cx + rx, cy, 0));
+    float dx = tr.x() - tc.x();
+    float dy = tr.y() - tc.y();
+    float screenRx = (float) Math.sqrt(dx * dx + dy * dy);
+    int segments = (int) (screenRx * Math.PI * 0.5F);
+    return Math.clamp(segments, 8, 128);
+  }
+
+  private void drawRoundCorner(float centerX, float centerY, float radius, float startAngle, float endAngle) {
+    int segments = computeRoundSegments(radius);
+    float previousX = centerX + (float) Math.cos(startAngle) * radius;
+    float previousY = centerY + (float) Math.sin(startAngle) * radius;
+    float step = (endAngle - startAngle) / segments;
+    for (int index = 1; index <= segments; index++) {
+      float angle = startAngle + step * index;
+      float currentX = centerX + (float) Math.cos(angle) * radius;
+      float currentY = centerY + (float) Math.sin(angle) * radius;
+      drawTriangle(centerX, centerY, previousX, previousY, currentX, currentY);
+      previousX = currentX;
+      previousY = currentY;
+    }
+  }
+
+  private void drawRoundCornerFrame(float centerX, float centerY, float radius, float startAngle, float endAngle) {
+    int segments = computeRoundSegments(radius);
+    float previousX = centerX + (float) Math.cos(startAngle) * radius;
+    float previousY = centerY + (float) Math.sin(startAngle) * radius;
+    float step = (endAngle - startAngle) / segments;
+    for (int index = 1; index <= segments; index++) {
+      float angle = startAngle + step * index;
+      float currentX = centerX + (float) Math.cos(angle) * radius;
+      float currentY = centerY + (float) Math.sin(angle) * radius;
+      drawLine(previousX, previousY, currentX, currentY);
+      previousX = currentX;
+      previousY = currentY;
+    }
+  }
+
+  private static float clampRoundRadius(float width, float height, float radius) {
+    return Math.min(radius, Math.min(width, height) * 0.5F);
+  }
+
+  private static int computeRoundSegments(float radius) {
+    return Math.clamp((int) Math.ceil(radius / ROUND_SEGMENT_LENGTH), MIN_ROUND_SEGMENTS, MAX_ROUND_SEGMENTS);
   }
 }

@@ -18,7 +18,9 @@ import io.viki.momentum.input.event.ResizeEvent;
 import io.viki.momentum.input.event.ScrollEvent;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.gfx.ui.render.TooltipRenderer;
 import io.viki.momentum.gfx.view.View;
+import io.viki.momentum.gfx.view.DesktopView;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
 import org.jspecify.annotations.Nullable;
@@ -45,8 +47,10 @@ public final class PrimaryContext implements AutoCloseable {
   private @Nullable Element hoveredElement;
   private float pointerX;
   private float pointerY;
+  private long hoveredSinceNanos;
   private boolean registered;
   private boolean closed;
+  private String clipboardText = "";
 
   public PrimaryContext(int framebufferWidth, int framebufferHeight,
                         TransformHandler transformHandler) {
@@ -97,6 +101,20 @@ public final class PrimaryContext implements AutoCloseable {
 
   public Resolution resolution() {
     return resolution;
+  }
+
+  public String getClipboardText() {
+    if (view instanceof DesktopView desktopView) {
+      clipboardText = desktopView.getClipboardText();
+    }
+    return clipboardText;
+  }
+
+  public void setClipboardText(String value) {
+    clipboardText = value;
+    if (view instanceof DesktopView desktopView) {
+      desktopView.setClipboardText(value);
+    }
   }
 
   /** Returns the screen's current pollable input state. */
@@ -151,6 +169,7 @@ public final class PrimaryContext implements AutoCloseable {
       if (previousCapture != null) {
         cancelCapture(previousCapture, button);
       }
+      targetCanvas.bringWindowToFrontAt(pointerX, pointerY);
       Element target = routeMouseButton(targetCanvas, pointerX, pointerY, button, action, modifiers);
       keyCaptures[captureIndex] = target;
       targetCanvas.focusNearest(target);
@@ -258,6 +277,21 @@ public final class PrimaryContext implements AutoCloseable {
     resolution.apply(graphics);
   }
 
+  void drawTooltip(Graphics graphics) {
+    if (hoveredElement == null) {
+      return;
+    }
+    String tooltip = hoveredElement.tooltip();
+    if (tooltip == null) {
+      return;
+    }
+    long delayNanos = hoveredElement.tooltipDelayMillis() * 1_000_000L;
+    if (System.nanoTime() - hoveredSinceNanos < delayNanos) {
+      return;
+    }
+    TooltipRenderer.render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
+  }
+
   void treeChanged() {
     if (canvas != null) {
       purgeDetachedReferences(canvas);
@@ -313,18 +347,53 @@ public final class PrimaryContext implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseMove(Element element, float x, float y) {
+    if (!element.visible()) {
+      return null;
+    }
+    Element target = routeMouseMoveParts(element, x, y);
+    if (target != null) {
+      return target;
+    }
+    return routeMouseMoveContent(element, x, y);
+  }
+
+  private @Nullable Element routeMouseMoveContent(Element element, float x, float y) {
     if (!element.containsLocal(x, y)) {
       return null;
     }
+    Element target = routeMouseMoveContent(element.children(), x, y);
+    if (target != null) {
+      return target;
+    }
+    return element.onMouseMove(x, y) || element.tooltip() != null ? element : null;
+  }
+
+  private @Nullable Element routeMouseMoveContent(List<Element> elements, float x, float y) {
+    for (int i = elements.size() - 1; i >= 0; i--) {
+      Element child = elements.get(i);
+      Element target = routeMouseMoveContent(child,
+          x - child.bounds().minX(), y - child.bounds().minY());
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
+  }
+
+  private @Nullable Element routeMouseMoveParts(Element element, float x, float y) {
     Element target = routeMouseMove(element.parts(), x, y);
     if (target != null) {
       return target;
     }
-    target = routeMouseMove(element.children(), x, y);
-    if (target != null) {
-      return target;
+    for (int i = element.children().size() - 1; i >= 0; i--) {
+      Element child = element.children().get(i);
+      target = routeMouseMoveParts(child,
+          x - child.bounds().minX(), y - child.bounds().minY());
+      if (target != null) {
+        return target;
+      }
     }
-    return element.onMouseMove(x, y) ? element : null;
+    return null;
   }
 
   private @Nullable Element routeMouseMove(List<Element> elements, float x, float y) {
@@ -341,18 +410,56 @@ public final class PrimaryContext implements AutoCloseable {
 
   private @Nullable Element routeMouseButton(Element element, float x, float y, KeyCode button,
                                              KeyAction action, int modifiers) {
-    if (!element.containsLocal(x, y)) {
+    if (!element.visible()) {
       return null;
     }
-    Element target = routeMouseButton(element.parts(), x, y, button, action, modifiers);
+    Element target = routeMouseButtonParts(element, x, y, button, action, modifiers);
     if (target != null) {
       return target;
     }
-    target = routeMouseButton(element.children(), x, y, button, action, modifiers);
+    return routeMouseButtonContent(element, x, y, button, action, modifiers);
+  }
+
+  private @Nullable Element routeMouseButtonContent(Element element, float x, float y,
+      KeyCode button, KeyAction action, int modifiers) {
+    if (!element.containsLocal(x, y)) {
+      return null;
+    }
+    Element target = routeMouseButtonContent(element.children(), x, y, button, action, modifiers);
     if (target != null) {
       return target;
     }
     return element.onMouseButton(x, y, button, action, modifiers) ? element : null;
+  }
+
+  private @Nullable Element routeMouseButtonParts(Element element, float x, float y,
+      KeyCode button, KeyAction action, int modifiers) {
+    Element target = routeMouseButton(element.parts(), x, y, button, action, modifiers);
+    if (target != null) {
+      return target;
+    }
+    for (int i = element.children().size() - 1; i >= 0; i--) {
+      Element child = element.children().get(i);
+      target = routeMouseButtonParts(child,
+          x - child.bounds().minX(), y - child.bounds().minY(), button, action, modifiers);
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
+  }
+
+  private @Nullable Element routeMouseButtonContent(List<Element> elements, float x, float y,
+      KeyCode button, KeyAction action, int modifiers) {
+    for (int i = elements.size() - 1; i >= 0; i--) {
+      Element child = elements.get(i);
+      Element target = routeMouseButtonContent(child,
+          x - child.bounds().minX(), y - child.bounds().minY(), button, action, modifiers);
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
   }
 
   private @Nullable Element routeMouseButton(List<Element> elements, float x, float y,
@@ -370,18 +477,56 @@ public final class PrimaryContext implements AutoCloseable {
 
   private @Nullable Element routeScroll(Element element, float x, float y,
                                         double deltaX, double deltaY) {
-    if (!element.containsLocal(x, y)) {
+    if (!element.visible()) {
       return null;
     }
-    Element target = routeScroll(element.parts(), x, y, deltaX, deltaY);
+    Element target = routeScrollParts(element, x, y, deltaX, deltaY);
     if (target != null) {
       return target;
     }
-    target = routeScroll(element.children(), x, y, deltaX, deltaY);
+    return routeScrollContent(element, x, y, deltaX, deltaY);
+  }
+
+  private @Nullable Element routeScrollContent(Element element, float x, float y,
+      double deltaX, double deltaY) {
+    if (!element.containsLocal(x, y)) {
+      return null;
+    }
+    Element target = routeScrollContent(element.children(), x, y, deltaX, deltaY);
     if (target != null) {
       return target;
     }
     return element.onScroll(x, y, deltaX, deltaY) ? element : null;
+  }
+
+  private @Nullable Element routeScrollParts(Element element, float x, float y,
+      double deltaX, double deltaY) {
+    Element target = routeScroll(element.parts(), x, y, deltaX, deltaY);
+    if (target != null) {
+      return target;
+    }
+    for (int i = element.children().size() - 1; i >= 0; i--) {
+      Element child = element.children().get(i);
+      target = routeScrollParts(child,
+          x - child.bounds().minX(), y - child.bounds().minY(), deltaX, deltaY);
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
+  }
+
+  private @Nullable Element routeScrollContent(List<Element> elements, float x, float y,
+      double deltaX, double deltaY) {
+    for (int i = elements.size() - 1; i >= 0; i--) {
+      Element child = elements.get(i);
+      Element target = routeScrollContent(child,
+          x - child.bounds().minX(), y - child.bounds().minY(), deltaX, deltaY);
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
   }
 
   private @Nullable Element routeScroll(List<Element> elements, float x, float y,
@@ -406,6 +551,7 @@ public final class PrimaryContext implements AutoCloseable {
     }
     hoveredElement = target;
     if (target != null) {
+      hoveredSinceNanos = System.nanoTime();
       target.onPointerEnter();
     }
   }

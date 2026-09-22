@@ -17,7 +17,6 @@ import io.viki.momentum.input.event.ResizeEvent;
 import io.viki.momentum.input.event.ScrollEvent;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.texture.Texture;
-import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Matrix4x4;
@@ -25,7 +24,6 @@ import io.viki.momentum.math.Vector2;
 import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Supplier;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertSame;
@@ -101,38 +99,11 @@ public final class ResolutionTest {
   }
 
   @Test
-  void lookResolvesSuppliersAtUseTime() {
-    AtomicInteger calls = new AtomicInteger();
-    StyleKey<Color> dynamicKey = new StyleKey<>("dynamic", Color.class);
-    StyleKey<Color> emptyKey = new StyleKey<>("empty", Color.class);
-    Look look = new Look();
-    Supplier<Color> dynamic = () -> {
-      calls.incrementAndGet();
-      return Color.RED;
-    };
-    look.put(dynamicKey, dynamic);
-    look.put(emptyKey, (Supplier<Color>) () -> null);
-
-    assertEquals(Color.RED, look.get(dynamicKey));
-    assertEquals(Color.RED, look.get(dynamicKey));
-    assertEquals(2, calls.get());
-    assertTrue(look.get(emptyKey) == null);
-    Supplier<?> stored = null;
-    for (var entry : look) {
-      if (entry.getKey().equals(dynamicKey)) {
-        stored = entry.getValue();
-      }
-    }
-    assertSame(dynamic, stored);
-  }
-
-  @Test
   void viewEventBusConvertsInputAndDispatchesLocalCallbacks() {
     TestView view = new TestView(1600, 900, 800, 450);
-    Look look = new Look();
-    try (Canvas canvas = Canvas.open(view, HANDLER, look)) {
-      PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100), look);
-      Probe probe = new Probe(Rectangle.of(10, 10, 80, 30), look);
+    try (Canvas canvas = Canvas.open(view, HANDLER)) {
+      PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100));
+      Probe probe = new Probe(Rectangle.of(10, 10, 80, 30));
       host.addChild(probe);
       canvas.add(host);
 
@@ -156,9 +127,8 @@ public final class ResolutionTest {
   void barePrimaryContextCanBeDrivenWithoutView() {
     PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
     AtomicInteger clicks = new AtomicInteger();
-    Look look = interactiveLook(context);
-    try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
+    try (Canvas canvas = new Canvas(context)) {
+      Button button = new Button(Rectangle.of(10, 20, 100, 30));
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
 
@@ -177,9 +147,8 @@ public final class ResolutionTest {
     TestView view = new TestView(800, 450, 800, 450);
     AtomicInteger clicks = new AtomicInteger();
     PrimaryContext context = new PrimaryContext(view, HANDLER);
-    Look look = interactiveLook(context);
-    try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
+    try (Canvas canvas = new Canvas(context)) {
+      Button button = new Button(Rectangle.of(10, 20, 100, 30));
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
 
@@ -203,15 +172,14 @@ public final class ResolutionTest {
   }
 
   @Test
-  void buttonUsesItsLookKeyBindingAndFollowsRuntimeRebinding() {
+  void buttonUsesConfiguredKeyBindingAndFollowsRuntimeRebinding() {
     PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
-    Look look = new Look();
     KeyBinding activation = new KeyBinding("test.button.activate",
         KeyMatch.of(context.snapshot().key(KeyCode.F1)));
-    look.put(Button.ACTIVATE_BINDING, activation);
     AtomicInteger clicks = new AtomicInteger();
-    try (Canvas canvas = new Canvas(context, look)) {
-      Button button = new Button(Rectangle.of(10, 20, 100, 30), look);
+    try (Canvas canvas = new Canvas(context)) {
+      Button button = new Button(Rectangle.of(10, 20, 100, 30));
+      button.setActivationBinding(activation);
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
       canvas.requestFocus(button);
@@ -236,14 +204,15 @@ public final class ResolutionTest {
   @Test
   void keyboardReleaseStaysCapturedWhenFocusChanges() {
     PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
-    Look look = new Look();
-    look.put(Button.ACTIVATE_BINDING, new KeyBinding("test.button.activate",
-        KeyMatch.of(context.snapshot().key(KeyCode.F1))));
+    KeyBinding activation = new KeyBinding("test.button.activate",
+        KeyMatch.of(context.snapshot().key(KeyCode.F1)));
     AtomicInteger firstClicks = new AtomicInteger();
     AtomicInteger secondClicks = new AtomicInteger();
-    try (Canvas canvas = new Canvas(context, look)) {
-      Button first = new Button(Rectangle.of(10, 20, 100, 30), look);
-      Button second = new Button(Rectangle.of(120, 20, 100, 30), look);
+    try (Canvas canvas = new Canvas(context)) {
+      Button first = new Button(Rectangle.of(10, 20, 100, 30));
+      Button second = new Button(Rectangle.of(120, 20, 100, 30));
+      first.setActivationBinding(activation);
+      second.setActivationBinding(activation);
       first.setOnClick(firstClicks::incrementAndGet);
       second.setOnClick(secondClicks::incrementAndGet);
       canvas.add(first);
@@ -263,17 +232,16 @@ public final class ResolutionTest {
   void internalPartsWinHitTestingAndCloseDeregistersCallbacks() {
     TestView view = new TestView(800, 450, 800, 450);
     PrimaryContext context = new PrimaryContext(view, HANDLER);
-    Look look = interactiveLook(context);
     AtomicInteger partClicks = new AtomicInteger();
     AtomicInteger childClicks = new AtomicInteger();
-    PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100), look);
-    Button part = new Button(Rectangle.of(10, 10, 80, 30), look);
-    Button child = new Button(Rectangle.of(10, 10, 80, 30), look);
+    PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100));
+    Button part = new Button(Rectangle.of(10, 10, 80, 30));
+    Button child = new Button(Rectangle.of(10, 10, 80, 30));
     part.setOnClick(partClicks::incrementAndGet);
     child.setOnClick(childClicks::incrementAndGet);
     host.attachPart(part);
     host.addChild(child);
-    Canvas canvas = new Canvas(context, look);
+    Canvas canvas = new Canvas(context);
     canvas.add(host);
 
     postMouse(view, KeyAction.PRESS, 115.0, 115.0);
@@ -298,15 +266,9 @@ public final class ResolutionTest {
     view.eventBus().post(new MouseButtonEvent(KeyCode.MOUSE_LEFT, action, x, y, 0));
   }
 
-  private static Look interactiveLook(PrimaryContext context) {
-    Look look = new Look();
-    look.put(Button.ACTIVATE_BINDING, Button.makeDefaultActivationKeyBinding(context.snapshot()));
-    return look;
-  }
-
   private static final class PartHost extends Element {
-    private PartHost(Rectangle bounds, Look look) {
-      super(bounds, look);
+    private PartHost(Rectangle bounds) {
+      super(bounds);
     }
 
     private void attachPart(Element part) {
@@ -320,8 +282,8 @@ public final class ResolutionTest {
     private double scrollX;
     private double scrollY;
 
-    private Probe(Rectangle bounds, Look look) {
-      super(bounds, look);
+    private Probe(Rectangle bounds) {
+      super(bounds);
     }
 
     @Override
