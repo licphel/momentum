@@ -27,6 +27,7 @@ package io.viki.momentum.gfx.opengl;
 import io.viki.momentum.gfx.DirectBufferPool;
 import io.viki.momentum.gfx.io.ImageUtil;
 import io.viki.momentum.gfx.pass.RenderTarget;
+import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
 import io.viki.momentum.gfx.texture.TextureFilter;
@@ -105,15 +106,30 @@ public final class OpenGLRenderTarget implements RenderTarget {
 
   @Override
   public void blit(RenderTarget target, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY, int dstW,
-                   int dstH, TextureFilter filter) {
+                   int dstH, TextureFilter filter, Scissor scissor) {
     ctx.submit(() -> {
       OpenGLRenderTarget dst = (OpenGLRenderTarget) target;
       int glFilter = OpenGLUtils.textureFilter(filter);
-      ctx.cache.bindFramebuffer(GL_READ_FRAMEBUFFER, handle);
-      ctx.cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, dst.handle);
-      glBlitFramebuffer(srcX, srcY, srcX + srcW, srcY + srcH, dstX, dstY, dstX + dstW, dstY + dstH,
-          GL_COLOR_BUFFER_BIT, glFilter);
-      ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, 0);
+      OpenGLCache cache = ctx.cache;
+      int previousReadFramebuffer = cache.fboR;
+      int previousDrawFramebuffer = cache.fboW;
+      boolean previousScissorEnabled = cache.scissorTest;
+      int previousScissorX = cache.scissorRect[0];
+      int previousScissorY = cache.scissorRect[1];
+      int previousScissorWidth = cache.scissorRect[2];
+      int previousScissorHeight = cache.scissorRect[3];
+      try {
+        cache.setScissor(scissor.x(), target.height() - scissor.y() - scissor.height(),
+            scissor.width(), scissor.height(), scissor.enable());
+        cache.bindFramebuffer(GL_READ_FRAMEBUFFER, handle);
+        cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, dst.handle);
+        glBlitFramebuffer(srcX, srcY, srcX + srcW, srcY + srcH, dstX, dstY, dstX + dstW, dstY + dstH, GL_COLOR_BUFFER_BIT, glFilter);
+      } finally {
+        cache.bindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+        cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+        cache.setScissor(previousScissorX, previousScissorY, previousScissorWidth,
+            previousScissorHeight, previousScissorEnabled);
+      }
     });
   }
 
@@ -208,19 +224,36 @@ public final class OpenGLRenderTarget implements RenderTarget {
         if (dstHandle == 0) {
           return;
         }
-        // use a temporary FBO pair to blit textures
-        int readFbo = glGenFramebuffers();
-        int drawFbo = glGenFramebuffers();
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, readFbo);
-        glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcHandle, 0);
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFbo);
-        glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstHandle, 0);
-        glBlitFramebuffer(srcX, fboHeight - srcY - srcH, srcX + srcW, fboHeight - srcY,
-            dstX, target.height() - dstY - dstH, dstX + dstW, target.height() - dstY,
-            GL_COLOR_BUFFER_BIT, GL_LINEAR);
-        glBindFramebuffer(GL_FRAMEBUFFER, 0);
-        glDeleteFramebuffers(readFbo);
-        glDeleteFramebuffers(drawFbo);
+        OpenGLCache cache = OpenGLRenderTarget.this.ctx.cache;
+        int previousReadFramebuffer = cache.fboR;
+        int previousDrawFramebuffer = cache.fboW;
+        boolean previousScissorEnabled = cache.scissorTest;
+        int readFbo = 0;
+        int drawFbo = 0;
+        try {
+          // Use a temporary FBO pair to blit textures. The scissor test is
+          // disabled because it clips framebuffer blits as well as draws.
+          cache.setScissorEnabled(false);
+          readFbo = glGenFramebuffers();
+          drawFbo = glGenFramebuffers();
+          cache.bindFramebuffer(GL_READ_FRAMEBUFFER, readFbo);
+          glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, srcHandle, 0);
+          cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, drawFbo);
+          glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstHandle, 0);
+          glBlitFramebuffer(srcX, fboHeight - srcY - srcH, srcX + srcW, fboHeight - srcY,
+              dstX, target.height() - dstY - dstH, dstX + dstW, target.height() - dstY,
+              GL_COLOR_BUFFER_BIT, GL_LINEAR);
+        } finally {
+          if (readFbo != 0) {
+            glDeleteFramebuffers(readFbo);
+          }
+          if (drawFbo != 0) {
+            glDeleteFramebuffers(drawFbo);
+          }
+          cache.bindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+          cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, previousDrawFramebuffer);
+          cache.setScissorEnabled(previousScissorEnabled);
+        }
       });
     }
 

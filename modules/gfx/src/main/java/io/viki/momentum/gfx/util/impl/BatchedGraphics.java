@@ -82,11 +82,11 @@ public class BatchedGraphics extends StatefulGraphics {
 
     Resource rp = Resource.classpath(BatchedGraphics.class);
     ShaderProgram spCol = ShaderProgram.load(device,
-        rp.readString("/shaders/builtin_color.vert.hlsl"),
-        rp.readString("/shaders/builtin_color.frag.hlsl"));
+        rp.readString("/shaders/builtin_color.vert.glsl"),
+        rp.readString("/shaders/builtin_color.frag.glsl"), ShaderLanguage.GLSL);
     ShaderProgram spTex = ShaderProgram.load(device,
-        rp.readString("/shaders/builtin_texture.vert.hlsl"),
-        rp.readString("/shaders/builtin_texture.frag.hlsl"));
+        rp.readString("/shaders/builtin_texture.vert.glsl"),
+        rp.readString("/shaders/builtin_texture.frag.glsl"), ShaderLanguage.GLSL);
 
     rslColor = ResourceSetLayout.bake(
         new Slot(1, "T", ShaderType.VERTEX_BIT, ResourceType.UNIFORM_BUFFER));

@@ -24,6 +24,7 @@
 
 package io.viki.momentum.gfx.pass;
 
+import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.texture.TextureFilter;
 
@@ -58,8 +59,32 @@ public interface RenderTarget extends FragileTexture, AutoCloseable {
    * @param dstH   height of the destination region
    * @param filter filtering mode when scaling (ignored for 1:1 copies)
    */
-  void blit(RenderTarget target, int srcX, int srcY, int srcW, int srcH, int dstX, int dstY, int dstW, int dstH,
-            TextureFilter filter);
+  default void blit(RenderTarget target, int srcX, int srcY, int srcW, int srcH,
+                    int dstX, int dstY, int dstW, int dstH, TextureFilter filter) {
+    blit(target, srcX, srcY, srcW, srcH, dstX, dstY, dstW, dstH, filter, Scissor.DISABLED);
+  }
+
+  /**
+   * Blits a rectangular region of this render target into another with an explicit destination
+   * scissor.
+   *
+   * <p>The scissor uses top-left framebuffer coordinates, matching the graphics scissor state.
+   * Passing {@link Scissor#DISABLED} copies without clipping.
+   *
+   * @param target  the destination render target
+   * @param srcX    left edge of the source region
+   * @param srcY    top edge of the source region
+   * @param srcW    width of the source region
+   * @param srcH    height of the source region
+   * @param dstX    left edge of the destination region
+   * @param dstY    top edge of the destination region
+   * @param dstW    width of the destination region
+   * @param dstH    height of the destination region
+   * @param filter  filtering mode when scaling
+   * @param scissor destination scissor captured for this blit
+   */
+  void blit(RenderTarget target, int srcX, int srcY, int srcW, int srcH,
+            int dstX, int dstY, int dstW, int dstH, TextureFilter filter, Scissor scissor);
 
   /**
    * Returns the width of this render target in physical pixels, or {@code 0} if unknown.

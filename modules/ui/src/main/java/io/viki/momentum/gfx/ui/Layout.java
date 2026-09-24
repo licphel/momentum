@@ -22,7 +22,28 @@
  * SOFTWARE.
  */
 
-@NullMarked
 package io.viki.momentum.gfx.ui;
 
-import org.jspecify.annotations.NullMarked;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.math.shape.Rectangle;
+
+import java.util.List;
+
+/**
+ * Defines how a container positions its child elements inside a local area.
+ *
+ * <p>Layouts mutate child bounds during a container's layout pass and do not own the child list.
+ * Implementations should preserve the supplied gap where space permits and may clamp geometry
+ * when the available area is smaller than the requested content.
+ */
+@FunctionalInterface
+public interface Layout {
+  /**
+   * Arranges the supplied children within the given area.
+   *
+   * @param area the local region available to the children
+   * @param children the children whose bounds may be updated
+   * @param gap the spacing to preserve between adjacent children
+   */
+  void arrange(Rectangle area, List<Element> children, float gap);
+}

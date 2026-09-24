@@ -22,7 +22,42 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.element;
 
-import org.jspecify.annotations.NullMarked;
+import io.viki.momentum.math.shape.Rectangle;
+
+/**
+ * Provides a general-purpose container for grouping child elements in a rectangular region.
+ *
+ * <p>A panel does not impose layout or input behavior on its children; callers control both by
+ * attaching elements and setting their bounds. The panel is mutable and intended for one UI thread.
+ */
+public final class Panel extends Element {
+  /**
+   * Creates an empty panel with the supplied bounds.
+   *
+   * @param bounds the panel's local bounds
+   */
+  public Panel(Rectangle bounds) {
+    super(bounds);
+  }
+
+  /**
+   * Adds a direct child to the panel.
+   *
+   * @param element the child to attach
+   */
+  public void add(Element element) {
+    addChild(element);
+  }
+
+  /**
+   * Removes a direct child from the panel.
+   *
+   * @param element the child to detach
+   * @return whether the child was attached to this panel
+   */
+  public boolean remove(Element element) {
+    return removeChild(element);
+  }
+}

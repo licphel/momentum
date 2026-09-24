@@ -2,12 +2,36 @@
  * MIT License
  *
  * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
-package io.viki.momentum.gfx.ui;
 
+package io.viki.momentum.gfx.ui.element;
+
+import io.viki.momentum.gfx.ui.render.TooltipRenderer;
+import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.gfx.view.DesktopView;
+import io.viki.momentum.gfx.view.View;
+import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.event.CharEvent;
 import io.viki.momentum.input.event.CursorEnterEvent;
 import io.viki.momentum.input.event.FocusEvent;
@@ -16,131 +40,54 @@ import io.viki.momentum.input.event.MouseButtonEvent;
 import io.viki.momentum.input.event.MouseMoveEvent;
 import io.viki.momentum.input.event.ResizeEvent;
 import io.viki.momentum.input.event.ScrollEvent;
-import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.gfx.ui.render.TooltipRenderer;
-import io.viki.momentum.gfx.view.View;
-import io.viki.momentum.gfx.view.DesktopView;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.shape.Rectangle;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.ArrayList;
 
-/**
- * Abstract UI screen and the sole entry point for input dispatch and coordinate conversion.
- *
- * <p>A context may be backed by a {@link View}, in which case it subscribes to the view when a
- * {@link Canvas} binds to it, or it may be created bare and driven through the dispatch methods.
- * It is mutable and not thread-safe; use it only on the owning UI thread.
- */
-public final class PrimaryContext implements AutoCloseable {
+/** Routes view input to one canvas; not thread-safe. */
+@InternalApi
+final class InputRouter implements AutoCloseable {
   private static final KeyCode[] KEY_CODES = KeyCode.values();
 
+  private final Canvas canvas;
+  private final DpiContext context;
   private final @Nullable View view;
-  private final TransformHandler transformHandler;
-  private final Resolution resolution;
-  private final InputSnapshot snapshot = new InputSnapshot();
+  private final InputSnapshot snapshot;
   private final @Nullable Element[] keyCaptures = new Element[KEY_CODES.length];
-  private Vector2 inputSize;
-  private @Nullable Canvas canvas;
   private @Nullable Element hoveredElement;
   private float pointerX;
   private float pointerY;
   private long hoveredSinceNanos;
+  private String clipboardText = "";
   private boolean registered;
   private boolean closed;
-  private String clipboardText = "";
 
-  public PrimaryContext(int framebufferWidth, int framebufferHeight,
-                        TransformHandler transformHandler) {
-    this(framebufferWidth, framebufferHeight, Resolution.DEFAULT_LOGICAL_WIDTH,
-        Resolution.DEFAULT_LOGICAL_HEIGHT, false, transformHandler);
-  }
-
-  public PrimaryContext(int framebufferWidth, int framebufferHeight, float logicalWidth,
-                        float logicalHeight, boolean onlyIntegerScale,
-                        TransformHandler transformHandler) {
-    this(null, new Vector2(framebufferWidth, framebufferHeight),
-        Resolution.auto(framebufferWidth, framebufferHeight, logicalWidth, logicalHeight,
-            onlyIntegerScale, transformHandler), transformHandler);
-  }
-
-  public PrimaryContext(View view, TransformHandler transformHandler) {
-    this(view, Resolution.DEFAULT_LOGICAL_WIDTH, Resolution.DEFAULT_LOGICAL_HEIGHT, false,
-        transformHandler);
-  }
-
-  public PrimaryContext(View view, float logicalWidth, float logicalHeight,
-                        boolean onlyIntegerScale, TransformHandler transformHandler) {
-    this(view, view.getInputSize(),
-        Resolution.auto(view.getWidth(), view.getHeight(), logicalWidth, logicalHeight,
-            onlyIntegerScale, transformHandler), transformHandler);
-  }
-
-  private PrimaryContext(@Nullable View view, Vector2 inputSize, Resolution resolution,
-                         TransformHandler transformHandler) {
-    validateSize(inputSize.x(), inputSize.y(), "Input coordinate");
-    this.view = view;
-    this.inputSize = inputSize;
-    this.resolution = resolution;
-    this.transformHandler = transformHandler;
-  }
-
-  public Vector2 getInputSize() {
-    return view == null ? inputSize : view.getInputSize();
-  }
-
-  public Vector2 getLogicalSize() {
-    return resolution.logicalSize();
-  }
-
-  public TransformHandler getTransformHandler() {
-    return transformHandler;
-  }
-
-  public Resolution resolution() {
-    return resolution;
-  }
-
-  public String getClipboardText() {
-    if (view instanceof DesktopView desktopView) {
-      clipboardText = desktopView.getClipboardText();
-    }
-    return clipboardText;
-  }
-
-  public void setClipboardText(String value) {
-    clipboardText = value;
-    if (view instanceof DesktopView desktopView) {
-      desktopView.setClipboardText(value);
+  InputRouter(Canvas canvas, DpiContext context) {
+    this.canvas = canvas;
+    this.context = context;
+    view = context.view();
+    snapshot = view == null ? new InputSnapshot() : view.snapshot();
+    if (view != null) {
+      registerViewCallbacks(view);
+      registered = true;
     }
   }
 
-  /** Returns the screen's current pollable input state. */
-  public InputSnapshot snapshot() {
+  InputSnapshot snapshot() {
     return snapshot;
   }
 
-  public void setInputSize(float width, float height) {
-    ensureBare();
-    validateSize(width, height, "Input coordinate");
-    inputSize = new Vector2(width, height);
-  }
-
-  public void resize(int framebufferWidth, int framebufferHeight) {
+  void dispatchMouseMove(double inputX, double inputY) {
     ensureOpen();
-    resolution.resize(framebufferWidth, framebufferHeight);
     if (view == null) {
-      inputSize = new Vector2(framebufferWidth, framebufferHeight);
+      snapshot.applyMouseMove(inputX, inputY);
     }
-  }
-
-  public void dispatchMouseMove(double inputX, double inputY) {
-    Canvas targetCanvas = boundCanvas();
-    snapshot.applyMouseMove(inputX, inputY);
     updatePointer(inputX, inputY);
-    purgeDetachedReferences(targetCanvas);
+    purgeDetachedReferences();
 
     Element captured = firstCapture();
     if (captured != null) {
@@ -149,19 +96,21 @@ public final class PrimaryContext implements AutoCloseable {
       captured.onMouseMove(pointerX - absolute.minX(), pointerY - absolute.minY());
       return;
     }
-    setHovered(routeMouseMove(targetCanvas, pointerX, pointerY));
+    setHovered(routeMouseMove(canvas, pointerX, pointerY));
   }
 
-  public boolean dispatchMouseButton(KeyCode button, KeyAction action, double inputX,
-                                     double inputY, int modifiers) {
-    Canvas targetCanvas = boundCanvas();
+  boolean dispatchMouseButton(KeyCode button, KeyAction action, double inputX, double inputY,
+                              int modifiers) {
+    ensureOpen();
     int mouseId = button.mouseId();
     if (mouseId < 0) {
       throw new IllegalArgumentException("Pointer callback requires a mouse button, got " + button);
     }
-    snapshot.applyMouseButton(button, action, inputX, inputY, modifiers);
+    if (view == null) {
+      snapshot.applyMouseButton(button, action, inputX, inputY, modifiers);
+    }
     updatePointer(inputX, inputY);
-    purgeDetachedReferences(targetCanvas);
+    purgeDetachedReferences();
 
     if (action == KeyAction.PRESS) {
       int captureIndex = button.ordinal();
@@ -169,11 +118,11 @@ public final class PrimaryContext implements AutoCloseable {
       if (previousCapture != null) {
         cancelCapture(previousCapture, button);
       }
-      targetCanvas.bringWindowToFrontAt(pointerX, pointerY);
-      Element target = routeMouseButton(targetCanvas, pointerX, pointerY, button, action, modifiers);
+      canvas.bringWindowToFrontAt(pointerX, pointerY);
+      Element target = routeMouseButton(canvas, pointerX, pointerY, button, action, modifiers);
       keyCaptures[captureIndex] = target;
-      targetCanvas.focusNearest(target);
-      setHovered(routeMouseMove(targetCanvas, pointerX, pointerY));
+      canvas.focusNearest(target);
+      setHovered(routeMouseMove(canvas, pointerX, pointerY));
       return target != null;
     }
 
@@ -183,34 +132,38 @@ public final class PrimaryContext implements AutoCloseable {
       keyCaptures[captureIndex] = null;
     }
     if (target == null) {
-      target = routeMouseButton(targetCanvas, pointerX, pointerY, button, action, modifiers);
+      target = routeMouseButton(canvas, pointerX, pointerY, button, action, modifiers);
     } else {
       Rectangle absolute = target.absoluteBounds();
       target.onMouseButton(pointerX - absolute.minX(), pointerY - absolute.minY(), button, action,
           modifiers);
     }
-    setHovered(routeMouseMove(targetCanvas, pointerX, pointerY));
+    setHovered(routeMouseMove(canvas, pointerX, pointerY));
     return target != null;
   }
 
-  public boolean dispatchScroll(double deltaX, double deltaY, double inputX, double inputY) {
-    Canvas targetCanvas = boundCanvas();
-    snapshot.applyScroll(deltaX, deltaY);
+  boolean dispatchScroll(double deltaX, double deltaY, double inputX, double inputY) {
+    ensureOpen();
+    if (view == null) {
+      snapshot.applyScroll(deltaX, deltaY);
+    }
     updatePointer(inputX, inputY);
-    purgeDetachedReferences(targetCanvas);
-    return routeScroll(targetCanvas, pointerX, pointerY, deltaX, deltaY) != null;
+    purgeDetachedReferences();
+    return routeScroll(canvas, pointerX, pointerY, deltaX, deltaY) != null;
   }
 
-  public boolean dispatchKey(KeyCode key, KeyAction action, int modifiers) {
-    Canvas targetCanvas = boundCanvas();
-    snapshot.applyKey(key, action, modifiers);
+  boolean dispatchKey(KeyCode key, KeyAction action, int modifiers) {
+    ensureOpen();
+    if (view == null) {
+      snapshot.applyKey(key, action, modifiers);
+    }
     int captureIndex = key.ordinal();
     Element target = keyCaptures[captureIndex];
     if (action == KeyAction.PRESS) {
       if (target != null) {
         cancelCapture(target, key);
       }
-      target = routeKey(targetCanvas.focusedElement(), key, action, modifiers);
+      target = routeKey(canvas.focusedElement(), key, action, modifiers);
       keyCaptures[captureIndex] = target;
       return target != null;
     }
@@ -220,15 +173,15 @@ public final class PrimaryContext implements AutoCloseable {
       }
       return target.onKey(key, action, modifiers);
     }
-    return routeKey(targetCanvas.focusedElement(), key, action, modifiers) != null;
+    return routeKey(canvas.focusedElement(), key, action, modifiers) != null;
   }
 
-  public boolean dispatchCharacter(int codepoint) {
-    Canvas targetCanvas = boundCanvas();
+  boolean dispatchCharacter(int codepoint) {
+    ensureOpen();
     if (!Character.isValidCodePoint(codepoint)) {
       throw new IllegalArgumentException("Invalid Unicode code point: " + codepoint);
     }
-    Element target = targetCanvas.focusedElement();
+    Element target = canvas.focusedElement();
     while (target != null) {
       if (target.onCharacter(codepoint)) {
         return true;
@@ -238,63 +191,9 @@ public final class PrimaryContext implements AutoCloseable {
     return false;
   }
 
-  /** Clears this screen's transient input state after it finishes a frame. */
-  public void clearFrameState() {
-    ensureOpen();
-    snapshot.clearFrameState();
-  }
-
-  @Override
-  public void close() {
-    if (closed) {
-      return;
-    }
-    if (view != null && registered) {
-      view.eventBus().deregister(this);
-      registered = false;
-    }
-    clearAllInputState();
-    if (canvas != null) {
-      canvas.clearFocusFromContext();
-    }
-    closed = true;
-  }
-
-  void bind(Canvas targetCanvas) {
-    ensureOpen();
-    if (canvas != null) {
-      throw new IllegalStateException("PrimaryContext is already bound to a Canvas");
-    }
-    canvas = targetCanvas;
-    if (view != null) {
-      registerViewCallbacks(view);
-      registered = true;
-    }
-  }
-
-  void apply(Graphics graphics) {
-    ensureOpen();
-    resolution.apply(graphics);
-  }
-
-  void drawTooltip(Graphics graphics) {
-    if (hoveredElement == null) {
-      return;
-    }
-    String tooltip = hoveredElement.tooltip();
-    if (tooltip == null) {
-      return;
-    }
-    long delayNanos = hoveredElement.tooltipDelayMillis() * 1_000_000L;
-    if (System.nanoTime() - hoveredSinceNanos < delayNanos) {
-      return;
-    }
-    TooltipRenderer.render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
-  }
-
   void treeChanged() {
-    if (canvas != null) {
-      purgeDetachedReferences(canvas);
+    if (!closed) {
+      purgeDetachedReferences();
     }
   }
 
@@ -309,39 +208,81 @@ public final class PrimaryContext implements AutoCloseable {
     snapshot.clearInputState();
   }
 
+  String getClipboardText() {
+    if (view instanceof DesktopView desktopView) {
+      return desktopView.getClipboardText();
+    }
+    return clipboardText;
+  }
+
+  void setClipboardText(String value) {
+    clipboardText = value;
+    if (view instanceof DesktopView desktopView) {
+      desktopView.setClipboardText(value);
+    }
+  }
+
+  void drawTooltip(Graphics graphics) {
+    if (hoveredElement == null) {
+      return;
+    }
+    List<Text> tooltip = new ArrayList<>();
+    hoveredElement.appendTooltips(tooltip);
+    if (tooltip.isEmpty()) {
+      return;
+    }
+    long delayNanos = hoveredElement.tooltipDelayMillis() * 1_000_000L;
+    if (System.nanoTime() - hoveredSinceNanos < delayNanos) {
+      return;
+    }
+    TooltipRenderer.render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
+  }
+
+  @Override
+  public void close() {
+    if (closed) {
+      return;
+    }
+    if (view != null && registered) {
+      view.eventBus().deregister(this);
+      registered = false;
+    }
+    clearAllInputState();
+    closed = true;
+  }
+
   private void registerViewCallbacks(View source) {
-    source.eventBus().register(ResizeEvent.class, (context, event) -> {
+    source.eventBus().register(ResizeEvent.class, (eventContext, event) -> {
       if (event.width() > 0 && event.height() > 0) {
-        resize(event.width(), event.height());
+        context.resize(event.width(), event.height());
       }
     }, this);
     source.eventBus().register(MouseMoveEvent.class,
-        (context, event) -> dispatchMouseMove(event.x(), event.y()), this);
-    source.eventBus().register(MouseButtonEvent.class, (context, event) ->
+        (eventContext, event) -> dispatchMouseMove(event.x(), event.y()), this);
+    source.eventBus().register(MouseButtonEvent.class, (eventContext, event) ->
         dispatchMouseButton(event.button(), event.action(), event.x(), event.y(),
             event.modifiers()), this);
-    source.eventBus().register(ScrollEvent.class, (context, event) ->
+    source.eventBus().register(ScrollEvent.class, (eventContext, event) ->
         dispatchScroll(event.dx(), event.dy(), event.x(), event.y()), this);
     source.eventBus().register(KeyEvent.class,
-        (context, event) -> dispatchKey(event.code(), event.action(), event.modifiers()), this);
+        (eventContext, event) -> dispatchKey(event.code(), event.action(), event.modifiers()), this);
     source.eventBus().register(CharEvent.class,
-        (context, event) -> dispatchCharacter(event.codepoint()), this);
-    source.eventBus().register(CursorEnterEvent.class, (context, event) -> {
+        (eventContext, event) -> dispatchCharacter(event.codepoint()), this);
+    source.eventBus().register(CursorEnterEvent.class, (eventContext, event) -> {
       if (!event.entered()) {
         clearPointerState();
       }
     }, this);
-    source.eventBus().register(FocusEvent.class, (context, event) -> {
+    source.eventBus().register(FocusEvent.class, (eventContext, event) -> {
       if (!event.focused()) {
         clearAllInputState();
-        boundCanvas().clearFocusFromContext();
+        canvas.clearFocusFromContext();
       }
     }, this);
   }
 
   private void updatePointer(double inputX, double inputY) {
-    Vector2 size = getInputSize();
-    Vector2 logical = resolution.inputToLogical(inputX, inputY, size.x(), size.y());
+    Vector2 logical = context.inputToLogical(inputX, inputY);
     pointerX = logical.x();
     pointerY = logical.y();
   }
@@ -365,7 +306,7 @@ public final class PrimaryContext implements AutoCloseable {
     if (target != null) {
       return target;
     }
-    return element.onMouseMove(x, y) || element.tooltip() != null ? element : null;
+    return element.onMouseMove(x, y) || element.hasTooltipForRender() ? element : null;
   }
 
   private @Nullable Element routeMouseMoveContent(List<Element> elements, float x, float y) {
@@ -408,8 +349,8 @@ public final class PrimaryContext implements AutoCloseable {
     return null;
   }
 
-  private @Nullable Element routeMouseButton(Element element, float x, float y, KeyCode button,
-                                             KeyAction action, int modifiers) {
+  private @Nullable Element routeMouseButton(Element element, float x, float y,
+                                             KeyCode button, KeyAction action, int modifiers) {
     if (!element.visible()) {
       return null;
     }
@@ -590,13 +531,13 @@ public final class PrimaryContext implements AutoCloseable {
     }
   }
 
-  private void purgeDetachedReferences(Canvas targetCanvas) {
-    if (hoveredElement != null && !targetCanvas.isAttached(hoveredElement)) {
+  private void purgeDetachedReferences() {
+    if (hoveredElement != null && !canvas.isAttached(hoveredElement)) {
       setHovered(null);
     }
     for (KeyCode key : KEY_CODES) {
       Element capture = keyCaptures[key.ordinal()];
-      if (capture != null && !targetCanvas.isAttached(capture)) {
+      if (capture != null && !canvas.isAttached(capture)) {
         cancelCapture(capture, key);
         keyCaptures[key.ordinal()] = null;
       }
@@ -623,31 +564,9 @@ public final class PrimaryContext implements AutoCloseable {
     }
   }
 
-  private Canvas boundCanvas() {
-    ensureOpen();
-    if (canvas == null) {
-      throw new IllegalStateException("PrimaryContext is not bound to a Canvas");
-    }
-    return canvas;
-  }
-
-  private void ensureBare() {
-    ensureOpen();
-    if (view != null) {
-      throw new IllegalStateException("A View-backed PrimaryContext obtains input size from its View");
-    }
-  }
-
   private void ensureOpen() {
     if (closed) {
-      throw new IllegalStateException("PrimaryContext is closed");
-    }
-  }
-
-  private static void validateSize(float width, float height, String name) {
-    if (!Float.isFinite(width) || !Float.isFinite(height) || width <= 0.0F || height <= 0.0F) {
-      throw new IllegalArgumentException(name + " size must be finite and positive: "
-          + width + "x" + height);
+      throw new IllegalStateException("Canvas input router is closed");
     }
   }
 }

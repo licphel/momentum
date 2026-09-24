@@ -22,7 +22,33 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.render;
 
-import org.jspecify.annotations.NullMarked;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.shape.Rectangle;
+
+/**
+ * No-op renderer for elements that provide layout or interaction without drawing a surface.
+ *
+ * <p>The singleton is used by the canvas root and by base elements that intentionally leave
+ * their appearance to descendants or a custom renderer.
+ */
+public final class EmptyRenderer implements ElementRenderer {
+  /** Shared no-op renderer instance. */
+  public static final EmptyRenderer INSTANCE = new EmptyRenderer();
+
+  private EmptyRenderer() {
+  }
+
+  /**
+   * Intentionally performs no drawing.
+   *
+   * @param graphics graphics context, left unchanged
+   * @param element element with no built-in visual content
+   * @param area absolute element bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element element, Rectangle area) {
+  }
+}

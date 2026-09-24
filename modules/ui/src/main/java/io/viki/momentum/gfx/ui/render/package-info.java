@@ -23,6 +23,6 @@
  */
 
 @NullMarked
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.render;
 
 import org.jspecify.annotations.NullMarked;

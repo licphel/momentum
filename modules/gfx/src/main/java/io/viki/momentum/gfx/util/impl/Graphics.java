@@ -30,6 +30,7 @@ import io.viki.momentum.gfx.mesh.Mesh;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.Pipeline;
+import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.util.VertexStore;
@@ -117,6 +118,13 @@ public abstract class Graphics extends VertexBuilder2D implements AutoCloseable 
    * @return the viewport
    */
   public abstract Rectangle currentViewport();
+
+  /**
+   * Returns the current framebuffer-space scissor state.
+   *
+   * @return the current scissor
+   */
+  public abstract Scissor currentScissor();
 
   /**
    * Replays the sections of the given mesh with the current render state.

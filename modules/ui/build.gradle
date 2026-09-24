@@ -6,6 +6,7 @@ sourceSets {
   main {
     resources {
       srcDir 'src/main/java'
+      include 'shaders/**'
       include 'io/viki/momentum/gfx/ui/sample.jpg'
     }
   }

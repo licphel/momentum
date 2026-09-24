@@ -22,7 +22,27 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.render;
 
-import org.jspecify.annotations.NullMarked;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.shape.Rectangle;
+
+/**
+ * Rendering strategy for one UI element.
+ *
+ * <p>An element renderer is responsible only for the element's own visual content. Input
+ * handling, layout, child traversal, and clipping remain in the widget and dispatcher layers,
+ * which makes custom renderers easy to install without changing widget behavior.
+ */
+@FunctionalInterface
+public interface ElementRenderer {
+  /**
+   * Renders only the element's own visual content.
+   *
+   * @param graphics graphics context receiving the visual content
+   * @param element element whose state should be represented
+   * @param absoluteBounds element bounds in the graphics coordinate system
+   */
+  void render(Graphics graphics, Element element, Rectangle absoluteBounds);
+}

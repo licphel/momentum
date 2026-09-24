@@ -6,7 +6,7 @@
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, publish, distribute, sublicense, and/or sell
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
@@ -21,7 +21,8 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
-package io.viki.momentum.gfx.ui;
+
+package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyBinding;
@@ -33,14 +34,16 @@ import io.viki.momentum.gfx.ui.render.ButtonRenderer;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import org.jspecify.annotations.Nullable;
 
+
 /**
- * Minimal logical-space button with hit testing and click handling.
+ * Represents an activatable logical-space button with pointer and keyboard input handling.
  *
- * <p>Button state is mutable and not thread-safe; use it on the owning UI/render thread.
+ * <p>The button tracks hover, focus, and pressed state and invokes an optional callback after a
+ * completed activation. State is mutable and must be accessed from its owning UI thread.
  */
 public final class Button extends Element {
   private State state = State.IDLE;
-  private String label = "Action button";
+  private String label = "";
   private boolean enabled = true;
   private boolean hovered;
   private boolean focused;
@@ -51,19 +54,40 @@ public final class Button extends Element {
   private @Nullable KeyBinding activationBinding;
   private @Nullable Runnable onClick;
 
+  /**
+   * Creates a button with the default label and the supplied bounds.
+   *
+   * @param bounds the button's local bounds
+   */
   public Button(Rectangle bounds) {
     super(bounds);
   }
-
+  /**
+   * Returns the label presented by this button.
+   *
+   * <p>The value is read by the active renderer each time the button is drawn.
+   *
+   * @return current button label
+   */
   public String label() {
     return label;
   }
 
+  /**
+   * Changes the text displayed by the button renderer.
+   *
+   * @param value the new label
+   */
   public void setLabel(String value) {
-    label = java.util.Objects.requireNonNull(value, "value");
+    label = value;
   }
 
-  /** Creates the conventional mouse, Enter, and Space activation binding for one input snapshot. */
+  /**
+   * Creates the conventional mouse, Enter, and Space activation binding for one input snapshot.
+   *
+   * @param snapshot the input snapshot used to build transition matches
+   * @return a binding that recognizes the standard button activation keys
+   */
   public static KeyBinding makeDefaultActivationKeyBinding(InputSnapshot snapshot) {
     return new KeyBinding("button.activate",
         KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
@@ -71,15 +95,32 @@ public final class Button extends Element {
         KeyMatch.of(snapshot.key(KeyCode.KP_ENTER)),
         KeyMatch.of(snapshot.key(KeyCode.SPACE)));
   }
-
+  /**
+   * Returns the interaction state currently exposed to the renderer.
+   *
+   * <p>Disabled buttons report {@link State#DISABLED} even when their stored state was previously
+   * hovered or pressed.
+   *
+   * @return current logical button state
+   */
   public State state() {
     return enabled ? state : State.DISABLED;
   }
 
+  /**
+   * Reports whether the button accepts activation input.
+   *
+   * @return whether the button is enabled
+   */
   public boolean enabled() {
     return enabled;
   }
 
+  /**
+   * Reports whether the button currently owns keyboard focus.
+   *
+   * @return whether the button is focused
+   */
   public boolean focused() {
     return focused;
   }
@@ -89,6 +130,11 @@ public final class Button extends Element {
     return ButtonRenderer.INSTANCE;
   }
 
+  /**
+   * Enables or disables this button.
+   *
+   * @param value whether input should be accepted
+   */
   public void setEnabled(boolean value) {
     enabled = value;
     if (!value) {
@@ -101,10 +147,20 @@ public final class Button extends Element {
     refreshState();
   }
 
+  /**
+   * Installs or removes the callback invoked after a successful activation.
+   *
+   * @param value the callback, or {@code null} to remove it
+   */
   public void setOnClick(@Nullable Runnable value) {
     onClick = value;
   }
 
+  /**
+   * Installs or removes a custom activation binding.
+   *
+   * @param value the binding, or {@code null} to use default activation behavior
+   */
   public void setActivationBinding(@Nullable KeyBinding value) {
     activationBinding = value;
   }
@@ -233,10 +289,19 @@ public final class Button extends Element {
     return key == KeyCode.ENTER || key == KeyCode.KP_ENTER || key == KeyCode.SPACE;
   }
 
+  /**
+   * Describes the interaction state used to select a button's visual treatment.
+   *
+   * <p>The state reflects the combination of enablement, pointer hover, and activation input.
+   */
   public enum State {
+    /** The button is enabled and idle. */
     IDLE,
+    /** The pointer is over the button. */
     HOVERED,
+    /** An activation input is being held. */
     PRESSED,
+    /** The button is disabled. */
     DISABLED
   }
 }

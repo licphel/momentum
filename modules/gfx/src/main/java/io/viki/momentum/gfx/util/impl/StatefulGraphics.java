@@ -121,6 +121,11 @@ abstract class StatefulGraphics extends Graphics {
   }
 
   @Override
+  public Scissor currentScissor() {
+    return scissor;
+  }
+
+  @Override
   public void setViewport(Rectangle vp) {
     viewport = vp;
   }

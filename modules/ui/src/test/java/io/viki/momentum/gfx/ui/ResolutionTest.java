@@ -2,9 +2,32 @@
  * MIT License
  *
  * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
  */
+
 package io.viki.momentum.gfx.ui;
 
+import io.viki.momentum.gfx.ui.element.Button;
+import io.viki.momentum.gfx.ui.element.Canvas;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.ui.element.DpiContext;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyBinding;
 import io.viki.momentum.input.KeyCode;
@@ -30,6 +53,12 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Verifies logical-resolution mapping, input conversion, and canvas event routing.
+ *
+ * <p>The tests use a lightweight view implementation so coordinate behavior can be checked
+ * without opening a native window.
+ */
 public final class ResolutionTest {
   private static final TransformHandler HANDLER = new TransformHandler() {
     @Override
@@ -124,17 +153,17 @@ public final class ResolutionTest {
   }
 
   @Test
-  void barePrimaryContextCanBeDrivenWithoutView() {
-    PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
+  void bareLogicalContextCanBeDrivenWithoutView() {
+    DpiContext context = new DpiContext(800, 450, HANDLER);
     AtomicInteger clicks = new AtomicInteger();
     try (Canvas canvas = new Canvas(context)) {
       Button button = new Button(Rectangle.of(10, 20, 100, 30));
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
 
-      context.dispatchMouseMove(20.0, 30.0);
-      context.dispatchMouseButton(KeyCode.MOUSE_LEFT, KeyAction.PRESS, 20.0, 30.0, 0);
-      context.dispatchMouseButton(KeyCode.MOUSE_LEFT, KeyAction.RELEASE, 20.0, 30.0, 0);
+      canvas.dispatchMouseMove(20.0, 30.0);
+      canvas.dispatchMouseButton(KeyCode.MOUSE_LEFT, KeyAction.PRESS, 20.0, 30.0, 0);
+      canvas.dispatchMouseButton(KeyCode.MOUSE_LEFT, KeyAction.RELEASE, 20.0, 30.0, 0);
 
       assertEquals(1, clicks.get());
       assertSame(button, canvas.focusedElement());
@@ -146,7 +175,7 @@ public final class ResolutionTest {
   void buttonCapturesPointerAndReceivesFocusedKeyboardInput() {
     TestView view = new TestView(800, 450, 800, 450);
     AtomicInteger clicks = new AtomicInteger();
-    PrimaryContext context = new PrimaryContext(view, HANDLER);
+    DpiContext context = new DpiContext(view, HANDLER);
     try (Canvas canvas = new Canvas(context)) {
       Button button = new Button(Rectangle.of(10, 20, 100, 30));
       button.setOnClick(clicks::incrementAndGet);
@@ -173,42 +202,42 @@ public final class ResolutionTest {
 
   @Test
   void buttonUsesConfiguredKeyBindingAndFollowsRuntimeRebinding() {
-    PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
-    KeyBinding activation = new KeyBinding("test.button.activate",
-        KeyMatch.of(context.snapshot().key(KeyCode.F1)));
+    DpiContext context = new DpiContext(800, 450, HANDLER);
     AtomicInteger clicks = new AtomicInteger();
     try (Canvas canvas = new Canvas(context)) {
+      KeyBinding activation = new KeyBinding("test.button.activate",
+          KeyMatch.of(canvas.inputSnapshot().key(KeyCode.F1)));
       Button button = new Button(Rectangle.of(10, 20, 100, 30));
       button.setActivationBinding(activation);
       button.setOnClick(clicks::incrementAndGet);
       canvas.add(button);
       canvas.requestFocus(button);
 
-      context.dispatchKey(KeyCode.ENTER, KeyAction.PRESS, 0);
-      context.dispatchKey(KeyCode.ENTER, KeyAction.RELEASE, 0);
+      canvas.dispatchKey(KeyCode.ENTER, KeyAction.PRESS, 0);
+      canvas.dispatchKey(KeyCode.ENTER, KeyAction.RELEASE, 0);
       assertEquals(0, clicks.get());
 
-      context.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
-      context.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
+      canvas.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
+      canvas.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
       assertEquals(1, clicks.get());
 
-      activation.rebind(KeyMatch.of(context.snapshot().key(KeyCode.SPACE)));
-      context.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
-      context.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
-      context.dispatchKey(KeyCode.SPACE, KeyAction.PRESS, 0);
-      context.dispatchKey(KeyCode.SPACE, KeyAction.RELEASE, 0);
+      activation.rebind(KeyMatch.of(canvas.inputSnapshot().key(KeyCode.SPACE)));
+      canvas.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
+      canvas.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
+      canvas.dispatchKey(KeyCode.SPACE, KeyAction.PRESS, 0);
+      canvas.dispatchKey(KeyCode.SPACE, KeyAction.RELEASE, 0);
       assertEquals(2, clicks.get());
     }
   }
 
   @Test
   void keyboardReleaseStaysCapturedWhenFocusChanges() {
-    PrimaryContext context = new PrimaryContext(800, 450, HANDLER);
-    KeyBinding activation = new KeyBinding("test.button.activate",
-        KeyMatch.of(context.snapshot().key(KeyCode.F1)));
+    DpiContext context = new DpiContext(800, 450, HANDLER);
     AtomicInteger firstClicks = new AtomicInteger();
     AtomicInteger secondClicks = new AtomicInteger();
     try (Canvas canvas = new Canvas(context)) {
+      KeyBinding activation = new KeyBinding("test.button.activate",
+          KeyMatch.of(canvas.inputSnapshot().key(KeyCode.F1)));
       Button first = new Button(Rectangle.of(10, 20, 100, 30));
       Button second = new Button(Rectangle.of(120, 20, 100, 30));
       first.setActivationBinding(activation);
@@ -219,9 +248,9 @@ public final class ResolutionTest {
       canvas.add(second);
       canvas.requestFocus(first);
 
-      context.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
+      canvas.dispatchKey(KeyCode.F1, KeyAction.PRESS, 0);
       canvas.requestFocus(second);
-      context.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
+      canvas.dispatchKey(KeyCode.F1, KeyAction.RELEASE, 0);
 
       assertEquals(1, firstClicks.get());
       assertEquals(0, secondClicks.get());
@@ -231,7 +260,7 @@ public final class ResolutionTest {
   @Test
   void internalPartsWinHitTestingAndCloseDeregistersCallbacks() {
     TestView view = new TestView(800, 450, 800, 450);
-    PrimaryContext context = new PrimaryContext(view, HANDLER);
+    DpiContext context = new DpiContext(view, HANDLER);
     AtomicInteger partClicks = new AtomicInteger();
     AtomicInteger childClicks = new AtomicInteger();
     PartHost host = new PartHost(Rectangle.of(100, 100, 200, 100));
@@ -258,8 +287,7 @@ public final class ResolutionTest {
     postMouse(view, KeyAction.RELEASE, 115.0, 115.0);
     assertEquals(800, canvas.resolution().width());
     assertEquals(1, partClicks.get());
-    assertThrows(IllegalStateException.class,
-        () -> canvas.context().dispatchMouseMove(1.0, 1.0));
+    assertThrows(IllegalStateException.class, () -> canvas.dispatchMouseMove(1.0, 1.0));
   }
 
   private static void postMouse(TestView view, KeyAction action, double x, double y) {
