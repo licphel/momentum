@@ -27,11 +27,13 @@ package io.viki.momentum.mod;
 import io.viki.momentum.event.EventBus;
 import io.viki.momentum.resource.Resource;
 import io.viki.momentum.util.Namespace;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
+import java.util.Optional;
 
 /**
- * Represents a loaded mod backed by a single JAR file.
+ * Represents one loaded built-in or external mod.
  *
  * <p>Instances are created by {@link ModLoader} during loading. Each mod has
  * its own private {@link EventBus} and a reference to the class loader that loaded its entrypoint.
@@ -43,17 +45,17 @@ import java.nio.file.Path;
 public final class ModInstance {
   private final Namespace namespace;
   private final Mod mod;
-  private final Path jarPath;
-  private final Resource jarResource;
+  private final @Nullable Path sourcePath;
+  private final Resource resource;
   private final EventBus eventBus;
   private final ClassLoader classLoader;
   private boolean enabled;
 
-  ModInstance(Namespace namespace, Mod mod, Path jarPath, ClassLoader classLoader) {
+  ModInstance(Namespace namespace, Mod mod, @Nullable Path sourcePath, ClassLoader classLoader) {
     this.namespace = namespace;
     this.mod = mod;
-    this.jarPath = jarPath;
-    this.jarResource = Resource.jar(jarPath);
+    this.sourcePath = sourcePath;
+    this.resource = mod.createResource();
     this.eventBus = new EventBus();
     this.enabled = true;
     this.classLoader = classLoader;
@@ -87,25 +89,21 @@ public final class ModInstance {
   }
 
   /**
-   * Returns the JAR file this mod was loaded from.
+   * Returns the external source path, or empty for a built-in mod.
    *
-   * @return the mod's jar path
+   * @return the external source path
    */
-  public Path jarPath() {
-    return jarPath;
+  public Optional<Path> sourcePath() {
+    return Optional.ofNullable(sourcePath);
   }
 
   /**
-   * Returns a provider for resources rooted at this mod's JAR.
+   * Returns the resource provider created by the mod entrypoint.
    *
-   * <p>Paths passed to the provider are relative to the JAR root. Streams
-   * returned by the provider own their JAR handles and must be closed by the
-   * caller.
-   *
-   * @return this mod's JAR resource provider
+   * @return this mod's resource provider
    */
-  public Resource jarResource() {
-    return jarResource;
+  public Resource resource() {
+    return resource;
   }
 
   /**

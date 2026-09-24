@@ -63,7 +63,7 @@ public interface Resource extends AutoCloseable {
    * @return a classpath-backed provider
    */
   static Resource classpath(Class<?> caller) {
-    return new ClasspathResource(caller.getClassLoader());
+    return new ClasspathResource(caller);
   }
 
   /**

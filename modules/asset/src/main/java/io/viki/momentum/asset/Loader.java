@@ -47,7 +47,7 @@ import java.util.stream.Stream;
  * Processing rules are supplied by a reusable {@link LoadingDispatcher}.
  *
  * <p>The resource provider is owned by the caller. In particular, a mod's
- * provider is available from {@code mod.jarResource()} and is not closed by
+ * provider is available from {@code mod.resource()} and is not closed by
  * this loader.
  */
 public final class Loader {
@@ -186,7 +186,7 @@ public final class Loader {
   public void scan(int priority, String relativeDir) {
     String directory = Resource.normalizePath(relativeDir);
     try (Stream<String> paths = resources.walk(directory)) {
-      paths.forEach(path -> enqueue(priority, path));
+      paths.filter(processors::matches).forEach(path -> enqueue(priority, path));
     } catch (UnsupportedOperationException e) {
       throw new AssetException("Resource provider cannot scan: " + directory, e);
     } catch (IOException e) {

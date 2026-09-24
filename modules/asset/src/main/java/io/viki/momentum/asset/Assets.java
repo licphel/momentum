@@ -72,15 +72,17 @@ public final class Assets {
    */
   @SuppressWarnings("unchecked")
   public static void set(Identifier id, Object value) {
-    Ref<?>[] toNotify = new Ref<?>[1];
+    @Nullable Ref<?>[] existing = new Ref<?>[1];
     STORE.compute(id, (k, ref) -> {
       if (ref == null) {
         return new Ref<>(id, value);
       }
-      toNotify[0] = ref;
+      existing[0] = ref;
       return ref;
     });
-    ((Ref<Object>) toNotify[0]).set(value);
+    if (existing[0] != null) {
+      ((Ref<Object>) existing[0]).set(value);
+    }
   }
 
   /**

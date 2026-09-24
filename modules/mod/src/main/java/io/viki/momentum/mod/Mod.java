@@ -24,6 +24,7 @@
 
 package io.viki.momentum.mod;
 
+import io.viki.momentum.resource.Resource;
 import io.viki.momentum.util.SemanticVersion;
 
 import java.util.Arrays;
@@ -37,6 +38,19 @@ import java.util.stream.Collectors;
  * no external metadata file is required.
  */
 public interface Mod {
+  /**
+   * Creates this mod's resource provider.
+   *
+   * <p>The default follows the entrypoint's class loader, which works for
+   * built-in mods, exploded development classes, and ordinary mod JARs.
+   * Implementations may return a combined or remote-backed provider instead.
+   *
+   * @return a resource provider owned by the loaded mod instance
+   */
+  default Resource createResource() {
+    return Resource.classpath(getClass());
+  }
+
   /**
    * Returns the unique identifier of this mod.
    *

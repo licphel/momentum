@@ -61,6 +61,7 @@ public final class ModLoader {
   private final Map<ClassLoader, ModInstance> classLoaderMap = new ConcurrentHashMap<>();
   private final EventBus globalEventBus = new EventBus();
   private @Nullable ModInstance core;
+  private boolean externalLoadingStarted;
 
   private static URLClassLoader createClassLoader(Path jarPath) {
     try {
@@ -215,6 +216,7 @@ public final class ModLoader {
    *                      loaded
    */
   public ModInstance load(Path jarPath) {
+    externalLoadingStarted = true;
     if (!Files.isRegularFile(jarPath)) {
       throw new ModException("Mod JAR not found: " + jarPath);
     }
@@ -233,31 +235,7 @@ public final class ModLoader {
       Mod entrypoint = result;
       validateMod(entrypoint, jarPath);
 
-      String modId = entrypoint.modId();
-      if (insts.containsKey(modId)) {
-        throw new ModException("Mod with id '" + modId + "' is already loaded");
-      }
-
-      Namespace namespace = Namespace.of(modId);
-      boolean isCoreMod = entrypoint.isCoreMod();
-      if (isCoreMod && core != null) {
-        throw new ModException("Core mod " + core.namespace() + " has already been loaded");
-      }
-
-      ModInstance mod = new ModInstance(namespace, entrypoint, jarPath, classLoader);
-      insts.put(modId, mod);
-      classLoaderMap.put(classLoader, mod);
-
-      if (isCoreMod) {
-        /*
-         * There will be only ONE bottom core,
-         * serving as the application's core logic supplier.
-         * All other mods are expected to be built on it.
-         */
-        core = mod;
-      }
-
-      return mod;
+      return register(entrypoint, jarPath, classLoader);
     } catch (RuntimeException e) {
       try {
         classLoader.close();
@@ -266,6 +244,60 @@ public final class ModLoader {
       }
       throw e;
     }
+  }
+
+  /**
+   * Registers a mod entrypoint already present on the application classpath.
+   * Built-ins must be registered before the first external JAR is loaded.
+   *
+   * @param clazz class annotated with {@link BuiltinMod}
+   * @return the loaded built-in mod
+   */
+  public ModInstance loadBuiltin(Class<? extends Mod> clazz) {
+    if (externalLoadingStarted) {
+      throw new ModException("Built-in mods must be loaded before external mod JARs");
+    }
+    if (clazz.getAnnotation(BuiltinMod.class) == null) {
+      throw new ModException("Built-in mod entrypoint is missing @BuiltinMod: "
+          + clazz.getName());
+    }
+    if (clazz.isInterface() || Modifier.isAbstract(clazz.getModifiers())) {
+      throw new ModException("Built-in mod entrypoint must be concrete: "
+          + clazz.getName());
+    }
+
+    Mod mod;
+    try {
+      mod = clazz.getDeclaredConstructor().newInstance();
+    } catch (ReflectiveOperationException exception) {
+      throw new ModException("Failed to instantiate built-in mod entrypoint '"
+          + clazz.getName() + "'", exception);
+    }
+    validateMod(mod, Path.of("builtin-" + mod.modId()));
+    return register(mod, null, clazz.getClassLoader());
+  }
+
+  private ModInstance register(Mod entrypoint, @Nullable Path sourcePath,
+                               ClassLoader classLoader) {
+    String modId = entrypoint.modId();
+    if (insts.containsKey(modId)) {
+      throw new ModException("Mod with id '" + modId + "' is already loaded");
+    }
+
+    Namespace namespace = Namespace.of(modId);
+    if (entrypoint.isCoreMod() && core != null) {
+      throw new ModException("Core mod " + core.namespace() + " has already been loaded");
+    }
+
+    ModInstance instance = new ModInstance(namespace, entrypoint, sourcePath, classLoader);
+    instance.eventBus().register(entrypoint);
+    globalEventBus.register(entrypoint);
+    insts.put(modId, instance);
+    classLoaderMap.put(classLoader, instance);
+    if (entrypoint.isCoreMod()) {
+      core = instance;
+    }
+    return instance;
   }
 
   /**
@@ -310,9 +342,13 @@ public final class ModLoader {
     for (Map.Entry<String, ModInstance> entry : insts.entrySet()) {
       for (Dependency dep : entry.getValue().mod().dependencies()) {
         ModInstance inst = insts.getOrDefault(dep.modId(), null);
+        if (inst == null) {
+          throw new ModException("Mod '" + entry.getKey()
+              + "' requires missing mod '" + dep.modId() + "'");
+        }
         SemanticVersion detectedVer = inst.mod().version();
-        if (inst == null || !dep.isSatisfiedBy(detectedVer)) {
-          throw dep.createNotSatisfiedException(inst.mod().modId(), detectedVer);
+        if (!dep.isSatisfiedBy(detectedVer)) {
+          throw dep.createNotSatisfiedException(entry.getKey(), detectedVer);
         }
       }
     }
