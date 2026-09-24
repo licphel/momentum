@@ -30,7 +30,7 @@ package io.viki.momentum.math;
  * <p>Eight singleton directions are provided (N, NE, E, SE, S, SW, W, NW).
  * Each carries an integer offset, a float angle in degrees, and an index.
  */
-public enum Direction2D {
+public enum Direction {
   /**
    * North — offset (0, -1), 90°.
    */
@@ -67,15 +67,15 @@ public enum Direction2D {
   /**
    * Four cardinal directions: N, E, S, W.
    */
-  public static final Direction2D[] CARDINAL = {NORTH, EAST, SOUTH, WEST};
+  public static final Direction[] CARDINAL = {NORTH, EAST, SOUTH, WEST};
   /**
    * Four diagonal directions: NE, SE, SW, NW.
    */
-  public static final Direction2D[] DIAGONAL = {NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
+  public static final Direction[] DIAGONAL = {NORTH_EAST, SOUTH_EAST, SOUTH_WEST, NORTH_WEST};
   /**
    * All eight directions: N, NE, E, SE, S, SW, W, NW.
    */
-  public static final Direction2D[] ALL = values();
+  public static final Direction[] ALL = values();
   /**
    * Integer grid offset for this direction.
    */
@@ -89,7 +89,7 @@ public enum Direction2D {
    */
   public final int index;
 
-  Direction2D(int dx, int dy, float angle, int index) {
+  Direction(int dx, int dy, float angle, int index) {
     offset = new int[] {dx, dy};
     this.angle = angle;
     this.index = index;
@@ -102,7 +102,7 @@ public enum Direction2D {
    * @return the corresponding direction
    * @throws IndexOutOfBoundsException if index is out of range
    */
-  public static Direction2D fromIndex(int index) {
+  public static Direction fromIndex(int index) {
     return ALL[index];
   }
 
@@ -112,10 +112,10 @@ public enum Direction2D {
    * @param angle angle in degrees
    * @return nearest direction
    */
-  public static Direction2D getNearest(float angle) {
-    Direction2D nearest = NORTH;
+  public static Direction getNearest(float angle) {
+    Direction nearest = NORTH;
     float minDelta = Float.MAX_VALUE;
-    for (Direction2D d : ALL) {
+    for (Direction d : ALL) {
       float delta = Math.abs(angle - d.angle);
       if (delta < minDelta) {
         minDelta = delta;
@@ -132,7 +132,7 @@ public enum Direction2D {
    * @param dy y offset (-1, 0, or 1)
    * @return the corresponding direction, or null if not a valid direction
    */
-  public static Direction2D fromOffset(int dx, int dy) {
+  public static Direction fromOffset(int dx, int dy) {
     return switch (dx) {
       case 0 -> switch (dy) {
         case -1 -> NORTH;
@@ -160,7 +160,7 @@ public enum Direction2D {
    *
    * @return clockwise 90° neighbor (cardinal only)
    */
-  public Direction2D cw90() {
+  public Direction cw90() {
     return ALL[(index + 2) % 8];
   }
 
@@ -169,7 +169,7 @@ public enum Direction2D {
    *
    * @return counter-clockwise 90° neighbor (cardinal only)
    */
-  public Direction2D ccw90() {
+  public Direction ccw90() {
     return ALL[(index + 6) % 8];
   }
 
@@ -178,7 +178,7 @@ public enum Direction2D {
    *
    * @return clockwise 45° neighbour
    */
-  public Direction2D cw45() {
+  public Direction cw45() {
     return ALL[(index + 1) % 8];
   }
 
@@ -187,7 +187,7 @@ public enum Direction2D {
    *
    * @return counter-clockwise 45° neighbour
    */
-  public Direction2D ccw45() {
+  public Direction ccw45() {
     return ALL[(index + 7) % 8];
   }
 
@@ -196,7 +196,7 @@ public enum Direction2D {
    *
    * @return opposite direction
    */
-  public Direction2D opposite() {
+  public Direction opposite() {
     return ALL[(index + 4) % 8];
   }
 

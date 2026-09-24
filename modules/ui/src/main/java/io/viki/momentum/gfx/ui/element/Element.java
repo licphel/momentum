@@ -56,7 +56,7 @@ public abstract class Element implements InputListener {
   private @Nullable ElementRenderer rendererOverride;
   private final List<Text> defaultTooltip = new ArrayList<>();
   private final List<Text> defaultTooltipView = Collections.unmodifiableList(defaultTooltip);
-  private @Nullable Long tooltipDelayMillis;
+  private long tooltipDelayMillis = DEFAULT_TOOLTIP_DELAY_MILLIS;
   private boolean visible = true;
 
   /**
@@ -396,10 +396,7 @@ public abstract class Element implements InputListener {
    * @return delay in milliseconds
    */
   public final long tooltipDelayMillis() {
-    if (tooltipDelayMillis != null) {
-      return tooltipDelayMillis;
-    }
-    return DEFAULT_TOOLTIP_DELAY_MILLIS;
+    return tooltipDelayMillis;
   }
 
   /**

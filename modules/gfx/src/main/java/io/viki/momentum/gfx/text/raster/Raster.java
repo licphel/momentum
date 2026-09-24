@@ -85,7 +85,8 @@ public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float 
         int prev = 0;
         for (int next = charBreaker.next(); next != BreakIterator.DONE; next = charBreaker.next()) {
           if (x >= egcX && x <= egcX + egcW) {
-            return run.textStart() + clusterStart + prev;
+            int insertion = x < egcX + egcW * 0.5F ? prev : next;
+            return run.textStart() + clusterStart + insertion;
           }
           egcX += egcW;
           prev = next;
@@ -101,7 +102,7 @@ public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float 
     for (LayoutGlyph g : glyphs) {
       runEnd = Math.max(runEnd, g.end());
     }
-    return run.textStart() + runEnd - 1;
+    return run.textStart() + runEnd;
   }
 
   private static int countGraphemes(String s) {

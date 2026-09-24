@@ -88,7 +88,7 @@ public final class Button extends Element {
    * @param snapshot the input snapshot used to build transition matches
    * @return a binding that recognizes the standard button activation keys
    */
-  public static KeyBinding makeDefaultActivationKeyBinding(InputSnapshot snapshot) {
+  public static KeyBinding makeConventionalActivationKeyBinding(InputSnapshot snapshot) {
     return new KeyBinding("button.activate",
         KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
         KeyMatch.of(snapshot.key(KeyCode.ENTER)),

@@ -45,8 +45,11 @@ import java.nio.ByteBuffer;
  * @see FontMetrics
  */
 public interface Font extends AutoCloseable {
-  /** Default font size in pixels. */
-  float DEFAULT_SIZE = 16.0F;
+  /**
+   * Default font size in pixels.
+   * Can be set by configuration.
+   */
+  float[] DEFAULT_SIZE = new float[] {8.0F};
   /** Plain (regular) weight — the default style. */
   int REGULAR = 0;
   /** Bold weight flag. */

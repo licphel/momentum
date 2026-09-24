@@ -40,7 +40,7 @@ import java.util.function.Consumer;
  * renderer. Its mutable state is intended for one owning UI thread.
  */
 public final class CheckBox extends Element {
-  private static final float DEFAULT_CHECK_MARK_INSET = 0.10F;
+  private static final float DEFAULT_CHECK_MARK_INSET = 0.2F;
 
   private String label;
   private boolean checked;

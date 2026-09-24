@@ -137,76 +137,53 @@ public final class Rasterizer {
     List<BreakPoint> result = new ArrayList<>();
     BreakIterator breaker = BreakIterator.getLineInstance(Locale.US);
     breaker.setText(text);
-
-    int nextBoundary = breaker.following(0);
-    if (nextBoundary == BreakIterator.DONE) {
-      nextBoundary = textLen;
+    boolean[] softBreaks = new boolean[textLen + 1];
+    for (int boundary = breaker.first(); boundary != BreakIterator.DONE;
+         boundary = breaker.next()) {
+      softBreaks[boundary] = true;
     }
 
+    int lineStart = 0;
     float lineWidth = 0;
-    int prevBreakChar = -1;
-    float lineWidthAtPrevBreak = 0;
-
-    for (int ci = 0; ci < textLen; ci++) {
+    int previousSoftBreak = -1;
+    float widthAtPreviousSoftBreak = 0;
+    int ci = 0;
+    while (ci < textLen) {
       if (text.charAt(ci) == '\n') {
         result.add(new BreakPoint(ci, lineWidth, true));
+        ci++;
+        lineStart = ci;
         lineWidth = 0;
-        prevBreakChar = -1;
-        lineWidthAtPrevBreak = 0;
-        while (nextBoundary <= ci + 1) {
-          int nb = breaker.next();
-          if (nb == BreakIterator.DONE) {
-            nextBoundary = textLen;
-            break;
-          }
-          nextBoundary = nb;
-        }
+        previousSoftBreak = -1;
+        widthAtPreviousSoftBreak = 0;
         continue;
       }
-      lineWidth += charAdvances[ci];
-      if (ci + 1 == nextBoundary) {
-        while (lineWidth > widthLimit) {
-          if (prevBreakChar >= 0) {
-            result.add(new BreakPoint(prevBreakChar, lineWidthAtPrevBreak, false));
-            lineWidth -= lineWidthAtPrevBreak;
-            prevBreakChar = -1;
-            lineWidthAtPrevBreak = 0;
-          } else {
-            forceBreak(result, charAdvances, ci + 1, widthLimit, lineWidth, result.isEmpty() ? 0 :
-                result.getLast().charOffset());
-            lineWidth = 0;
-            break;
-          }
-        }
-        prevBreakChar = ci + 1;
-        lineWidthAtPrevBreak = lineWidth;
-        nextBoundary = breaker.next();
-        if (nextBoundary == BreakIterator.DONE) {
-          nextBoundary = textLen;
-        }
+
+      float nextWidth = lineWidth + charAdvances[ci];
+      if (nextWidth > widthLimit && ci > lineStart) {
+        int breakOffset = previousSoftBreak > lineStart ? previousSoftBreak : ci;
+        float breakWidth = previousSoftBreak > lineStart
+            ? widthAtPreviousSoftBreak : lineWidth;
+        result.add(new BreakPoint(breakOffset, breakWidth, false));
+        lineStart = breakOffset;
+        ci = lineStart;
+        lineWidth = 0;
+        previousSoftBreak = -1;
+        widthAtPreviousSoftBreak = 0;
+        continue;
+      }
+
+      lineWidth = nextWidth;
+      ci++;
+      if (softBreaks[ci]) {
+        previousSoftBreak = ci;
+        widthAtPreviousSoftBreak = lineWidth;
       }
     }
     if (result.isEmpty() || result.getLast().charOffset() < textLen) {
       result.add(new BreakPoint(textLen, lineWidth, false));
     }
     return result;
-  }
-
-  private static void forceBreak(List<BreakPoint> result, float[] charAdvances, int end, float widthLimit,
-                                 float lineWidth, int lastBreak) {
-    float w = 0;
-    for (int ci = lastBreak; ci < end; ci++) {
-      float adv = charAdvances[ci];
-      if (adv == 0) {
-        continue;
-      }
-      if (w + adv > widthLimit) {
-        result.add(new BreakPoint(Math.max(lastBreak + 1, ci), w, false));
-        return;
-      }
-      w += adv;
-    }
-    result.add(new BreakPoint(Math.max(lastBreak + 1, end), lineWidth, false));
   }
 
   private static String buildMergedText(List<Literal> literals) {

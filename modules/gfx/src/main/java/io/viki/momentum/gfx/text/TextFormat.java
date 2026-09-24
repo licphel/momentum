@@ -57,7 +57,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
         FallbackFont.acquire(),
         Color.WHITE,
         Font.REGULAR,
-        Font.DEFAULT_SIZE
+        Font.DEFAULT_SIZE[0]
     );
   }
 
@@ -111,7 +111,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
     private final Font font;
     private Gradient gradient = Color.WHITE;
     private int fontStyle = Font.REGULAR;
-    private float fontSize = Font.DEFAULT_SIZE;
+    private float fontSize = Float.NaN;
 
     /**
      * Creates a builder for the given font.
@@ -164,7 +164,8 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
      * @return a new style with the configured attributes
      */
     public TextFormat build() {
-      return new TextFormat(this.font, this.gradient, this.fontStyle, this.fontSize);
+      fontSize = Float.isNaN(fontSize) ? Font.DEFAULT_SIZE[0] : fontSize;
+      return new TextFormat(font, gradient, fontStyle, fontSize);
     }
   }
 }
