@@ -55,7 +55,7 @@ public final class HeartbeatPacket extends Packet {
   }
 
   @Override
-  public void handle(Connection connection) {
+  public void handle(Connection connection, Object context) {
     // Heartbeat reception is tracked by the session's activity timestamp;
     // timeout detection runs in the server's processing loop.
   }

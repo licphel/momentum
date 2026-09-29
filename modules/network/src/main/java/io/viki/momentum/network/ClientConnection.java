@@ -47,8 +47,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A client-side network endpoint that manages a single connection to a remote server.
@@ -59,12 +59,12 @@ import java.util.function.Consumer;
  * {@link ConnectionState#CONNECTING}, {@link #connection()} is empty, and no lifecycle callback has fired.
  *
  * <p>The typical lifecycle is: register lifecycle callbacks, call {@link #connect(String, int)}, then invoke
- * {@link #process()} each frame to drain inbound packets and fire lifecycle events.
+ * {@link #process(Supplier)} each frame to drain inbound packets and fire lifecycle events.
  *
  * <p>Outbound packets may be sent from any thread via {@link #send(Packet)} or through the session object. Inbound
- * packet handling and lifecycle callbacks always execute on the thread that calls {@link #process()}.
+ * packet handling and lifecycle callbacks always execute on the thread that calls {@link #process(Supplier)}.
  *
- * <p>This class is thread-safe for sending. {@link #process()} should be called from a single dedicated thread.
+ * <p>This class is thread-safe for sending. {@link #process(Supplier)} should be called from a single dedicated thread.
  *
  * @see ServerConnection
  * @see Connection
@@ -90,7 +90,6 @@ public final class ClientConnection implements ConnectionHost {
 
   private @Nullable Consumer<Connection> onConnected;
   private @Nullable Consumer<Connection> onDisconnected;
-  private @Nullable BiConsumer<Connection, Packet> onPacket;
 
   /**
    * Creates a network client, unconnected.
@@ -218,9 +217,9 @@ public final class ClientConnection implements ConnectionHost {
    * heartbeats.
    *
    * <p>This method should be called once per frame from the main thread. Inbound packets receive their
-   * {@link Packet#handle(Connection)} call on the calling thread.
+   * {@link Packet#handle(Connection, Object)} call on the calling thread.
    */
-  public void process() {
+  public void process(Supplier<Object> contextSup) {
     Connection s;
     while ((s = connectEvents.poll()) != null) {
       Consumer<Connection> cb = onConnected;
@@ -243,12 +242,7 @@ public final class ClientConnection implements ConnectionHost {
       Connection sess = this.session;
       if (sess != null) {
         try {
-          BiConsumer<Connection, Packet> callback = onPacket;
-          if (callback != null) {
-            callback.accept(sess, packet);
-          } else {
-            packet.handle(sess);
-          }
+          packet.handle(sess, contextSup.get());
         } catch (RuntimeException exception) {
           sess.close();
           break;
@@ -269,7 +263,7 @@ public final class ClientConnection implements ConnectionHost {
   /**
    * Registers a callback invoked when the connection to the server is established.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread, after the handshake completed and both
+   * <p>The callback fires during {@link #process(Supplier)} on the calling thread, after the handshake completed and both
    * endpoints agreed on the connection identifier.
    *
    * @param callback the callback to invoke on connection
@@ -281,17 +275,12 @@ public final class ClientConnection implements ConnectionHost {
   /**
    * Registers a callback invoked when the connection to the server is lost.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread.
+   * <p>The callback fires during {@link #process(Supplier)} on the calling thread.
    *
    * @param callback the callback to invoke on disconnection
    */
   public void onDisconnected(Consumer<Connection> callback) {
     this.onDisconnected = callback;
-  }
-
-  @Override
-  public void onPacket(BiConsumer<Connection, Packet> callback) {
-    this.onPacket = callback;
   }
 
   /**

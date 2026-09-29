@@ -144,6 +144,20 @@ public interface Texture extends FragileTexture, AutoCloseable {
   }
 
   /**
+   * Returns one texel as an {@code 0xRRGGBBAA} value using top-left image coordinates.
+   *
+   * <p>Backends may reject formats or resources that do not retain CPU-readable pixel data.
+   *
+   * @param x texel X coordinate
+   * @param y texel Y coordinate
+   * @param z texel Z coordinate, or {@code 0} for a 1D or 2D texture
+   * @return packed RGBA8 texel
+   * @throws IndexOutOfBoundsException if a coordinate is outside the texture
+   * @throws UnsupportedOperationException if the texture cannot provide CPU-readable pixels
+   */
+  int pixel(int x, int y, int z);
+
+  /**
    * Uploads pixel data to a sub-region of this texture.
    *
    * <p>The byte array must contain pixel data matching the texture's format

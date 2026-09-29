@@ -104,7 +104,7 @@ public final class EchoPacket extends Packet {
   }
 
   @Override
-  public void handle(Connection connection) {
+  public void handle(Connection connection, Object context) {
     BiConsumer<Connection, EchoPacket> obs = observer;
     if (obs != null) {
       obs.accept(connection, this);

@@ -32,13 +32,13 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * In-process client/server transport used by single-player without bypassing packets.
  *
- * <p>Packets may be queued from another thread, but each endpoint's {@link ConnectionHost#process()} method and
+ * <p>Packets may be queued from another thread, but each endpoint's {@link ConnectionHost#process(Supplier)} method and
  * lifecycle callbacks should be driven from a single thread.
  */
 public final class IntegratedConnection implements AutoCloseable {
@@ -90,7 +90,6 @@ public final class IntegratedConnection implements AutoCloseable {
     private final LocalConnection connection;
     private final ConcurrentLinkedQueue<Packet> inbound = new ConcurrentLinkedQueue<>();
     private @Nullable LocalConnection peer;
-    private @Nullable BiConsumer<Connection, Packet> onPacket;
     private @Nullable Consumer<Connection> onConnected;
     private @Nullable Consumer<Connection> onDisconnected;
     private boolean running;
@@ -120,15 +119,10 @@ public final class IntegratedConnection implements AutoCloseable {
     }
 
     @Override
-    public void process() {
+    public void process(Supplier<Object> contextSup) {
       Packet packet;
       while ((packet = inbound.poll()) != null) {
-        BiConsumer<Connection, Packet> callback = onPacket;
-        if (callback != null) {
-          callback.accept(connection, packet);
-        } else {
-          packet.handle(connection);
-        }
+        packet.handle(connection, contextSup.get());
       }
     }
 
@@ -140,11 +134,6 @@ public final class IntegratedConnection implements AutoCloseable {
     @Override
     public void onDisconnected(Consumer<Connection> callback) {
       onDisconnected = callback;
-    }
-
-    @Override
-    public void onPacket(BiConsumer<Connection, Packet> callback) {
-      onPacket = callback;
     }
 
     @Override

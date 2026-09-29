@@ -112,6 +112,30 @@ public record Color(float red, float green, float blue, float alpha) implements 
   }
 
   /**
+   * Packs four byte channels into an {@code 0xRRGGBBAA} integer.
+   *
+   * @param red red channel in {@code [0, 255]}
+   * @param green green channel in {@code [0, 255]}
+   * @param blue blue channel in {@code [0, 255]}
+   * @param alpha alpha channel in {@code [0, 255]}
+   * @return packed RGBA8 value
+   */
+  public static int packRgba8(int red, int green, int blue, int alpha) {
+    return red << 24 | green << 16 | blue << 8 | alpha;
+  }
+
+  /**
+   * Packs this color into an {@code 0xRRGGBBAA} integer.
+   *
+   * <p>Floating-point channels are rounded to the nearest byte and clamped to the byte range.
+   *
+   * @return packed RGBA8 value
+   */
+  public int packRgba8() {
+    return packRgba8(channel8(red), channel8(green), channel8(blue), channel8(alpha));
+  }
+
+  /**
    * Creates RGBA color from HSVA color.
    *
    * @param hue        hue in {@code [0, 360)}
@@ -233,6 +257,10 @@ public record Color(float red, float green, float blue, float alpha) implements 
    */
   public long packF16LE() {
     return packF16LE(red, green, blue, alpha);
+  }
+
+  private static int channel8(float value) {
+    return Math.max(0, Math.min(255, Math.round(value * 255.0F)));
   }
 
   @Override

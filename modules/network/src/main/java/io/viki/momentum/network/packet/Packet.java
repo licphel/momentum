@@ -38,7 +38,7 @@ import io.viki.momentum.network.Connection;
  * <ul>
  *   <li>{@link #read(BinaryBuffer)} — called on the I/O event loop during decode</li>
  *   <li>{@link #write(BinaryBuffer)} — called on whichever thread sends the packet</li>
- *   <li>{@link #handle(Connection)} — called on the main thread during the processing tick</li>
+ *   <li>{@link #handle(Connection, Object)} — called on the main thread during the processing tick</li>
  * </ul>
  *
  * @see PacketRegistry
@@ -90,8 +90,9 @@ public abstract class Packet {
    * that sent this packet.
    *
    * @param connection the connection from which this packet originated
+   * @param context the application context supplied by the endpoint's processing loop
    */
-  public abstract void handle(Connection connection);
+  public abstract void handle(Connection connection, Object context);
 
   @Override
   public String toString() {

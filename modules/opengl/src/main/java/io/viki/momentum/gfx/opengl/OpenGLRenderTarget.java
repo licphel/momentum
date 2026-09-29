@@ -188,6 +188,14 @@ public final class OpenGLRenderTarget implements RenderTarget {
     }
 
     @Override
+    public int pixel(int x, int y, int z) {
+      if (x < 0 || x >= width() || y < 0 || y >= height() || z != 0) {
+        throw new IndexOutOfBoundsException("Render-target pixel is outside " + width() + "x" + height() + ": " + x + ", " + y + ", " + z);
+      }
+      throw new UnsupportedOperationException("Render-target textures do not retain CPU-readable pixels");
+    }
+
+    @Override
     public void submit(ByteBuffer data, Cube region) {
       int x = (int) region.minX();
       int y = (int) region.minY();

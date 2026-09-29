@@ -27,10 +27,7 @@ package io.viki.momentum.network.packet;
 import io.viki.momentum.network.NetworkException;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -43,7 +40,7 @@ import java.util.function.Supplier;
  */
 public final class PacketRegistry {
   private static final List<Supplier<? extends Packet>> ID_TO_FACTORY = new ArrayList<>();
-  private static final Map<Class<? extends Packet>, Integer> TYPE_TO_ID = new HashMap<>();
+  private static final Map<Class<? extends Packet>, Integer> TYPE_TO_ID = new IdentityHashMap<>();
 
   static {
     register(ConnectionOpenPacket.class, ConnectionOpenPacket::new);

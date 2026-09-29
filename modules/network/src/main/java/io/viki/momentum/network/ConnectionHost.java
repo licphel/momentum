@@ -29,16 +29,14 @@ import org.jspecify.annotations.Nullable;
 import java.util.Collection;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-
-import io.viki.momentum.network.packet.Packet;
+import java.util.function.Supplier;
 
 /**
  * Owns one network endpoint and the logical connections reachable through it.
  *
  * <p>Implementations may receive packets asynchronously, but lifecycle callbacks and packet processing are invoked by
- * the thread that calls {@link #process()}.
+ * the thread that calls {@link #process(Supplier)}.
  */
 public interface ConnectionHost extends AutoCloseable {
   /**
@@ -99,8 +97,12 @@ public interface ConnectionHost extends AutoCloseable {
 
   /**
    * Processes queued packets and lifecycle events on the calling thread.
+   *
+   * <p>The supplier is evaluated on this thread once for each inbound packet, immediately before its handler runs.
+   *
+   * @param contextSup the packet context supplier
    */
-  void process();
+  void process(Supplier<Object> contextSup);
 
   /**
    * Registers the callback invoked when a connection becomes active.
@@ -115,13 +117,6 @@ public interface ConnectionHost extends AutoCloseable {
    * @param callback the callback to invoke for disconnected connections
    */
   void onDisconnected(Consumer<Connection> callback);
-
-  /**
-   * Registers the callback used to handle received packets.
-   *
-   * @param callback the callback to invoke for each received packet
-   */
-  void onPacket(BiConsumer<Connection, Packet> callback);
 
   /**
    * Reports whether this host has been started and has not been closed.

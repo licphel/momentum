@@ -28,7 +28,9 @@ import io.viki.momentum.gfx.DirectBufferPool;
 import io.viki.momentum.gfx.io.ImageUtil;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
+import io.viki.momentum.gfx.texture.TextureFormat;
 import io.viki.momentum.gfx.texture.TextureType;
+import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.math.Cube;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
@@ -58,6 +60,9 @@ public final class OpenGLTexture implements Texture, Handle {
   final int target;
   private final OpenGLDevice ctx;
   private final TextureDesc desc;
+  private final byte[] pixels;
+  private final int pixelStride;
+  private volatile boolean pixelsValid = true;
   /**
    * The GL texture handle (0 until created on the render thread).
    */
@@ -76,6 +81,8 @@ public final class OpenGLTexture implements Texture, Handle {
   OpenGLTexture(OpenGLDevice ctx, TextureDesc desc) {
     this.ctx = ctx;
     this.desc = desc;
+    pixelStride = readablePixelStride(desc.format());
+    pixels = createPixelMirror(desc, pixelStride);
     target = OpenGLUtils.textureTarget(desc.type());
 
     ctx.submit(() -> {
@@ -123,6 +130,24 @@ public final class OpenGLTexture implements Texture, Handle {
   }
 
   @Override
+  public int pixel(int x, int y, int z) {
+    if (x < 0 || x >= width() || y < 0 || y >= height() || z < 0 || z >= depth()) {
+      throw new IndexOutOfBoundsException("Texture pixel is outside " + width() + "x" + height() + "x" + depth() + ": " + x + ", " + y + ", " + z);
+    }
+    if (pixelStride == 0 || !pixelsValid) {
+      throw new UnsupportedOperationException("Texture pixels are unavailable for format " + desc.format());
+    }
+    int index = ((z * height() + y) * width() + x) * pixelStride;
+    synchronized (pixels) {
+      int red = pixels[index] & 0xFF;
+      int green = pixelStride >= 2 ? pixels[index + 1] & 0xFF : 0;
+      int blue = pixelStride >= 3 ? pixels[index + 2] & 0xFF : 0;
+      int alpha = pixelStride >= 4 ? pixels[index + 3] & 0xFF : 0xFF;
+      return Color.packRgba8(red, green, blue, alpha);
+    }
+  }
+
+  @Override
   public void submit(ByteBuffer bytes, Cube region) {
     int x = (int) region.minX();
     int y = (int) region.minY();
@@ -130,6 +155,8 @@ public final class OpenGLTexture implements Texture, Handle {
     int w = (int) region.width();
     int h = (int) region.height();
     int d = (int) region.depth();
+
+    updatePixelMirror(bytes, x, y, z, w, h, d);
 
     // snapshot + flip on the calling thread: the caller may reuse or release its
     // buffer immediately; the GL work runs later on the render thread
@@ -188,6 +215,7 @@ public final class OpenGLTexture implements Texture, Handle {
         cache.bindFramebuffer(GL_READ_FRAMEBUFFER, fbos[0]);
         glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, handle, 0);
 
+        // If it's not a OpenGLTexture, just let it crash!
         OpenGLTexture dstTex = (OpenGLTexture) target2;
         cache.bindFramebuffer(GL_DRAW_FRAMEBUFFER, fbos[1]);
         glFramebufferTexture2D(GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, dstTex.handle, 0);
@@ -235,5 +263,57 @@ public final class OpenGLTexture implements Texture, Handle {
   @Override
   public int handle(int slot) {
     return slot == 0 ? handle : target;
+  }
+
+  private void updatePixelMirror(ByteBuffer source, int x, int y, int z,
+                                 int width, int height, int depth) {
+    if (pixelStride == 0 || !pixelsValid) {
+      return;
+    }
+    int rowBytes = width * pixelStride;
+    int requiredBytes = rowBytes * height * depth;
+    ByteBuffer copy = source.duplicate();
+    if (copy.remaining() < requiredBytes) {
+      pixelsValid = false;
+      return;
+    }
+    synchronized (pixels) {
+      for (int layer = 0; layer < depth; layer++) {
+        for (int row = 0; row < height; row++) {
+          int destination = (((z + layer) * desc.height() + y + row) * desc.width() + x)
+              * pixelStride;
+          copy.get(pixels, destination, rowBytes);
+        }
+      }
+    }
+  }
+
+  private static int readablePixelStride(TextureFormat format) {
+    return switch (format) {
+      case RED8 -> 1;
+      case RG8 -> 2;
+      case RGB8 -> 3;
+      case RGBA8 -> 4;
+      default -> 0;
+    };
+  }
+
+  private static byte[] createPixelMirror(TextureDesc desc, int stride) {
+    if (stride == 0) {
+      return new byte[0];
+    }
+    int size = Math.multiplyExact(Math.multiplyExact(
+        Math.multiplyExact(desc.width(), desc.height()), desc.depth()), stride);
+    byte[] result = new byte[size];
+    byte[] initial = desc.initialBytes();
+    if (initial != null) {
+      if (initial.length != size) {
+        throw new IllegalArgumentException("Initial texture byte count " + initial.length
+            + " does not match " + desc.width() + "x" + desc.height() + "x"
+            + desc.depth() + " " + desc.format() + " texture: " + size);
+      }
+      System.arraycopy(initial, 0, result, 0, size);
+    }
+    return result;
   }
 }

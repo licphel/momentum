@@ -83,7 +83,7 @@ public final class ConnectionOpenPacket extends Packet {
   }
 
   @Override
-  public void handle(Connection connection) {
+  public void handle(Connection connection, Object context) {
     // Handled internally by Connection's handshake logic before reaching the
     // inbound queue; application code never sees this packet.
   }

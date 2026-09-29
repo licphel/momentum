@@ -47,8 +47,8 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 
 /**
  * A server-side network endpoint that binds to a port, accepts client connections, and manages sessions.
@@ -67,7 +67,7 @@ import java.util.function.Consumer;
  * disconnected.
  *
  * <p>This class is thread-safe. {@link #send(Packet)} and {@link #send(UUID, Packet)} may be called from any thread,
- * while {@link #process()} should be called from a single dedicated thread.
+ * while {@link #process(Supplier)} should be called from a single dedicated thread.
  *
  * @see Connection
  */
@@ -107,7 +107,6 @@ public final class ServerConnection implements ConnectionHost {
 
   private @Nullable Consumer<Connection> onConnected;
   private @Nullable Consumer<Connection> onDisconnected;
-  private @Nullable BiConsumer<Connection, Packet> onPacket;
 
   /**
    * Creates a new, unbound server.
@@ -254,9 +253,9 @@ public final class ServerConnection implements ConnectionHost {
    * evicts stale or never-established sessions.
    *
    * <p>This method should be called once per frame from the main thread. Inbound packets receive their
-   * {@link Packet#handle(Connection)} call on the calling thread.
+   * {@link Packet#handle(Connection, Object)} call on the calling thread.
    */
-  public void process() {
+  public void process(Supplier<Object> contextSup) {
     Connection s;
     while ((s = connectEvents.poll()) != null) {
       Consumer<Connection> cb = onConnected;
@@ -278,12 +277,7 @@ public final class ServerConnection implements ConnectionHost {
       entry.connection.releaseQueuedPacket();
       processed++;
       try {
-        BiConsumer<Connection, Packet> callback = onPacket;
-        if (callback != null) {
-          callback.accept(entry.connection, entry.packet);
-        } else {
-          entry.packet.handle(entry.connection);
-        }
+        entry.packet.handle(entry.connection, contextSup.get());
       } catch (RuntimeException exception) {
         entry.connection.close();
       }
@@ -324,7 +318,7 @@ public final class ServerConnection implements ConnectionHost {
   /**
    * Registers a callback invoked when a new session is established.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread, after the handshake completed and the client
+   * <p>The callback fires during {@link #process(Supplier)} on the calling thread, after the handshake completed and the client
    * acknowledged the shared connection identifier.
    *
    * @param callback the callback to invoke for each new connection
@@ -336,17 +330,12 @@ public final class ServerConnection implements ConnectionHost {
   /**
    * Registers a callback invoked when a session is disconnected.
    *
-   * <p>The callback fires during {@link #process()} on the calling thread.
+   * <p>The callback fires during {@link #process(Supplier)} on the calling thread.
    *
    * @param callback the callback to invoke for each disconnection
    */
   public void onDisconnected(Consumer<Connection> callback) {
     this.onDisconnected = callback;
-  }
-
-  @Override
-  public void onPacket(BiConsumer<Connection, Packet> callback) {
-    this.onPacket = callback;
   }
 
   /**
