@@ -85,7 +85,6 @@ public final class ButtonRenderer implements ElementRenderer {
   }
 
   private static void drawLabel(Graphics graphics, Button button, Rectangle area) {
-    RendererSupport.drawText(graphics, button.label(), area.centralX(), area.centralY(),
-        Alignment.CENTRAL, RendererSupport.FOREGROUND);
+    graphics.drawText(button.label(), area.centralX(), area.centralY(), Alignment.CENTRAL);
   }
 }

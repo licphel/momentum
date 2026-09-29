@@ -30,6 +30,7 @@ dependencies {
   testImplementation 'org.junit.jupiter:junit-jupiter'
   testImplementation project(':momentum-glfw')
   testImplementation project(':momentum-opengl')
+  testImplementation project(':momentum-ai')
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
   testRuntimeOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   testRuntimeOnly "org.lwjgl:lwjgl-glfw:${lwjgl_version}"
@@ -55,4 +56,7 @@ tasks.register('runControlsDemo', JavaExec) {
   description = 'Opens an interactive window demonstrating every standard UI control.'
   classpath = sourceSets.test.runtimeClasspath
   mainClass = 'io.viki.momentum.gfx.ui.ControlsRenderDemo'
+  if (project.hasProperty('aiModel')) {
+    args project.property('aiModel')
+  }
 }

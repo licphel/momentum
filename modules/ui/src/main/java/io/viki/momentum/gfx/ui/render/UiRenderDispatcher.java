@@ -39,7 +39,8 @@ import java.util.List;
  *
  * <p>Children are rendered in their insertion order, while parts are rendered in a second local
  * pass so popups and other overlays remain above sibling content. A layer boundary is rendered as
- * one unit, which keeps an overlay from an older window above a newer window.
+ * one unit, which keeps an overlay from an older window above a newer window. A window that opts
+ * into backdrop blur receives a full-surface capture before its translucent glass is painted.
  */
 public final class UiRenderDispatcher implements AutoCloseable {
   /** Dispatcher used by elements that are drawn without an explicitly configured Canvas. */
@@ -132,8 +133,8 @@ public final class UiRenderDispatcher implements AutoCloseable {
       return;
     }
     Rectangle absolute = absoluteBounds(element, parentX, parentY);
-    if (element instanceof Window) {
-      drawOccludedBackdrop(graphics, absolute);
+    if (element instanceof Window window) {
+      drawWindowBackdrop(graphics, window, absolute);
       renderedWindows.add(absolute);
     }
     element.renderer().render(graphics, element, absolute);
@@ -195,6 +196,14 @@ public final class UiRenderDispatcher implements AutoCloseable {
     for (Rectangle region : blurRegions) {
       backdropBlur.draw(graphics, region);
     }
+  }
+
+  private void drawWindowBackdrop(Graphics graphics, Window window, Rectangle windowBounds) {
+    if (backdropBlur != null && window.backdropBlurEnabled()) {
+      backdropBlur.draw(graphics, windowBounds);
+      return;
+    }
+    drawOccludedBackdrop(graphics, windowBounds);
   }
 
   private static void appendUncovered(Rectangle area, List<Rectangle> covered,

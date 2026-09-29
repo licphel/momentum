@@ -57,8 +57,8 @@ public final class WindowRenderer implements ElementRenderer {
 
   private void renderWindow(Graphics graphics, Element raw, Rectangle area) {
     Window window = (Window) raw;
-    // Draw the glass surface, shadow, and outer frame after the dispatcher backdrop pass.
-    RendererSupport.drawWindowBackground(graphics, area);
+    // Draw the glass surface and outer frame after the dispatcher backdrop pass.
+    RendererSupport.drawWindowBackground(graphics, area, window.shadowEnabled());
     // Draw the title-bar surface and separator frame.
     float titleHeight = Math.min(area.height(), window.titleHeightForRender());
     Rectangle titleArea = Rectangle.of(area.minX(), area.minY(), area.width(), titleHeight);
@@ -77,10 +77,13 @@ public final class WindowRenderer implements ElementRenderer {
   }
 
   private static void drawTitleBar(Graphics graphics, Window window, Rectangle titleArea) {
+    if (titleArea.width() <= 0.0F || titleArea.height() <= 0.0F) {
+      return;
+    }
     RendererSupport.fill(graphics, titleArea, RendererSupport.GLASS_TITLE_SURFACE);
     RendererSupport.drawBoundary(graphics, titleArea, RendererSupport.OUTLINE);
-    RendererSupport.drawText(graphics, window.title(), titleArea.minX() + RendererSupport.PADDING,
-        titleArea.centralY(), RendererSupport.LEFT_CENTER, RendererSupport.FOREGROUND);
+    graphics.drawText(window.title(), titleArea.minX() + RendererSupport.PADDING,
+        titleArea.centralY(), RendererSupport.LEFT_CENTER);
   }
 
   private static void drawCloseButton(Graphics graphics, Window window, Rectangle closeArea,

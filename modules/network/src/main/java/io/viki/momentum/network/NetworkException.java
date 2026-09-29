@@ -22,27 +22,37 @@
  * SOFTWARE.
  */
 
-rootProject.name = "momentum"
+package io.viki.momentum.network;
 
-// Shared-library versions, declared once here and injected into every
-// subproject from the root build script; modules must not repeat them.
-dependencyResolutionManagement {
-  versionCatalogs {
-    libs {
-      library('jspecify', 'org.jspecify', 'jspecify').version('1.0.0')
-      library('fastutil', 'it.unimi.dsi', 'fastutil').version('8.5.15')
-      library('jackson-databind', 'com.fasterxml.jackson.core', 'jackson-databind').version('2.21.1')
-      library('llama', 'net.ladenthin', 'llama').version('5.1.0')
-    }
+import org.jspecify.annotations.Nullable;
+
+import java.io.Serial;
+
+/**
+ * Unchecked exception for network-level errors.
+ *
+ * <p>Covers connection failures, protocol violations, and problems encountered during packet encoding or decoding.
+ */
+public class NetworkException extends RuntimeException {
+  @Serial
+  private static final long serialVersionUID = 2026070400L;
+
+  /**
+   * Creates an exception with a descriptive message.
+   *
+   * @param message a human-readable description of the error
+   */
+  public NetworkException(String message) {
+    super(message);
   }
-}
 
-var modulesDir = file("modules")
-
-// ui.old is a source archive, not a Gradle module. Keep archived code beside
-// the replacement UI without letting the dynamic module scan configure it.
-modulesDir.listFiles()?.findAll { it.isDirectory() && it.name != "ui.old" }?.each { dir ->
-  var projectName = "momentum-${dir.name}"
-  include(projectName)
-  project(":${projectName}").projectDir = dir
+  /**
+   * Creates an exception with a descriptive message and a root cause.
+   *
+   * @param message a human-readable description of the error
+   * @param cause   the underlying throwable that triggered this error, or {@code null}
+   */
+  public NetworkException(String message, @Nullable Throwable cause) {
+    super(message, cause);
+  }
 }

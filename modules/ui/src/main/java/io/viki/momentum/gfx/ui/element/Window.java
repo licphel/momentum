@@ -24,12 +24,15 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.WindowRenderer;
 import org.jspecify.annotations.Nullable;
+
+import java.util.Objects;
 
 /**
  * Provides a simulated window with a title bar, optional controls, and a clipped content area.
@@ -40,10 +43,12 @@ import org.jspecify.annotations.Nullable;
  * thread.
  */
 public final class Window extends Element {
-  private String title;
+  private Text title;
   private boolean movable = true;
   private boolean closable = true;
   private boolean minimizable = true;
+  private boolean backdropBlurEnabled;
+  private boolean shadowEnabled = true;
   private boolean closed;
   private boolean minimized;
   private boolean dragging;
@@ -61,28 +66,65 @@ public final class Window extends Element {
    * Creates a window at the supplied local bounds.
    *
    * @param bounds initial local bounds
-   * @param title title displayed in the title bar
+   * @param title rich title displayed in the title bar
    */
-  public Window(Rectangle bounds, String title) {
+  public Window(Rectangle bounds, Text title) {
     super(bounds);
-    this.title = title;
+    this.title = Objects.requireNonNull(title, "title");
   }
+
   /**
    * Returns the title displayed in the title bar.
    *
-   * @return current window title
+   * @return current rich window title
    */
-  public String title() {
+  public Text title() {
     return title;
   }
 
   /**
    * Changes the title-bar text.
    *
-   * @param value new title
+   * @param value new rich title
    */
-  public void setTitle(String value) {
-    title = value;
+  public void setTitle(Text value) {
+    title = Objects.requireNonNull(value, "value");
+  }
+
+  /**
+   * Reports whether this window asks the UI dispatcher to blur the content behind its surface.
+   *
+   * @return {@code true} when backdrop blur is enabled
+   */
+  public boolean backdropBlurEnabled() {
+    return backdropBlurEnabled;
+  }
+
+  /**
+   * Enables or disables the device-backed frosted backdrop pass for this window.
+   *
+   * @param value {@code true} to blur the framebuffer behind the window before painting its glass
+   */
+  public void setBackdropBlurEnabled(boolean value) {
+    backdropBlurEnabled = value;
+  }
+
+  /**
+   * Reports whether this window draws the standard drop shadow.
+   *
+   * @return {@code true} when the window shadow is enabled
+   */
+  public boolean shadowEnabled() {
+    return shadowEnabled;
+  }
+
+  /**
+   * Enables or disables the standard drop shadow behind this window.
+   *
+   * @param value {@code true} to draw the window shadow
+   */
+  public void setShadowEnabled(boolean value) {
+    shadowEnabled = value;
   }
 
   @Override

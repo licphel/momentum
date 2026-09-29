@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Literal;
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.SliderRenderer;
 import io.viki.momentum.input.KeyAction;
@@ -32,6 +34,7 @@ import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.function.DoubleConsumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -45,7 +48,7 @@ import java.util.function.IntConsumer;
 public final class Slider extends Element {
   private final double minimum;
   private final double maximum;
-  private final List<String> options;
+  private final List<Text> options;
   private double value;
   private double step;
   private boolean enabled = true;
@@ -58,7 +61,7 @@ public final class Slider extends Element {
   private float valueGap = 4.0F;
   private @Nullable DoubleConsumer onChanged;
   private @Nullable IntConsumer onSelectionChanged;
-  private @Nullable Function<String, String> valueFormatter;
+  private @Nullable Function<Text, Text> valueFormatter;
 
   /**
    * Creates a numeric slider.
@@ -86,17 +89,18 @@ public final class Slider extends Element {
    * Creates a discrete option slider.
    *
    * @param bounds the slider's local bounds
-   * @param options the non-empty option labels
+   * @param options the non-empty rich option labels
    * @param selectedIndex the initial option index
    * @throws IllegalArgumentException if {@code options} is empty
    * @throws IndexOutOfBoundsException if {@code selectedIndex} is invalid
    */
-  public Slider(Rectangle bounds, List<String> options, int selectedIndex) {
+  public Slider(Rectangle bounds, List<Text> options, int selectedIndex) {
     super(bounds);
+    Objects.requireNonNull(options, "options");
     if (options.isEmpty()) {
       throw new IllegalArgumentException("Option slider requires at least one option");
     }
-    this.options = List.copyOf(options);
+    this.options = options.stream().map(option -> Objects.requireNonNull(option, "option")).toList();
     minimum = 0.0;
     maximum = options.size() - 1.0;
     step = 1.0;
@@ -182,9 +186,9 @@ public final class Slider extends Element {
   /**
    * Returns the immutable option list represented by this slider.
    *
-   * @return option labels, or an empty list for numeric sliders
+   * @return rich option labels, or an empty list for numeric sliders
    */
-  public List<String> options() {
+  public List<Text> options() {
     return options;
   }
 
@@ -202,10 +206,10 @@ public final class Slider extends Element {
   /**
    * Returns the selected option label.
    *
-   * @return the selected option text
+   * @return the selected rich option text
    * @throws IllegalStateException if this is a numeric slider
    */
-  public String selectedOption() {
+  public Text selectedOption() {
     return options.get(selectedIndex());
   }
 
@@ -266,9 +270,10 @@ public final class Slider extends Element {
   /**
    * Installs or removes the displayed-value formatter.
    *
-   * @param value the formatter, or {@code null} to use the raw value
+   * @param value formatter receiving the raw rich value and returning rich text, or
+   *              {@code null} to use the raw value
    */
-  public void setValueFormatter(@Nullable Function<String, String> value) {
+  public void setValueFormatter(@Nullable Function<Text, Text> value) {
     valueFormatter = value;
   }
 
@@ -522,18 +527,18 @@ public final class Slider extends Element {
   }
 
   /**
-   * Returns the value formatted for display.
+   * Returns the value formatted as rich text for display.
    *
-   * @return the raw or formatted numeric/option value
+   * @return the raw or formatted rich text value
    * @throws IllegalArgumentException if a formatter returns {@code null}
    */
-  public String displayValue() {
-    String raw = isOptionSlider() ? selectedOption() : Double.toString(value);
-    Function<String, String> formatter = valueFormatter;
+  public Text displayValue() {
+    Text raw = isOptionSlider() ? selectedOption() : Literal.of(Double.toString(value));
+    Function<Text, Text> formatter = valueFormatter;
     if (formatter == null) {
       return raw;
     }
-    String formatted = formatter.apply(raw);
+    Text formatted = formatter.apply(raw);
     if (formatted == null) {
       throw new IllegalArgumentException("Slider value formatter returned null");
     }

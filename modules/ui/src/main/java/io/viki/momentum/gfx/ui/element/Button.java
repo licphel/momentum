@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Literal;
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyBinding;
 import io.viki.momentum.input.KeyCode;
@@ -34,6 +36,8 @@ import io.viki.momentum.gfx.ui.render.ButtonRenderer;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+
 
 /**
  * Represents an activatable logical-space button with pointer and keyboard input handling.
@@ -43,7 +47,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class Button extends Element {
   private State state = State.IDLE;
-  private String label = "";
+  private Text label = Literal.of("");
   private boolean enabled = true;
   private boolean hovered;
   private boolean focused;
@@ -62,24 +66,36 @@ public final class Button extends Element {
   public Button(Rectangle bounds) {
     super(bounds);
   }
+
+  /**
+   * Creates a button with a rich label and the supplied bounds.
+   *
+   * @param bounds the button's local bounds
+   * @param label rich label displayed by the button
+   */
+  public Button(Rectangle bounds, Text label) {
+    this(bounds);
+    this.label = Objects.requireNonNull(label, "label");
+  }
+
   /**
    * Returns the label presented by this button.
    *
    * <p>The value is read by the active renderer each time the button is drawn.
    *
-   * @return current button label
+   * @return current rich button label
    */
-  public String label() {
+  public Text label() {
     return label;
   }
 
   /**
    * Changes the text displayed by the button renderer.
    *
-   * @param value the new label
+   * @param value the new rich label
    */
-  public void setLabel(String value) {
-    label = value;
+  public void setLabel(Text value) {
+    label = Objects.requireNonNull(value, "value");
   }
 
   /**

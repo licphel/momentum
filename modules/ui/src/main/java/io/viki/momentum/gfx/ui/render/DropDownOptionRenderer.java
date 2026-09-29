@@ -74,7 +74,6 @@ public final class DropDownOptionRenderer implements ElementRenderer {
   private static void drawOptionLabel(Graphics graphics, DropDown owner,
                                       DropDown.OptionPart option, Rectangle area) {
     RendererSupport.drawText(graphics, owner.options().get(option.index()),
-        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER,
-        RendererSupport.FOREGROUND);
+        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER);
   }
 }

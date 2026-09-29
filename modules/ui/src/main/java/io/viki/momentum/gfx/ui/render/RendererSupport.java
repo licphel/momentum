@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.ui.render;
 
-import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.tint.Color;
@@ -70,12 +69,8 @@ final class RendererSupport {
   private RendererSupport() {
   }
 
-  static void drawText(Graphics graphics, String value, float x, float y, Alignment alignment, Color color) {
-    if (value.isEmpty()) {
-      return;
-    }
-    Text text = Literal.of(value).with(TEXT_FORMAT.tint(color));
-    graphics.drawText(text, x, y, alignment);
+  static void drawText(Graphics graphics, Text value, float x, float y, Alignment alignment) {
+    graphics.drawText(value, x, y, alignment);
   }
 
   static void fill(Graphics graphics, Rectangle area, Color color) {
@@ -127,10 +122,11 @@ final class RendererSupport {
     drawBoundary(graphics, area, focused ? OUTLINE_FOCUS : OUTLINE);
   }
 
-  static void drawWindowBackground(Graphics graphics, Rectangle area) {
-    // Draw the window drop shadow behind the glass surface.
-    graphics.setTint(SHADOW);
-    graphics.drawRectangle(area);
+  static void drawWindowBackground(Graphics graphics, Rectangle area, boolean shadowEnabled) {
+    if (shadowEnabled) {
+      graphics.setTint(SHADOW);
+      graphics.drawRectangle(area);
+    }
     // Draw the captured/blurred backdrop when the UI dispatcher provides it.
     // Draw the translucent glass surface over the backdrop.
     fill(graphics, area, GLASS_SURFACE);

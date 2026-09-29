@@ -160,7 +160,7 @@ public final class TextBoxRenderer implements ElementRenderer {
     float padding = RendererSupport.PADDING;
     float x = padding;
     float y = padding;
-    float height = Math.max(1.0F, textBox.bounds().height() - padding * 2.0F);
+    float height = emptyLineHeight(textBox.bounds().height(), padding);
     TextFormat renderedFormat = RendererSupport.TEXT_FORMAT.tint(RendererSupport.FOREGROUND);
     Raster raster = ensureActualLayout(textBox, renderedFormat,
         layoutWidth(textBox, textBox.bounds().width(), padding)).raster();
@@ -170,8 +170,8 @@ public final class TextBoxRenderer implements ElementRenderer {
       int localIndex = Math.clamp(textBox.cursorIndex() - run.textStart(),
           0, visibleLineLength(run.text()));
       x += offsetFor(run, localIndex);
-      y += run.lineTop();
-      height = run.lineHeight();
+      y += caretTop(run);
+      height = caretHeight();
     }
     scrollPane.scrollToVisible(textBox, Rectangle.of(x, y, 1.0F, height));
   }
@@ -231,14 +231,14 @@ public final class TextBoxRenderer implements ElementRenderer {
                          Raster raster) {
     float offset = 0.0F;
     float top = area.minY() + padding;
-    float height = Math.max(1.0F, area.height() - padding * 2.0F);
+    float height = emptyLineHeight(area.height(), padding);
     LayoutRun run = runAtCursor(textBox, raster);
     if (run != null) {
       int localIndex = Math.clamp(textBox.cursorIndex() - run.textStart(),
           0, visibleLineLength(run.text()));
       offset = offsetFor(run, localIndex);
-      top += run.lineTop();
-      height = run.lineHeight();
+      top += caretTop(run);
+      height = caretHeight();
     }
     graphics.setTint(RendererSupport.FOREGROUND);
     float caretX = area.minX() + padding + offset;
@@ -303,17 +303,28 @@ public final class TextBoxRenderer implements ElementRenderer {
     return Math.max(1.0F, visibleWidth - padding * 2.0F);
   }
 
+  private static float emptyLineHeight(float controlHeight, float padding) {
+    float contentHeight = Math.max(1.0F, controlHeight - padding * 2.0F);
+    return Math.min(caretHeight(), contentHeight);
+  }
+
+  private static float caretTop(LayoutRun run) {
+    float ascender = RendererSupport.TEXT_FORMAT.font().metrics().ascender()
+        * RendererSupport.TEXT_FORMAT.fontSize();
+    return run.lineY() - ascender;
+  }
+
+  private static float caretHeight() {
+    float fontSize = RendererSupport.TEXT_FORMAT.fontSize();
+    float ascender = RendererSupport.TEXT_FORMAT.font().metrics().ascender() * fontSize;
+    float descender = RendererSupport.TEXT_FORMAT.font().metrics().descender() * fontSize;
+    return Math.max(1.0F, ascender - descender);
+  }
+
   private static int visibleLineLength(String value) {
     return value.endsWith("\n") ? value.length() - 1 : value.length();
   }
 
-  private record CachedLayout(String value, TextFormat format, float width,
-                              MutableText component, Raster raster) {
-    private CachedLayout {
-      if (!Float.isFinite(width) && width != Float.MAX_VALUE) {
-        throw new IllegalArgumentException("Text layout width must be finite or Float.MAX_VALUE: "
-            + width);
-      }
-    }
+  private record CachedLayout(String value, TextFormat format, float width, MutableText component, Raster raster) {
   }
 }

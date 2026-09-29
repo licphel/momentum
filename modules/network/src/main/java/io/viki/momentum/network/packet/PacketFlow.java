@@ -22,27 +22,34 @@
  * SOFTWARE.
  */
 
-rootProject.name = "momentum"
+package io.viki.momentum.network.packet;
 
-// Shared-library versions, declared once here and injected into every
-// subproject from the root build script; modules must not repeat them.
-dependencyResolutionManagement {
-  versionCatalogs {
-    libs {
-      library('jspecify', 'org.jspecify', 'jspecify').version('1.0.0')
-      library('fastutil', 'it.unimi.dsi', 'fastutil').version('8.5.15')
-      library('jackson-databind', 'com.fasterxml.jackson.core', 'jackson-databind').version('2.21.1')
-      library('llama', 'net.ladenthin', 'llama').version('5.1.0')
-    }
+/** Declares which remote endpoint is permitted to send a packet type. */
+public enum PacketFlow {
+  /** Packets that may be sent from the server to the client. */
+  CLIENTBOUND,
+  /** Packets that may be sent from the client to the server. */
+  SERVERBOUND,
+  /** Packets that may be sent in either direction. */
+  BIDIRECTIONAL,
+  /** Packets reserved for internal connection-management traffic. */
+  INTERNAL;
+
+  /**
+   * Reports whether this flow permits delivery to the client.
+   *
+   * @return {@code true} if the packet may be sent to the client
+   */
+  public boolean acceptedByClient() {
+    return this == CLIENTBOUND || this == BIDIRECTIONAL;
   }
-}
 
-var modulesDir = file("modules")
-
-// ui.old is a source archive, not a Gradle module. Keep archived code beside
-// the replacement UI without letting the dynamic module scan configure it.
-modulesDir.listFiles()?.findAll { it.isDirectory() && it.name != "ui.old" }?.each { dir ->
-  var projectName = "momentum-${dir.name}"
-  include(projectName)
-  project(":${projectName}").projectDir = dir
+  /**
+   * Reports whether this flow permits delivery to the server.
+   *
+   * @return {@code true} if the packet may be sent to the server
+   */
+  public boolean acceptedByServer() {
+    return this == SERVERBOUND || this == BIDIRECTIONAL;
+  }
 }

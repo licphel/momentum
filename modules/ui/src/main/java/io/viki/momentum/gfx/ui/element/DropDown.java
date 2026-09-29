@@ -24,6 +24,7 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.DropDownOptionRenderer;
 import io.viki.momentum.gfx.ui.render.DropDownPopupRenderer;
@@ -35,6 +36,7 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.function.IntConsumer;
 
 /**
@@ -47,7 +49,7 @@ import java.util.function.IntConsumer;
 public final class DropDown extends Element {
   private static final int DEFAULT_SCROLLBAR_MINIMUM_ENTRIES = 8;
 
-  private final List<String> options;
+  private final List<Text> options;
   private final List<OptionPart> optionParts = new ArrayList<>();
   private final Popup popup;
   private int selectedIndex;
@@ -64,20 +66,21 @@ public final class DropDown extends Element {
    * Creates a drop-down menu from immutable option text.
    *
    * @param bounds the header's local bounds
-   * @param options the non-empty option list
+   * @param options the non-empty rich option list
    * @param selectedIndex the initial selected option index
    * @throws IllegalArgumentException if {@code options} is empty
    * @throws IndexOutOfBoundsException if {@code selectedIndex} is outside the option list
    */
-  public DropDown(Rectangle bounds, List<String> options, int selectedIndex) {
+  public DropDown(Rectangle bounds, List<Text> options, int selectedIndex) {
     super(bounds);
+    Objects.requireNonNull(options, "options");
     if (options.isEmpty()) {
       throw new IllegalArgumentException("Drop-down requires at least one option");
     }
     if (selectedIndex < 0 || selectedIndex >= options.size()) {
       throw new IndexOutOfBoundsException("Selected option index out of range: " + selectedIndex);
     }
-    this.options = List.copyOf(options);
+    this.options = options.stream().map(option -> Objects.requireNonNull(option, "option")).toList();
     this.selectedIndex = selectedIndex;
     popup = new Popup();
     addPart(popup);
@@ -88,9 +91,9 @@ public final class DropDown extends Element {
   /**
    * Returns the immutable option list displayed by this menu.
    *
-   * @return options in their selection order
+   * @return rich options in their selection order
    */
-  public List<String> options() {
+  public List<Text> options() {
     return options;
   }
 
@@ -106,9 +109,9 @@ public final class DropDown extends Element {
   /**
    * Returns the text of the selected option.
    *
-   * @return selected option text
+   * @return selected rich option text
    */
-  public String selectedOption() {
+  public Text selectedOption() {
     return options.get(selectedIndex);
   }
 

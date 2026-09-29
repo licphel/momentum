@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.InputListener;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
@@ -349,21 +348,6 @@ public abstract class Element implements InputListener {
    */
   public final void setDefaultTooltip(List<Text> value) {
     setTooltip(value);
-  }
-
-  /**
-   * Sets or clears a legacy single-string tooltip.
-   *
-   * <p>The string is converted to one {@link Text} entry and is therefore also available through
-   * {@link #defaultTooltip()} and {@link #appendTooltips(List)}.
-   *
-   * @param value tooltip text; {@code null} or an empty string clears the default entries
-   */
-  public final void setDefaultTooltip(@Nullable String value) {
-    defaultTooltip.clear();
-    if (value != null) {
-      defaultTooltip.add(Literal.of(value));
-    }
   }
 
   /**

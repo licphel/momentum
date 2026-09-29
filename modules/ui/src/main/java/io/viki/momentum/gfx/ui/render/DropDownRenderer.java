@@ -80,8 +80,7 @@ public final class DropDownRenderer implements ElementRenderer {
 
   private static void drawSelectedOption(Graphics graphics, DropDown dropDown, Rectangle area) {
     RendererSupport.drawText(graphics, dropDown.selectedOption(),
-        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER,
-        RendererSupport.FOREGROUND);
+        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER);
   }
 
   private static void drawCollapseIndicator(Graphics graphics, DropDown dropDown, Rectangle area) {

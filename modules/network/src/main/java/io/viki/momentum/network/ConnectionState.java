@@ -22,27 +22,23 @@
  * SOFTWARE.
  */
 
-rootProject.name = "momentum"
+package io.viki.momentum.network;
 
-// Shared-library versions, declared once here and injected into every
-// subproject from the root build script; modules must not repeat them.
-dependencyResolutionManagement {
-  versionCatalogs {
-    libs {
-      library('jspecify', 'org.jspecify', 'jspecify').version('1.0.0')
-      library('fastutil', 'it.unimi.dsi', 'fastutil').version('8.5.15')
-      library('jackson-databind', 'com.fasterxml.jackson.core', 'jackson-databind').version('2.21.1')
-      library('llama', 'net.ladenthin', 'llama').version('5.1.0')
-    }
-  }
-}
-
-var modulesDir = file("modules")
-
-// ui.old is a source archive, not a Gradle module. Keep archived code beside
-// the replacement UI without letting the dynamic module scan configure it.
-modulesDir.listFiles()?.findAll { it.isDirectory() && it.name != "ui.old" }?.each { dir ->
-  var projectName = "momentum-${dir.name}"
-  include(projectName)
-  project(":${projectName}").projectDir = dir
+/**
+ * Lifecycle states of a {@link Connection}.
+ *
+ * <p>The canonical progression is {@link #CONNECTING} → {@link #CONNECTED} → {@link #DISCONNECTING} →
+ * {@link #DISCONNECTED}. A freshly created session that has never connected starts at {@code DISCONNECTED}.
+ *
+ * @see Connection#state()
+ */
+public enum ConnectionState {
+  /** Initial connection handshake is in progress. */
+  CONNECTING,
+  /** Connection is established and data may flow. */
+  CONNECTED,
+  /** Close handshake has been initiated but the channel may still be open. */
+  DISCONNECTING,
+  /** Connection is fully closed and no further communication is possible. */
+  DISCONNECTED
 }

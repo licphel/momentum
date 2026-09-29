@@ -95,7 +95,7 @@ public final class CheckBoxRenderer implements ElementRenderer {
 
   private static void drawLabel(Graphics graphics, CheckBox checkBox, Rectangle area,
                                 Rectangle box) {
-    RendererSupport.drawText(graphics, checkBox.label(), box.maxX() + RendererSupport.PADDING,
-        area.centralY(), RendererSupport.LEFT_CENTER, RendererSupport.FOREGROUND);
+    graphics.drawText(checkBox.label(), box.maxX() + RendererSupport.PADDING,
+        area.centralY(), RendererSupport.LEFT_CENTER);
   }
 }

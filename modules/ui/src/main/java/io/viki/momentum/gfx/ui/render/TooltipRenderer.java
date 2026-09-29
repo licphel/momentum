@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.ui.render;
 
-import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
@@ -43,19 +42,6 @@ public final class TooltipRenderer {
   private static final float LINE_GAP = 2.0F;
 
   private TooltipRenderer() {
-  }
-
-  /**
-   * Renders a padded tooltip surface and its text at a canvas position.
-   *
-   * @param graphics graphics context receiving the tooltip
-   * @param value tooltip text to rasterize
-   * @param x left coordinate of the tooltip surface
-   * @param y top coordinate of the tooltip surface
-   */
-  public static void render(Graphics graphics, String value, float x, float y) {
-    Text text = Literal.of(value).with(RendererSupport.TEXT_FORMAT.tint(RendererSupport.FOREGROUND));
-    render(graphics, List.of(text), x, y);
   }
 
   /**

@@ -1,0 +1,10 @@
+plugins {
+  id 'java-library'
+}
+
+dependencies {
+  api project(':momentum-codec')
+  api platform("io.netty:netty-bom:${netty_version}")
+  api 'io.netty:netty-handler'
+  api 'io.netty:netty-transport'
+}

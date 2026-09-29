@@ -24,6 +24,7 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.CheckBoxRenderer;
 import io.viki.momentum.input.KeyAction;
@@ -32,6 +33,7 @@ import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * Represents a toggleable checkbox with pointer, keyboard, hover, and focus state.
@@ -42,7 +44,7 @@ import java.util.function.Consumer;
 public final class CheckBox extends Element {
   private static final float DEFAULT_CHECK_MARK_INSET = 0.2F;
 
-  private String label;
+  private Text label;
   private boolean checked;
   private boolean enabled = true;
   private boolean hovered;
@@ -56,12 +58,12 @@ public final class CheckBox extends Element {
    * Creates a checkbox with the supplied label, initial value, and bounds.
    *
    * @param bounds the checkbox's local bounds
-   * @param label the text displayed beside the box
+   * @param label the rich text displayed beside the box
    * @param checked the initial checked state
    */
-  public CheckBox(Rectangle bounds, String label, boolean checked) {
+  public CheckBox(Rectangle bounds, Text label, boolean checked) {
     super(bounds);
-    this.label = label;
+    this.label = Objects.requireNonNull(label, "label");
     this.checked = checked;
   }
 
@@ -89,9 +91,9 @@ public final class CheckBox extends Element {
   /**
    * Returns the label displayed beside the checkbox.
    *
-   * @return current checkbox label
+   * @return current rich checkbox label
    */
-  public String label() {
+  public Text label() {
     return label;
   }
 
@@ -176,10 +178,10 @@ public final class CheckBox extends Element {
   /**
    * Changes the label displayed beside the checkbox.
    *
-   * @param value the new label
+   * @param value the new rich label
    */
-  public void setLabel(String value) {
-    label = value;
+  public void setLabel(Text value) {
+    label = Objects.requireNonNull(value, "value");
   }
 
   /**

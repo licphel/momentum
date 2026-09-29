@@ -117,6 +117,6 @@ public final class SliderRenderer implements ElementRenderer {
   private static void drawValue(Graphics graphics, Slider slider, Rectangle area) {
     RendererSupport.drawText(graphics, slider.displayValue(),
         area.maxX() + slider.valueGapForRender(), area.centralY(),
-        RendererSupport.LEFT_CENTER, RendererSupport.FOREGROUND);
+        RendererSupport.LEFT_CENTER);
   }
 }
