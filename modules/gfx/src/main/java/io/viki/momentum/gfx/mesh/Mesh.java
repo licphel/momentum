@@ -28,6 +28,7 @@ import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.cmd.Encoder;
 
 import java.util.List;
+import java.util.Objects;
 
 /**
  * An immutable collection of GPU geometry sections ready for rendering.
@@ -39,18 +40,34 @@ import java.util.List;
  * <p>This class implements {@link AutoCloseable}; closing a mesh releases the uniform buffer,
  * all vertex and index buffers, and all materials.
  *
- * @param sections mesh sections
- *
  * @see Section
  * @see Material
  */
-public record Mesh(List<Section> sections) implements AutoCloseable {
+public final class Mesh implements AutoCloseable {
+  private final List<Section> sections;
+  private boolean isEmpty;
+
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
    *
    * @param sections the list of geometry sections
    */
-  public Mesh {
+  public Mesh(List<Section> sections) {
+    this.sections = sections;
+
+    if (sections.isEmpty()) {
+      isEmpty = true;
+    } else {
+      boolean hasNonempty = false;
+      for (Section section : sections) {
+        if (section.vertexCount() > 0) {
+          hasNonempty = true;
+          break;
+        }
+      }
+
+      isEmpty = !hasNonempty;
+    }
   }
 
   /**
@@ -58,9 +75,17 @@ public record Mesh(List<Section> sections) implements AutoCloseable {
    *
    * @return the list of sections
    */
-  @Override
   public List<Section> sections() {
     return sections;
+  }
+
+  /**
+   * Returns whether the mesh has no content to draw.
+   *
+   * @return whether the mesh is empty
+   */
+  public boolean isEmpty() {
+    return isEmpty;
   }
 
   /**
@@ -101,5 +126,28 @@ public record Mesh(List<Section> sections) implements AutoCloseable {
     for (Section s : sections) {
       s.close();
     }
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (obj == this) {
+      return true;
+    }
+    if (obj == null || obj.getClass() != this.getClass()) {
+      return false;
+    }
+    var that = (Mesh) obj;
+    return Objects.equals(this.sections, that.sections);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(sections);
+  }
+
+  @Override
+  public String toString() {
+    return "Mesh[" +
+        "sections=" + sections + ']';
   }
 }

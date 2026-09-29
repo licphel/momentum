@@ -32,6 +32,7 @@ import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.cmd.EncoderDesc;
 import io.viki.momentum.gfx.mesh.Mesh;
+import io.viki.momentum.gfx.mesh.Section;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.*;
@@ -126,11 +127,11 @@ public class BatchedGraphics extends StatefulGraphics {
    */
   @Override
   public void drawMesh(Mesh mesh) {
-    flush();
-
-    if (mesh.sections().isEmpty()) {
+    if (mesh.isEmpty()) {
       return;
     }
+
+    flush();
 
     encoder.setViewport((int) viewport.minX(), (int) viewport.minY(), (int) viewport.width(), (int) viewport.height());
     encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
