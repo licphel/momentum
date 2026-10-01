@@ -295,11 +295,13 @@ public final class Resolution {
    * @param inputWidth the input surface width
    * @param inputHeight the input surface height
    * @return the corresponding logical point
-   * @throws IllegalArgumentException if an input dimension is not positive
    */
   public Vector2 inputToLogical(double x, double y, double inputWidth, double inputHeight) {
-    if (inputWidth <= 0.0 || inputHeight <= 0.0) {
-      throw new IllegalArgumentException("Input coordinate size must be positive: " + inputWidth + "x" + inputHeight);
+    if (inputWidth <= 0.0) {
+      inputWidth = 1.0F; // Normalize for minimized window
+    }
+    if (inputHeight <= 0.0) {
+      inputHeight = 1.0F; // Normalize for minimized window
     }
     return screenToLogical(x * width / inputWidth, y * height / inputHeight);
   }

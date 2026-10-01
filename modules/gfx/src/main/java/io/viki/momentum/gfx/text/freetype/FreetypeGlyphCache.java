@@ -37,6 +37,7 @@ import org.lwjgl.util.freetype.FT_Face;
 import org.lwjgl.util.freetype.FT_GlyphSlot;
 
 import java.nio.ByteBuffer;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -52,12 +53,15 @@ import static org.lwjgl.util.freetype.FreeType.*;
  * cached {@link TexturePart}s remain valid when the atlas grows — no cache invalidation
  * or rebinding required.
  *
+ * <p>This cache is not thread-safe and is intended to be used by one rendering thread.
+ *
  * <p>Must be {@linkplain #close() closed} to release the underlying texture atlas.
  */
 @InternalApi
 public final class FreetypeGlyphCache implements AutoCloseable {
   private final Device device;
   private final Map<GlyphKey, @Nullable Glyph> cache = new HashMap<>();
+  private final ArrayDeque<GlyphKey> glyphKeyPool = new ArrayDeque<>();
   private @Nullable TextureAtlas atlas;
   private int resolution = 0;
   private boolean disposed;
@@ -101,9 +105,11 @@ public final class FreetypeGlyphCache implements AutoCloseable {
     if (glyphIndex == 0) {
       return null; // glyph 0 is the .notdef sentinel — control chars, unmapped codepoints, etc.
     }
-    GlyphKey key = new GlyphKey(font, resolution, glyphIndex, fontStyle);
-    if (cache.containsKey(key)) {
-      return cache.get(key);
+    GlyphKey key = acquireGlyphKey(font, glyphIndex, fontStyle);
+    Glyph cached = cache.get(key);
+    if (cached != null || cache.containsKey(key)) {
+      recycleGlyphKey(key);
+      return cached;
     }
     Glyph c = rasterize(font.ftFaceRaw(), glyphIndex, fontStyle);
     cache.put(key, c);
@@ -177,12 +183,66 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       return;
     }
     disposed = true;
+    cache.clear();
+    glyphKeyPool.clear();
     if (atlas != null) {
       atlas.close();
     }
   }
 
-  // Stable cache key: font + resolution + glyphIndex + fontStyle avoids identityHashCode collisions.
-  private record GlyphKey(Font font, int resolution, int glyphIndex, int fontStyle) {
+  private GlyphKey acquireGlyphKey(FreetypeFont font, int glyphIndex, int fontStyle) {
+    GlyphKey key = glyphKeyPool.pollFirst();
+    if (key == null) {
+      return new GlyphKey(font, resolution, glyphIndex, fontStyle);
+    }
+    key.reset(font, resolution, glyphIndex, fontStyle);
+    return key;
+  }
+
+  private void recycleGlyphKey(GlyphKey key) {
+    glyphKeyPool.addFirst(key);
+  }
+
+  /**
+   * Mutable only while checked out from {@link #glyphKeyPool}; cached instances are never reset.
+   */
+  private static final class GlyphKey {
+    private Font font;
+    private int resolution;
+    private int glyphIndex;
+    private int fontStyle;
+
+    private GlyphKey(Font font, int resolution, int glyphIndex, int fontStyle) {
+      reset(font, resolution, glyphIndex, fontStyle);
+    }
+
+    private void reset(Font font, int resolution, int glyphIndex, int fontStyle) {
+      this.font = font;
+      this.resolution = resolution;
+      this.glyphIndex = glyphIndex;
+      this.fontStyle = fontStyle;
+    }
+
+    @Override
+    public boolean equals(Object object) {
+      if (this == object) {
+        return true;
+      }
+      if (!(object instanceof GlyphKey other)) {
+        return false;
+      }
+      return resolution == other.resolution
+          && glyphIndex == other.glyphIndex
+          && fontStyle == other.fontStyle
+          && font.equals(other.font);
+    }
+
+    @Override
+    public int hashCode() {
+      int result = font.hashCode();
+      result = 31 * result + resolution;
+      result = 31 * result + glyphIndex;
+      return 31 * result + fontStyle;
+    }
   }
 }

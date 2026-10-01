@@ -27,12 +27,16 @@ package io.viki.momentum.gfx.opengl;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.texture.Texture;
+import io.viki.momentum.gfx.texture.TextureDesc;
+import io.viki.momentum.math.Cube;
+import org.lwjgl.system.MemoryUtil;
 import io.viki.momentum.gfx.texture.TextureFilter;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL33.*;
 
@@ -46,6 +50,7 @@ import static org.lwjgl.opengl.GL33.*;
  */
 @InternalApi
 public final class OpenGLSwapchain implements RenderTarget, Handle {
+  private static final int RGBA_BYTES = 4;
   private final OpenGLDevice ctx;
 
   OpenGLSwapchain(OpenGLDevice ctx) {
@@ -102,9 +107,70 @@ public final class OpenGLSwapchain implements RenderTarget, Handle {
     // Swapchain is owned by the device
   }
 
+  /** Queues an owned RGBA8 snapshot of the back buffer; execute before reading and close after use. */
   @Override
   public @Nullable Texture pin() {
-    return null;
+    int width = width();
+    int height = height();
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+    OpenGLTexture snapshot = new OpenGLTexture(ctx, TextureDesc.of(width, height));
+    ctx.submit(() -> capture(snapshot));
+    return snapshot;
+  }
+
+  @SuppressWarnings("try")
+  private void capture(OpenGLTexture snapshot) {
+    int width = snapshot.width();
+    int height = snapshot.height();
+    int rowBytes = Math.multiplyExact(width, RGBA_BYTES);
+    ByteBuffer pixels = MemoryUtil.memAlloc(Math.multiplyExact(rowBytes, height));
+    int previousReadFramebuffer = ctx.cache.fboR;
+
+    try (GLReadRaii ignored = new GLReadRaii()) {
+      ctx.cache.bindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+      int previousReadBuffer = glGetInteger(GL_READ_BUFFER);
+      try {
+        glReadBuffer(GL_BACK);
+        glReadPixels(0, 0, width, height, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
+      } finally {
+        glReadBuffer(previousReadBuffer);
+      }
+      byte[] topDown = new byte[pixels.capacity()];
+      for (int y = 0; y < height; y++) {
+        pixels.get((height - y - 1) * rowBytes, topDown, y * rowBytes, rowBytes);
+      }
+      snapshot.submit(topDown, new Cube(0, 0, 0, width, height, 1));
+    } finally {
+      ctx.cache.bindFramebuffer(GL_READ_FRAMEBUFFER, previousReadFramebuffer);
+      MemoryUtil.memFree(pixels);
+    }
+  }
+
+  static class GLReadRaii implements AutoCloseable {
+    private final int alignment = glGetInteger(GL_PACK_ALIGNMENT);
+    private final int rowLength = glGetInteger(GL_PACK_ROW_LENGTH);
+    private final int skipRows = glGetInteger(GL_PACK_SKIP_ROWS);
+    private final int skipPixels = glGetInteger(GL_PACK_SKIP_PIXELS);
+    private final int buffer = glGetInteger(GL_PIXEL_PACK_BUFFER_BINDING);
+
+    GLReadRaii() {
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+      glPixelStorei(GL_PACK_ALIGNMENT, 1);
+      glPixelStorei(GL_PACK_ROW_LENGTH, 0);
+      glPixelStorei(GL_PACK_SKIP_ROWS, 0);
+      glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
+    }
+
+    @Override
+    public void close() {
+      glPixelStorei(GL_PACK_ALIGNMENT, alignment);
+      glPixelStorei(GL_PACK_ROW_LENGTH, rowLength);
+      glPixelStorei(GL_PACK_SKIP_ROWS, skipRows);
+      glPixelStorei(GL_PACK_SKIP_PIXELS, skipPixels);
+      glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer);
+    }
   }
 
   @Override

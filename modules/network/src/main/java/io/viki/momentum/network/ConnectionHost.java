@@ -69,7 +69,7 @@ public interface ConnectionHost extends AutoCloseable {
    * @return an unstarted client host
    * @throws IllegalArgumentException if the host is blank or the port is outside the valid range
    */
-  static ConnectionHost createIPAddr(String host, int port) {
+  static ConnectionHost createRemote(String host, int port) {
     return ClientConnection.configured(host, port);
   }
 

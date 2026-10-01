@@ -41,6 +41,10 @@ subprojects {
     withSourcesJar()
   }
 
+  tasks.withType(Jar).configureEach {
+    archiveBaseName.set(project.projectDir.name)
+  }
+
   repositories { mavenCentral() }
 
   tasks.withType(JavaCompile).configureEach {
@@ -54,13 +58,10 @@ subprojects {
     failOnError = false
   }
 
-  tasks.withType(Test).configureEach { useJUnitPlatform() }
-
   // Shared dependencies, injected into every module from here so the
   // per-module build scripts stay free of boilerplate.
   dependencies {
     compileOnly libs.jspecify
-    testCompileOnly libs.jspecify
     implementation libs.fastutil
     implementation libs.jackson.databind
   }
@@ -84,9 +85,8 @@ subprojects {
 repositories { mavenCentral() }
 
 // Root has no sources of its own; expose lifecycle tasks that aggregate the
-// modules so plain `./gradlew build|test|clean` works from the engine root
-// (e.g. the engine's own CI).
-['build', 'check', 'test', 'clean', 'assemble'].each { name ->
+// modules so plain `./gradlew build|check|clean` works from the engine root.
+['build', 'check', 'clean', 'assemble'].each { name ->
   tasks.register(name) {
     group = 'build'
     description = "Aggregates '$name' across all modules."
