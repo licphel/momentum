@@ -93,14 +93,17 @@ public final class GlfwDesktopView extends DesktopView {
    * @return context-binding operation for the graphics device
    */
   @Override
-  public Object procAddress() {
+  public Object[] makeContext() {
     long h = handle;
-    return (Runnable) () -> {
-      glfwMakeContextCurrent(h);
-      glfwShowWindow(h);
-
-      hasContext = true;
-      applyPlatformVsync(vsync);
+    return new Object[] {
+        this,
+        "GLFW",
+        (Runnable) () -> {
+          glfwMakeContextCurrent(h);
+          glfwShowWindow(h);
+          hasContext = true;
+          GlfwDesktopView.this.applyPlatformVsync(vsync);
+        }
     };
   }
 

@@ -192,7 +192,7 @@ public abstract class View implements AutoCloseable {
    *
    * @return backend-specific native binding
    */
-  public abstract Object procAddress();
+  public abstract Object[] makeContext();
 
   /**
    * Creates the native display and applies configured values.

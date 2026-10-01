@@ -314,7 +314,7 @@ public final class Rasterizer {
     int textLen = mergedText.length();
 
     // Shape each literal -> ShapeGlyph[] with start/end absolute in mergedText.
-    List<ShapeGlyph> allList = new ArrayList<>();
+    List<ShapeGlyph> list = new ArrayList<>(mergedText.length());
     for (int si = 0; si < literals.size(); si++) {
       Literal lit = literals.get(si);
       if (lit.text().isEmpty()) {
@@ -340,16 +340,16 @@ public final class Rasterizer {
         litGlyphs[i] = new ShapeGlyph(start, offset + litLen, sr.glyphs()[i], xAdv, xOff, yOff, si);
       }
       computeEnds(litGlyphs, offset + litLen);
-      Collections.addAll(allList, litGlyphs);
+      Collections.addAll(list, litGlyphs);
     }
 
     shaper.close();
 
-    if (allList.isEmpty()) {
+    if (list.isEmpty()) {
       return empty();
     }
 
-    ShapeGlyph[] shapeGlyphs = allList.toArray(new ShapeGlyph[0]);
+    ShapeGlyph[] shapeGlyphs = list.toArray(new ShapeGlyph[0]);
     int totalGlyphs = shapeGlyphs.length;
 
     // Zero advance for control chars so they never contribute to line width.

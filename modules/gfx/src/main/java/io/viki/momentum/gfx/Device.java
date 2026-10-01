@@ -39,6 +39,7 @@ import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
+import io.viki.momentum.util.InternalApi;
 
 /**
  * Represents a graphics output device (hardware or software).
@@ -61,12 +62,15 @@ public interface Device extends AutoCloseable {
   /**
    * Loads this device onto the given view.
    *
-   * <p>The device extracts the opaque native handle via {@link View#procAddress()}
+   * <p>The device extracts the opaque native handle via {@link View#makeContext()}
    * and hooks internal callbacks (e.g. resize) on the view automatically. Must be called before any resource creation.
    *
-   * @param host the view to render into
+   * @param context the view context
    */
-  void load(View host);
+  @InternalApi
+  default void load(Object... context) {
+    throw new UnsupportedOperationException();
+  }
 
   /**
    * Creates a new GPU buffer (vertex, index, or uniform).

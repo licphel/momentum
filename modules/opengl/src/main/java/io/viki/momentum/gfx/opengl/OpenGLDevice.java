@@ -82,13 +82,13 @@ public final class OpenGLDevice implements Device {
   private final Queue<Runnable> queue = new ConcurrentLinkedQueue<>();
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
-  @Nullable View host;
+  @Nullable View view;
   private long lastCheckErrorMs;
 
   /**
    * Creates a new device.
    *
-   * <p>Call {@link #load(View)} before any GPU resource creation.
+   * <p>Call {@link #load(Object...)} before any GPU resource creation.
    */
   public OpenGLDevice() {
   }
@@ -100,10 +100,16 @@ public final class OpenGLDevice implements Device {
    * capabilities. Must be called before any resource creation.
    */
   @Override
-  public void load(View host) {
-    ((Runnable) host.procAddress()).run();
-    GL.createCapabilities();
-    this.host = host;
+  public void load(Object... context) {
+    this.view = (View) context[0];
+    String bk = (String) context[1];
+
+    if ("GLFW".equals(bk)) {
+      ((Runnable) context[2]).run();
+      GL.createCapabilities();
+    } else {
+      throw new IllegalArgumentException("OpenGL device only supports GLFW");
+    }
 
     /*
      * Okay, so we handle this here.
@@ -213,7 +219,7 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void pollEvents() {
-    if (host != null && host.isDebug()) {
+    if (view != null && view.isDebug()) {
       long ms = System.currentTimeMillis();
 
       if (ms - lastCheckErrorMs > 1000) {

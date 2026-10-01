@@ -88,18 +88,18 @@ public final class OpenGLSwapchain implements RenderTarget, Handle {
 
   @Override
   public int width() {
-    if (ctx.host == null) {
+    if (ctx.view == null) {
       return 0;
     }
-    return ctx.host.getWidth();
+    return ctx.view.getWidth();
   }
 
   @Override
   public int height() {
-    if (ctx.host == null) {
+    if (ctx.view == null) {
       return 0;
     }
-    return ctx.host.getHeight();
+    return ctx.view.getHeight();
   }
 
   @Override
