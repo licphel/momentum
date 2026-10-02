@@ -24,15 +24,12 @@
 
 package io.viki.momentum.gfx.ui.render;
 
-import io.viki.momentum.gfx.text.Literal;
-import io.viki.momentum.gfx.text.MutableText;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.text.raster.LayoutGlyph;
 import io.viki.momentum.gfx.text.raster.LayoutRun;
 import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.ui.HeadlessTextEditor;
 import io.viki.momentum.gfx.ui.element.ScrollPane;
 import io.viki.momentum.gfx.ui.element.TextBox;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -40,19 +37,20 @@ import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Renderer and layout cache for a {@link TextBox}.
+ * Stateless renderer for a {@link TextBox}.
  *
- * <p>The cache belongs to one TextBox instance. Keeping it here means text rasterization happens
- * only after text, formatting, wrapping width, or control size changes; input and editor state
- * remain in {@link HeadlessTextEditor} and {@code TextBox}.
+ * <p>Each text box owns its own layout cache. Keeping this renderer stateless allows one shared
+ * instance to serve every text box registered by a {@link io.viki.momentum.gfx.ui.Look}.
  */
 public final class TextBoxRenderer implements ElementRenderer {
-  private @Nullable CachedLayout actualLayout;
-  private @Nullable CachedLayout displayLayout;
+  /** Shared renderer for every text box. */
+  public static final TextBoxRenderer INSTANCE = new TextBoxRenderer();
+
+  private TextBoxRenderer() {
+  }
 
   @Override
-  public void render(Graphics graphics, Element element,
-                     Rectangle absoluteBounds) {
+  public void render(Graphics graphics, Element element, Rectangle absoluteBounds) {
     render(graphics, (TextBox) element, absoluteBounds);
   }
 
@@ -82,10 +80,10 @@ public final class TextBoxRenderer implements ElementRenderer {
     String rendered = showingPlaceholder ? textBox.placeholderForRender() : value;
     Color textColor = showingPlaceholder ? RendererSupport.MUTED : RendererSupport.FOREGROUND;
     TextFormat renderedFormat = format.tint(textColor);
-    CachedLayout actual = ensureActualLayout(textBox, value.isEmpty() ? format : renderedFormat,
-        contentWidth);
-    CachedLayout display = rendered.equals(value) ? actual
-        : ensureDisplayLayout(textBox, rendered, renderedFormat, contentWidth);
+    TextBox.Layout actual = textBox.actualLayoutForRender(
+        value.isEmpty() ? format : renderedFormat, contentWidth);
+    TextBox.Layout display = rendered.equals(value) ? actual
+        : textBox.displayLayoutForRender(rendered, renderedFormat, contentWidth);
     // Update scroll content dimensions from the raster bounds.
     updateContentSize(textBox, actual.raster(), padding);
 
@@ -108,16 +106,6 @@ public final class TextBoxRenderer implements ElementRenderer {
   }
 
   /**
-   * Invalidates both cached text layouts.
-   *
-   * <p>The next render or hit test rebuilds the layouts from the current text-box state.
-   */
-  public void invalidate() {
-    actualLayout = null;
-    displayLayout = null;
-  }
-
-  /**
    * Returns the UTF-16 index nearest a pointer position in the text box.
    *
    * @param textBox text box whose layout is queried
@@ -131,7 +119,7 @@ public final class TextBoxRenderer implements ElementRenderer {
     }
     TextFormat renderedFormat = RendererSupport.TEXT_FORMAT.tint(RendererSupport.FOREGROUND);
     float padding = RendererSupport.PADDING;
-    Raster raster = ensureActualLayout(textBox, renderedFormat,
+    Raster raster = textBox.actualLayoutForRender(renderedFormat,
         layoutWidth(textBox, textBox.bounds().width(), padding)).raster();
     LayoutRun[] runs = raster.runs();
     if (textBox.text().endsWith("\n") && runs.length > 0) {
@@ -162,7 +150,7 @@ public final class TextBoxRenderer implements ElementRenderer {
     float y = padding;
     float height = emptyLineHeight(textBox.bounds().height(), padding);
     TextFormat renderedFormat = RendererSupport.TEXT_FORMAT.tint(RendererSupport.FOREGROUND);
-    Raster raster = ensureActualLayout(textBox, renderedFormat,
+    Raster raster = textBox.actualLayoutForRender(renderedFormat,
         layoutWidth(textBox, textBox.bounds().width(), padding)).raster();
     updateContentSize(textBox, raster, padding);
     LayoutRun run = runAtCursor(textBox, raster);
@@ -174,34 +162,6 @@ public final class TextBoxRenderer implements ElementRenderer {
       height = caretHeight();
     }
     scrollPane.scrollToVisible(textBox, Rectangle.of(x, y, 1.0F, height));
-  }
-
-  private CachedLayout ensureActualLayout(TextBox textBox, TextFormat format, float width) {
-    return ensureLayout(textBox, actualLayout, textBox.text(), format, width, true);
-  }
-
-  private CachedLayout ensureDisplayLayout(TextBox textBox, String value, TextFormat format,
-                                           float width) {
-    return ensureLayout(textBox, displayLayout, value, format, width, false);
-  }
-
-  private CachedLayout ensureLayout(TextBox textBox, @Nullable CachedLayout cached, String value,
-                                    TextFormat format, float width, boolean actual) {
-    float layoutWidth = textBox.editor().wrapText() ? Math.max(1.0F, width) : Float.MAX_VALUE;
-    if (cached != null && cached.value().equals(value) && cached.format().equals(format)
-        && Float.compare(cached.width(), layoutWidth) == 0) {
-      return cached;
-    }
-    MutableText component = new MutableText().append(Literal.of(value).with(format))
-        .maxWidth(layoutWidth).justify(textBox.editor().wrapText()).flipY(true);
-    CachedLayout replacement = new CachedLayout(value, format, layoutWidth, component,
-        component.raster());
-    if (actual) {
-      actualLayout = replacement;
-    } else {
-      displayLayout = replacement;
-    }
-    return replacement;
   }
 
   private void drawSelection(Graphics graphics, TextBox textBox, Rectangle area, float padding,
@@ -323,8 +283,5 @@ public final class TextBoxRenderer implements ElementRenderer {
 
   private static int visibleLineLength(String value) {
     return value.endsWith("\n") ? value.length() - 1 : value.length();
-  }
-
-  private record CachedLayout(String value, TextFormat format, float width, MutableText component, Raster raster) {
   }
 }

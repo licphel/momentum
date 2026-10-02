@@ -26,6 +26,10 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.InputListener;
+import io.viki.momentum.gfx.ui.DefaultLook;
+import io.viki.momentum.gfx.ui.Look;
+import io.viki.momentum.gfx.ui.Locator;
+import io.viki.momentum.math.Vector2;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.EmptyRenderer;
 import io.viki.momentum.gfx.ui.render.UiRenderDispatcher;
@@ -53,6 +57,9 @@ public abstract class Element implements InputListener {
   private final List<Element> partsView = Collections.unmodifiableList(parts);
   private @Nullable Element parent;
   private @Nullable ElementRenderer rendererOverride;
+  private @Nullable Look lookOverride;
+  private @Nullable Locator locator;
+  private @Nullable Vector2 previousParentSize;
   private final List<Text> defaultTooltip = new ArrayList<>();
   private final List<Text> defaultTooltipView = Collections.unmodifiableList(defaultTooltip);
   private long tooltipDelayMillis = DEFAULT_TOOLTIP_DELAY_MILLIS;
@@ -112,6 +119,7 @@ public abstract class Element implements InputListener {
    * @param graphics graphics context receiving the element tree
    */
   public void draw(Graphics graphics) {
+    relayout();
     UiRenderDispatcher.INSTANCE.render(graphics, this);
   }
 
@@ -124,7 +132,91 @@ public abstract class Element implements InputListener {
    */
   public ElementRenderer renderer() {
     @Nullable ElementRenderer override = rendererOverride;
-    return override == null ? defaultRenderer() : override;
+    if (override != null) {
+      return override;
+    }
+    @Nullable ElementRenderer registered = look().renderer(getClass());
+    return registered == null ? defaultRenderer() : registered;
+  }
+
+  /**
+   * Returns the visual policy inherited by this element and its descendants.
+   *
+   * @return explicitly assigned look, the parent's effective look, or the shared default look
+   */
+  public final Look look() {
+    if (lookOverride != null) {
+      return lookOverride;
+    }
+    return parent == null ? DefaultLook.get() : parent.look();
+  }
+
+  /**
+   * Overrides the inherited visual policy for this element subtree.
+   *
+   * @param value look to apply to this element and inheriting descendants
+   */
+  public final void setLook(Look value) {
+    lookOverride = value;
+  }
+
+  /** Restores visual-policy inheritance from the parent or shared default look. */
+  public final void clearLookOverride() {
+    lookOverride = null;
+  }
+
+  /**
+   * Installs a parent-relative layout policy and immediately applies it.
+   *
+   * @param value locator used when the parent layout size changes
+   * @return this element for fluent configuration
+   */
+  public final Element withLocator(Locator value) {
+    locator = value;
+    previousParentSize = null;
+    relayout();
+    return this;
+  }
+
+  /** Stops automatic parent-relative layout while preserving the current bounds. */
+  public final void clearLocator() {
+    locator = null;
+    previousParentSize = null;
+  }
+
+  /**
+   * Applies pending parent-relative layout changes throughout this element subtree.
+   *
+   * <p>This operation visits every descendant and therefore has linear complexity in the
+   * subtree size. Unchanged elements do not allocate layout objects.
+   */
+  public final void relayout() {
+    relayout(false);
+  }
+
+  /** Reapplies descendant layout after a container has explicitly arranged its contents. */
+  final void relayoutAfterArrangement() {
+    relayout(true);
+  }
+
+  private void relayout(boolean force) {
+    if (parent != null && locator != null) {
+      Rectangle area = parent.bounds();
+      Vector2 previous = previousParentSize;
+      boolean changed = previous == null || previous.x() != area.width()
+          || previous.y() != area.height();
+      if (changed || force) {
+        Vector2 size = changed ? new Vector2(area.width(), area.height()) : previous;
+        previousParentSize = size;
+        locator.locate(this, previous == null ? size : previous, size);
+      }
+    }
+    for (Element child : children) {
+      child.relayout();
+    }
+    for (Element part : parts) {
+      part.relayout();
+    }
   }
 
   /**
@@ -200,6 +292,7 @@ public abstract class Element implements InputListener {
       return false;
     }
     child.parent = null;
+    child.previousParentSize = null;
     return true;
   }
 
@@ -209,6 +302,7 @@ public abstract class Element implements InputListener {
   public void clearChildren() {
     for (Element child : children) {
       child.parent = null;
+      child.previousParentSize = null;
     }
     children.clear();
   }
@@ -222,7 +316,12 @@ public abstract class Element implements InputListener {
     return childrenView;
   }
 
-  /** Moves a direct child to the end of this container's draw and hit-test order. */
+  /**
+   * Moves a direct child to the end of this container's draw and hit-test order.
+   *
+   * @param child direct child to promote
+   * @return {@code true} when the child belonged to this element
+   */
   final boolean bringChildToFront(Element child) {
     if (!children.remove(child)) {
       return false;
@@ -354,8 +453,8 @@ public abstract class Element implements InputListener {
    * Appends this element's default tooltip entries to a caller-owned list.
    *
    * <p>Subclasses may override this method to add dynamic context such as the current value,
-   * validation state, or keyboard hints. An override that wants the configured defaults should
-   * call {@code super.appendTooltips(tooltip)} before adding its own entries.
+   * validation state, or keyboard hints. Overrides are responsible for retaining the configured
+   * defaults when those entries remain relevant.
    *
    * @param tooltip destination list receiving entries in display order
    */
@@ -414,6 +513,13 @@ public abstract class Element implements InputListener {
     tooltipDelayMillis = value;
   }
 
+  /**
+   * Attaches an element to one of this element's ordered descendant collections.
+   *
+   * @param child element to attach
+   * @param destination child or visual-part collection receiving the element
+   * @throws IllegalArgumentException if attachment would create a cycle or a second parent
+   */
   private void attach(Element child, List<Element> destination) {
     if (child == this) {
       throw new IllegalArgumentException("An element cannot contain itself");
@@ -431,5 +537,7 @@ public abstract class Element implements InputListener {
     child.parent = this;
     destination.add(child);
     child.onAttached();
+    child.previousParentSize = null;
+    child.relayout();
   }
 }

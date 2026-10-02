@@ -25,11 +25,12 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.text.MutableText;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.TextViewRenderer;
 import io.viki.momentum.math.shape.Rectangle;
 
-import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Displays a rich {@link Text} component without accepting pointer or keyboard input.
@@ -39,9 +40,13 @@ import java.util.Objects;
  * The element is mutable and is intended for one owning UI thread.
  */
 public final class TextView extends Element {
-  private final TextViewRenderer renderCache = new TextViewRenderer();
   private Text text;
   private boolean wrapText;
+  private @Nullable MutableText layout;
+  private @Nullable Text layoutSource;
+  private long layoutVersion;
+  private float layoutWidth;
+  private boolean layoutWrap;
 
   /**
    * Creates a rich text view.
@@ -51,7 +56,7 @@ public final class TextView extends Element {
    */
   public TextView(Rectangle bounds, Text text) {
     super(bounds);
-    this.text = Objects.requireNonNull(text, "text");
+    this.text = text;
   }
 
   /**
@@ -69,10 +74,9 @@ public final class TextView extends Element {
    * @param value new rich content
    */
   public void setText(Text value) {
-    Text checked = Objects.requireNonNull(value, "value");
-    if (text != checked) {
-      text = checked;
-      renderCache.invalidate();
+    if (text != value) {
+      text = value;
+      layout = null;
     }
   }
 
@@ -93,12 +97,37 @@ public final class TextView extends Element {
   public void setWrapText(boolean value) {
     if (wrapText != value) {
       wrapText = value;
-      renderCache.invalidate();
+      layout = null;
     }
   }
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return renderCache;
+    return TextViewRenderer.INSTANCE;
+  }
+
+  /**
+   * Creates a mutable text suitable for direct rendering.
+   *
+   * @param width the max width
+   * @return a new, directly renderable text
+   */
+  public MutableText layoutForRender(float width) {
+    long version = text instanceof MutableText mutable ? mutable.version() : 0L;
+    if (layout != null && layoutSource == text && layoutVersion == version
+        && layoutWidth == width && layoutWrap == wrapText) {
+      return layout;
+    }
+    MutableText result = text instanceof MutableText mutable ? mutable.copy()
+        : new MutableText().append(text);
+    if (wrapText) {
+      result.maxWidth(Math.min(result.maxWidth(), Math.max(1.0F, width)));
+    }
+    layout = result.flipY(true);
+    layoutSource = text;
+    layoutVersion = version;
+    layoutWidth = width;
+    layoutWrap = wrapText;
+    return layout;
   }
 }

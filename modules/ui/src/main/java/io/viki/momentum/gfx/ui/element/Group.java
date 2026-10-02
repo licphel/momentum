@@ -123,6 +123,10 @@ public final class Group extends Element {
     float width = Math.max(0.0F, bounds().width() - padding * 2.0F);
     float height = Math.max(0.0F, bounds().height() - padding * 2.0F);
     layout.arrange(Rectangle.of(padding, padding, width, height), children(), gap);
+    // Explicit locators override the group arrangement, including after adding siblings.
+    for (Element child : children()) {
+      child.relayoutAfterArrangement();
+    }
   }
 
   /**

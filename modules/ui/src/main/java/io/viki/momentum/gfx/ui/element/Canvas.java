@@ -306,10 +306,24 @@ public final class Canvas extends Element implements AutoCloseable {
   @Override
   public void draw(Graphics graphics) {
     ensureOpen();
+    updateLayout();
     context.apply(graphics);
     renderer.render(graphics, this);
     inputRouter.drawTooltip(graphics);
   }
+
+  /**
+   * Requests a relocation to all element's bounds.
+   */
+  public void updateLayout() {
+    ensureOpen();
+    Vector2 size = context.getLogicalSize();
+    if (bounds().width() != size.x() || bounds().height() != size.y()) {
+      setBounds(Rectangle.of(Vector2.ZERO, size));
+    }
+    relayout();
+  }
+
   /**
    * Returns the element that currently owns keyboard focus.
    *

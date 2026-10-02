@@ -125,7 +125,7 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Returns the logical dimensions assigned to this context.
    *
-   * <p>The logical size remains stable while the framebuffer and input surfaces are resized.
+   * <p>The logical size follows the framebuffer dimensions and selected UI scale.
    *
    * @return logical UI dimensions
    */

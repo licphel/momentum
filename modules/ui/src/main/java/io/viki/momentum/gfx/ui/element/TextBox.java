@@ -24,6 +24,10 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.text.Literal;
+import io.viki.momentum.gfx.text.MutableText;
+import io.viki.momentum.gfx.text.TextFormat;
+import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.ui.HeadlessTextEditor;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.TextBoxRenderer;
@@ -44,13 +48,14 @@ import java.util.function.Consumer;
  */
 public final class TextBox extends Element {
   private final HeadlessTextEditor editor;
-  private final TextBoxRenderer renderCache;
+  private @Nullable Layout actualLayout;
+  private @Nullable Layout displayLayout;
   private final float minimumContentWidth;
   private final float minimumContentHeight;
   private boolean enabled = true;
   private boolean focused;
   private boolean draggingSelection;
-  private String placeholder = "Type here...";
+  private String placeholder = "";
   private @Nullable Consumer<String> onChanged;
   private @Nullable Consumer<String> onSubmit;
 
@@ -65,13 +70,12 @@ public final class TextBox extends Element {
     minimumContentWidth = bounds.width();
     minimumContentHeight = bounds.height();
     editor = new HeadlessTextEditor(text);
-    renderCache = new TextBoxRenderer();
     editor.setOnChanged(value -> {
-      renderCache.invalidate();
+      invalidateLayout();
       if (onChanged != null) {
         onChanged.accept(value);
       }
-      renderCache.scrollCursorIntoView(this);
+      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     });
     editor.setOnSubmit(value -> {
       if (onSubmit != null) {
@@ -94,7 +98,68 @@ public final class TextBox extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return renderCache;
+    return TextBoxRenderer.INSTANCE;
+  }
+
+  /**
+   * Stores one cached text layout used by this text box.
+   *
+   * <p>The entry is immutable, while its text component belongs exclusively to this text box.
+   *
+   * @param value source text represented by the layout
+   * @param format style used to rasterize the source text
+   * @param width effective line width used by the layout
+   * @param component rasterizable text component
+   * @param raster rasterized representation of the component
+   */
+  public record Layout(String value, TextFormat format, float width, MutableText component,
+                       Raster raster) {
+  }
+
+  /**
+   * Returns the cached actual-text layout for rendering or hit testing.
+   *
+   * @param format text style used for the actual value
+   * @param width available content width
+   * @return cached or newly built actual-text layout
+   */
+  public Layout actualLayoutForRender(TextFormat format, float width) {
+    return ensureLayout(actualLayout, text(), format, width, true);
+  }
+
+  /**
+   * Returns the cached display layout for placeholder or actual text.
+   *
+   * @param value text to display
+   * @param format text style used for the display value
+   * @param width available content width
+   * @return cached or newly built display layout
+   */
+  public Layout displayLayoutForRender(String value, TextFormat format, float width) {
+    return ensureLayout(displayLayout, value, format, width, false);
+  }
+
+  private Layout ensureLayout(@Nullable Layout cached, String value, TextFormat format,
+                              float width, boolean actual) {
+    float layoutWidth = editor.wrapText() ? Math.max(1.0F, width) : Float.MAX_VALUE;
+    if (cached != null && cached.value().equals(value) && cached.format().equals(format)
+        && Float.compare(cached.width(), layoutWidth) == 0) {
+      return cached;
+    }
+    MutableText component = new MutableText().append(Literal.of(value).with(format))
+        .maxWidth(layoutWidth).justify(editor.wrapText()).flipY(true);
+    Layout replacement = new Layout(value, format, layoutWidth, component, component.raster());
+    if (actual) {
+      actualLayout = replacement;
+    } else {
+      displayLayout = replacement;
+    }
+    return replacement;
+  }
+
+  private void invalidateLayout() {
+    actualLayout = null;
+    displayLayout = null;
   }
 
   /**
@@ -151,7 +216,7 @@ public final class TextBox extends Element {
   public boolean undo() {
     boolean changed = editor.undo();
     if (changed) {
-      renderCache.scrollCursorIntoView(this);
+      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     }
     return changed;
   }
@@ -164,7 +229,7 @@ public final class TextBox extends Element {
   public boolean redo() {
     boolean changed = editor.redo();
     if (changed) {
-      renderCache.scrollCursorIntoView(this);
+      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     }
     return changed;
   }
@@ -195,12 +260,12 @@ public final class TextBox extends Element {
    */
   public void setMultiline(boolean value) {
     editor.setMultiline(value);
-    renderCache.invalidate();
+    invalidateLayout();
     ScrollPane scrollPane = enclosingScrollPaneForRender();
     if (scrollPane != null) {
       scrollPane.contentLayoutChanged();
     }
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -219,12 +284,12 @@ public final class TextBox extends Element {
    */
   public void setWrapText(boolean value) {
     editor.setWrapText(value);
-    renderCache.invalidate();
+    invalidateLayout();
     ScrollPane scrollPane = enclosingScrollPaneForRender();
     if (scrollPane != null) {
       scrollPane.contentLayoutChanged();
     }
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -244,8 +309,8 @@ public final class TextBox extends Element {
    */
   public void setAutomaticTrailingNewline(boolean value) {
     editor.setAutomaticTrailingNewline(value);
-    renderCache.invalidate();
-    renderCache.scrollCursorIntoView(this);
+    invalidateLayout();
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -333,7 +398,7 @@ public final class TextBox extends Element {
    */
   public void setCursorIndex(int value) {
     editor.setCursorIndex(value);
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -372,7 +437,7 @@ public final class TextBox extends Element {
    */
   public void select(int start, int end) {
     editor.select(start, end);
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -380,7 +445,7 @@ public final class TextBox extends Element {
    */
   public void selectAll() {
     editor.selectAll();
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
   }
 
   /**
@@ -424,7 +489,7 @@ public final class TextBox extends Element {
    */
   public void setPlaceholder(String value) {
     placeholder = value;
-    renderCache.invalidate();
+    invalidateLayout();
   }
 
   @Override
@@ -432,15 +497,16 @@ public final class TextBox extends Element {
     Rectangle previous = bounds();
     super.setBounds(value);
     if (previous.width() != value.width() || previous.height() != value.height()) {
-      renderCache.invalidate();
+      invalidateLayout();
     }
   }
 
   @Override
   public boolean onMouseMove(float x, float y) {
     if (enabled && draggingSelection) {
-      editor.setCursorIndex(Math.min(renderCache.hitIndex(this, x, y), editor.text().length()), true);
-      renderCache.scrollCursorIntoView(this);
+      editor.setCursorIndex(Math.min(TextBoxRenderer.INSTANCE.hitIndex(this, x, y),
+          editor.text().length()), true);
+      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     }
     return enabled;
   }
@@ -450,7 +516,7 @@ public final class TextBox extends Element {
     if (!enabled || button != KeyCode.MOUSE_LEFT || action == KeyAction.REPEAT) {
       return false;
     }
-    int index = Math.min(renderCache.hitIndex(this, x, y), editor.text().length());
+    int index = Math.min(TextBoxRenderer.INSTANCE.hitIndex(this, x, y), editor.text().length());
     if (action == KeyAction.PRESS) {
       editor.setCursorIndex(index, (modifiers & InputModifiers.SHIFT) != 0);
       draggingSelection = true;
@@ -458,7 +524,7 @@ public final class TextBox extends Element {
       editor.setCursorIndex(index, true);
       draggingSelection = false;
     }
-    renderCache.scrollCursorIntoView(this);
+    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     return true;
   }
 
@@ -493,7 +559,7 @@ public final class TextBox extends Element {
     }
     boolean handled = editor.onKey(key, action, modifiers);
     if (handled) {
-      renderCache.scrollCursorIntoView(this);
+      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
     }
     return handled;
   }

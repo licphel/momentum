@@ -83,6 +83,7 @@ final class InputRouter implements AutoCloseable {
 
   void dispatchMouseMove(double inputX, double inputY) {
     ensureOpen();
+    canvas.updateLayout();
     if (view == null) {
       snapshot.applyMouseMove(inputX, inputY);
     }
@@ -102,6 +103,7 @@ final class InputRouter implements AutoCloseable {
   boolean dispatchMouseButton(KeyCode button, KeyAction action, double inputX, double inputY,
                               int modifiers) {
     ensureOpen();
+    canvas.updateLayout();
     int mouseId = button.mouseId();
     if (mouseId < 0) {
       throw new IllegalArgumentException("Pointer callback requires a mouse button, got " + button);
@@ -144,6 +146,7 @@ final class InputRouter implements AutoCloseable {
 
   boolean dispatchScroll(double deltaX, double deltaY, double inputX, double inputY) {
     ensureOpen();
+    canvas.updateLayout();
     if (view == null) {
       snapshot.applyScroll(deltaX, deltaY);
     }
@@ -255,6 +258,7 @@ final class InputRouter implements AutoCloseable {
     source.eventBus().register(ResizeEvent.class, (eventContext, event) -> {
       if (event.width() > 0 && event.height() > 0) {
         context.resize(event.width(), event.height());
+        canvas.updateLayout();
       }
     }, this);
     source.eventBus().register(MouseMoveEvent.class,

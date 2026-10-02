@@ -33,22 +33,57 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * A mutable sequence of text components sharing common layout parameters.
+ * Represents a mutable rich-text sequence with reusable layout settings.
  *
- * <p>A {@code MutableText} collects child {@link Text} components and
- * rasterizes them as a unit. Layout parameters — maximum width, justification,
- * line spacing, line count, and Y-axis orientation — are configured through
- * fluent setter methods. The rasterized result is cached until the component
- * sequence or its layout parameters change.
- *
- * <p>When an appended child is itself a {@code MutableText}, its children are
- * flattened into this sequence rather than being nested.
+ * <p>The sequence owns the text order and rasterization policy used by a text renderer. Changes
+ * invalidate the rendered representation and advance the observable {@link #version()} so views
+ * can refresh layouts after in-place edits. Instances are mutable and not thread-safe; mutation
+ * and rendering must be coordinated by one owning thread.
  */
 public final class MutableText implements Text {
   private final List<Text> children = new ArrayList<>();
   private final Rasterizer rasterizer = new Rasterizer();
   private volatile @Nullable Raster cached;
   private String text = "";
+  private long version;
+
+  /**
+   * Returns the content revision used to detect in-place changes.
+   *
+   * @return monotonically increasing revision for this sequence
+   */
+  public long version() {
+    return version;
+  }
+
+  /**
+   * Returns the current maximum line width.
+   *
+   * @return maximum width in text-layout units
+   */
+  public float maxWidth() {
+    return rasterizer.maxWidth;
+  }
+
+  /**
+   * Creates a mutable copy with the same content and layout policy.
+   *
+   * <p>The returned sequence has independent layout state, while its immutable or caller-owned
+   * text components remain shared.
+   *
+   * @return copied text sequence
+   */
+  public MutableText copy() {
+    MutableText result = new MutableText();
+    result.children.addAll(children);
+    result.text = text;
+    result.rasterizer.maxWidth = rasterizer.maxWidth;
+    result.rasterizer.flipY = rasterizer.flipY;
+    result.rasterizer.justify = rasterizer.justify;
+    result.rasterizer.lineSpacing = rasterizer.lineSpacing;
+    result.rasterizer.maxLines = rasterizer.maxLines;
+    return result;
+  }
 
   private static void flatten(Text c, List<Literal> out) {
     if (c instanceof Literal lit) {
@@ -61,78 +96,83 @@ public final class MutableText implements Text {
   }
 
   /**
-   * Sets the maximum width for line breaking.
+   * Sets the maximum width available to each laid-out line.
    *
-   * @param v the maximum width in pixels
-   * @return this sequence, for chaining
+   * @param v maximum width in text-layout units
+   * @return this sequence for fluent configuration
    */
   public MutableText maxWidth(float v) {
     rasterizer.maxWidth = v;
+    version++;
     cached = null;
     return this;
   }
 
   /**
-   * Sets whether the Y-axis is flipped during rasterization.
+   * Selects the vertical orientation used by rasterization.
    *
-   * @param v {@code true} to flip the Y-axis
-   * @return this sequence, for chaining
+   * @param v {@code true} when the raster should use the flipped vertical orientation
+   * @return this sequence for fluent configuration
    */
   public MutableText flipY(boolean v) {
     rasterizer.flipY = v;
+    version++;
     cached = null;
     return this;
   }
 
   /**
-   * Sets whether lines are justified to fill the full width.
+   * Selects whether lines should expand to the configured width.
    *
-   * @param v {@code true} to enable justification
-   * @return this sequence, for chaining
+   * @param v {@code true} to justify eligible lines
+   * @return this sequence for fluent configuration
    */
   public MutableText justify(boolean v) {
     rasterizer.justify = v;
+    version++;
     cached = null;
     return this;
   }
 
   /**
-   * Sets the line spacing multiplier.
+   * Sets the distance multiplier between adjacent text lines.
    *
-   * <p>A value of {@code 1.0} uses the font's default line height. Larger
-   * values increase spacing; smaller values tighten it.
+   * <p>A value of {@code 1.0} preserves the font's normal line height.
    *
-   * @param multiplier the line spacing multiplier
-   * @return this sequence, for chaining
+   * @param multiplier line-height multiplier
+   * @return this sequence for fluent configuration
    */
   public MutableText lineSpacing(float multiplier) {
     rasterizer.lineSpacing = multiplier;
+    version++;
     cached = null;
     return this;
   }
 
   /**
-   * Sets the maximum number of visible lines. Text beyond this limit is
-   * clipped.
+   * Limits the number of lines included in the rendered result.
    *
-   * @param n the maximum line count
-   * @return this sequence, for chaining
+   * @param n maximum visible line count
+   * @return this sequence for fluent configuration
    */
   public MutableText maxLines(int n) {
     rasterizer.maxLines = n;
+    version++;
     cached = null;
     return this;
   }
 
   /**
-   * Sets whether an ellipsis is appended when text is truncated.
+   * Records whether truncated text should request an ellipsis.
    *
-   * <p>Not yet implemented; provided for forward compatibility.
+   * <p>The current rasterizer does not draw the marker, but the setting remains part of the
+   * fluent text-layout contract for future renderers.
    *
-   * @param v {@code true} to append an ellipsis on overflow
-   * @return this sequence, for chaining
+   * @param v {@code true} to request an ellipsis on overflow
+   * @return this sequence for fluent configuration
    */
   public MutableText ellipsis(boolean v) {
+    version++;
     cached = null;
     return this;
   }
@@ -150,6 +190,7 @@ public final class MutableText implements Text {
       children.add(component);
     }
     text += component.text();
+    version++;
     cached = null;
     return this;
   }
