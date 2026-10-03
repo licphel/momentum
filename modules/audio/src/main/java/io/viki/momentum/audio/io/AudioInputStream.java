@@ -38,9 +38,25 @@ import java.io.InputStream;
  * which is valid as soon as the decoder is constructed.
  *
  * @see WaveInputStream
+ * @see OggVorbisInputStream
  * @see AudioFormat
  */
 public abstract class AudioInputStream extends InputStream {
+  /**
+   * Wraps raw PCM data as an audio input stream without copying it.
+   *
+   * @param format format describing the PCM data
+   * @param data   raw PCM bytes matching {@code format}
+   * @return a new stream positioned at the beginning of {@code data}
+   * @throws IllegalArgumentException if {@code data} does not contain complete PCM frames
+   */
+  public static AudioInputStream wrap(AudioFormat format, byte[] data) {
+    if (data.length % format.frameSize() != 0) {
+      throw new IllegalArgumentException("PCM data length must be aligned to the audio frame size");
+    }
+    return new WrappedAudioInputStream(data, format);
+  }
+
   /**
    * Probes an input stream for a known audio container and returns a decoder for it.
    *
@@ -57,6 +73,10 @@ public abstract class AudioInputStream extends InputStream {
 
     if (header.length >= 12 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' && header[8] == 'W' && header[9] == 'A' && header[10] == 'V' && header[11] == 'E') {
       return new WaveInputStream(buffered);
+    }
+    if (header.length >= 4 && header[0] == 'O' && header[1] == 'g'
+        && header[2] == 'g' && header[3] == 'S') {
+      return new OggVorbisInputStream(buffered);
     }
 
     throw new AudioFormatException("Unsupported audio format");

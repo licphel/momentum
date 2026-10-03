@@ -54,7 +54,7 @@ subprojects {
   }
 
   tasks.withType(Javadoc).configureEach {
-    options.addBooleanOption('Xdoclint:all,-missing,-html5', true)
+    options.addBooleanOption('Xdoclint:all,-missing', true)
     failOnError = false
   }
 

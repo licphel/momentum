@@ -1,52 +1,31 @@
-/*
- * MIT License
- *
- * Copyright (c) 2026 Licphel
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 package io.viki.momentum.audio;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import it.unimi.dsi.fastutil.ints.Int2ObjectMaps;
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Set;
 
 /**
- * Manages automatic cleanup of {@link Clip}s that have finished playing.
+ * Owns explicitly registered clips and releases them when playback completes.
  *
- * <p>After registering a clip with {@link #register(Clip)}, a background
- * thread monitors the clip and calls {@link Clip#close()} once playback completes. This removes the need for callers to
- * track playback completion manually.
+ * <p>Registration transfers responsibility for closing the clip to this manager. Unregistering
+ * transfers it back without stopping playback. Clips merely created or opened elsewhere are
+ * never managed automatically; interrupted music belongs to {@link MusicManager} instead.
  *
- * <p>Clips that are still playing when the manager is closed are stopped
- * and released immediately.
- *
- * @see Clip
+ * <p>Registration, removal, polling, and closure are thread-safe. The supplied clips must
+ * support playback observation and closure from the cleanup thread. Backend commands remain
+ * responsible for their own audio-thread dispatch.
  */
 public final class ClipManager implements AutoCloseable {
-  private final Int2ObjectMap<Clip> clips = Int2ObjectMaps.synchronize(new Int2ObjectOpenHashMap<>());
+  /** Maximum interval between automatic completion checks, in milliseconds. */
+  private static final long CLEANUP_INTERVAL_MILLIS = 100;
+  private final Set<Clip> clips = Collections.newSetFromMap(new IdentityHashMap<>());
   private final Thread cleanupThread;
   private volatile boolean running = true;
 
   /**
-   * Creates a new {@code ClipManager} and starts the background cleanup thread.
+   * Starts an owner for explicitly registered clips.
+   *
+   * <p>Cleanup runs on a daemon thread until this manager is closed.
    */
   public ClipManager() {
     cleanupThread = new Thread(this::cleanupLoop, "ClipManager-Cleanup");
@@ -55,74 +34,86 @@ public final class ClipManager implements AutoCloseable {
   }
 
   /**
-   * Registers a clip for automatic lifecycle management.
+   * Takes responsibility for releasing a clip when its backend reports completion.
    *
-   * <p>Once registered, the clip will be closed automatically when
-   * {@link Clip#shouldClose()} returns {@code true}. Registering the same clip instance more than once has no
-   * additional effect.
+   * <p>Registering the same instance repeatedly has no additional effect. Pending or paused
+   * playback is not completion; only {@link Clip#shouldClose()} authorizes release.
    *
-   * @param clip the clip to manage
+   * @param clip the clip whose lifecycle is transferred to this manager
+   * @throws IllegalStateException if this manager has been closed
    */
-  public void register(Clip clip) {
-    clips.put(System.identityHashCode(clip), clip);
+  public synchronized void register(Clip clip) {
+    if (!running) {
+      throw new IllegalStateException("ClipManager is closed");
+    }
+    clips.add(clip);
   }
 
   /**
-   * Removes a clip from automatic management without closing it.
+   * Transfers responsibility for a registered clip back to its caller.
    *
-   * <p>Has no effect if the clip is not currently registered.
+   * <p>This never stops or closes the clip and has no effect on an unregistered instance.
    *
-   * @param clip the clip to stop managing
+   * @param clip the clip to remove from automatic management
    */
-  public void unregister(Clip clip) {
-    clips.remove(System.identityHashCode(clip));
+  public synchronized void unregister(Clip clip) {
+    clips.remove(clip);
   }
 
   /**
-   * Returns the number of clips currently registered with this manager.
+   * Returns the number of clips whose release is currently managed.
    *
-   * @return number of registered clips
+   * @return the registered clip count
    */
-  public int activeCount() {
+  public synchronized int activeCount() {
     return clips.size();
   }
 
   /**
-   * Runs the cleanup loop, periodically checking registered clips and closing those that have finished playing.
+   * Releases completed clips immediately instead of waiting for automatic polling.
+   *
+   * <p>Applications may call this after mixer polling for lower cleanup latency.
+   * Calling it after closure has no effect.
    */
-  @SuppressWarnings("BusyWait")
-  private void cleanupLoop() {
-    while (running) {
-      try {
-        Thread.sleep(100);
-
-        for (var entry : clips.int2ObjectEntrySet()) {
-          Clip clip = entry.getValue();
-
-          /*
-           * Do not check Clip.isPlaying here.
-           * We do not guarantee that method will be implemented properly
-           * on every backend, but Clip#shouldClose does so.
-           */
-          if (clip.shouldClose()) {
-            clip.close();
-            clips.remove(entry.getIntKey());
-          }
-        }
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
+  public synchronized void update() {
+    var iterator = clips.iterator();
+    while (iterator.hasNext()) {
+      Clip clip = iterator.next();
+      if (clip.shouldClose()) {
+        iterator.remove();
+        clip.close();
       }
     }
   }
 
+  @SuppressWarnings("BusyWait")
+  private void cleanupLoop() {
+    while (running) {
+      try {
+        Thread.sleep(CLEANUP_INTERVAL_MILLIS);
+        update();
+      } catch (InterruptedException exception) {
+        Thread.currentThread().interrupt();
+        return;
+      }
+    }
+  }
+
+  /**
+   * Releases all registered clips and permanently rejects further registrations.
+   *
+   * <p>This also ends automatic polling. Repeated calls have no effect.
+   */
   @Override
-  public void close() {
+  public synchronized void close() {
+    if (!running) {
+      return;
+    }
     running = false;
     cleanupThread.interrupt();
-
-    for (Clip clip : clips.values()) {
+    for (Clip clip : clips) {
       clip.close();
     }
+    clips.clear();
   }
 }

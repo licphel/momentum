@@ -126,7 +126,7 @@ public final class Poly implements Shape<Poly> {
    *
    * @param rectangles source rectangles
    * @return immutable polygon
-   * @throws IllegalArgumentException if the rectangle has non-finite coordinates or non-positive dimensions
+   * @throws IllegalArgumentException if the rectangle has non-positive dimensions
    */
   public static Poly of(Rectangle... rectangles) {
     List<ConvexPart> parts = new ArrayList<>();
@@ -149,7 +149,7 @@ public final class Poly implements Shape<Poly> {
    *
    * @param vertices candidate polygon vertices
    * @return counter-clockwise coordinates with redundant vertices removed
-   * @throws IllegalArgumentException if the vertices are insufficient, non-finite, or degenerate
+   * @throws IllegalArgumentException if the vertices are insufficient or degenerate
    */
   private static float[] sanitize(Vector2[] vertices) {
     if (vertices.length < MINIMUM_VERTEX_COUNT) {
@@ -161,9 +161,6 @@ public final class Poly implements Shape<Poly> {
     for (Vector2 vertex : vertices) {
       float x = vertex.x();
       float y = vertex.y();
-      if (!Float.isFinite(x) || !Float.isFinite(y)) {
-        throw new IllegalArgumentException("Polygon vertices must be finite: " + vertex);
-      }
       if (size >= COORDINATE_STRIDE
           && samePoint(coordinates[size - 2], coordinates[size - 1], x, y)) {
         continue;
@@ -520,12 +517,38 @@ public final class Poly implements Shape<Poly> {
   }
 
   /**
+   * Returns whether the polygon interiors overlap. Edge or vertex contact alone
+   * does not count as an intersection. Empty polygons never intersect.
+   * The check allocates no objects and takes O(sum(n * m * (n + m))) time
+   * over pairs of convex components with n and m vertices.
+   *
+   * @param other polygon to test in the same coordinate space
+   * @return whether any convex component interiors overlap
+   */
+  public boolean intersects(Poly other) {
+    if (isEmpty() || other.isEmpty() || !bounds.intersects(other.bounds)) {
+      return false;
+    }
+
+    for (ConvexPart first : parts) {
+      for (ConvexPart second : other.parts) {
+        if (first.minX < second.maxX && first.maxX > second.minX
+            && first.minY < second.maxY && first.maxY > second.minY
+            && !first.hasSeparatingAxis(second) && !second.hasSeparatingAxis(first)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
    * Returns a new polygon scaled by the given factors.
    *
    * @param sx x scale factor
    * @param sy y scale factor
    * @return scaled polygon
-   * @throws IllegalArgumentException if either scale factor is non-finite or zero
+   * @throws IllegalArgumentException if either scale factor is zero
    */
   @Override
   public Poly scale(float sx, float sy) {
@@ -546,7 +569,6 @@ public final class Poly implements Shape<Poly> {
    * @param tx x translation
    * @param ty y translation
    * @return translated polygon
-   * @throws IllegalArgumentException if either translation is non-finite
    */
   @Override
   public Poly translate(float tx, float ty) {
@@ -653,6 +675,43 @@ public final class Poly implements Shape<Poly> {
         }
       }
       return true;
+    }
+
+    private boolean hasSeparatingAxis(ConvexPart other) {
+      for (int i = 0; i < coordinates.length; i += COORDINATE_STRIDE) {
+        int next = (i + COORDINATE_STRIDE) % coordinates.length;
+        // Project relative to an edge origin in double precision to avoid
+        // cancellation at large world coordinates. Axis normalization is unnecessary.
+        double originX = coordinates[i];
+        double originY = coordinates[i + 1];
+        double axisX = originY - coordinates[next + 1];
+        double axisY = coordinates[next] - originX;
+        if (axisX == 0.0 && axisY == 0.0) {
+          continue;
+        }
+
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        for (int j = 0; j < coordinates.length; j += COORDINATE_STRIDE) {
+          double projection = (coordinates[j] - originX) * axisX
+              + (coordinates[j + 1] - originY) * axisY;
+          min = Math.min(min, projection);
+          max = Math.max(max, projection);
+        }
+
+        double otherMin = Double.POSITIVE_INFINITY;
+        double otherMax = Double.NEGATIVE_INFINITY;
+        for (int j = 0; j < other.coordinates.length; j += COORDINATE_STRIDE) {
+          double projection = (other.coordinates[j] - originX) * axisX
+              + (other.coordinates[j + 1] - originY) * axisY;
+          otherMin = Math.min(otherMin, projection);
+          otherMax = Math.max(otherMax, projection);
+        }
+        if (max <= otherMin || otherMax <= min) {
+          return true;
+        }
+      }
+      return false;
     }
 
     private ConvexPart scale(float sx, float sy) {

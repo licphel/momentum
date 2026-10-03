@@ -32,7 +32,6 @@ import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import io.viki.momentum.gfx.ui.render.WindowRenderer;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
 
 /**
  * Provides a simulated window with a title bar, optional controls, and a clipped content area.
@@ -70,7 +69,7 @@ public final class Window extends Element {
    */
   public Window(Rectangle bounds, Text title) {
     super(bounds);
-    this.title = Objects.requireNonNull(title, "title");
+    this.title = title;
   }
 
   /**
@@ -88,7 +87,7 @@ public final class Window extends Element {
    * @param value new rich title
    */
   public void setTitle(Text value) {
-    title = Objects.requireNonNull(value, "value");
+    title = value;
   }
 
   /**
@@ -153,12 +152,12 @@ public final class Window extends Element {
   /**
    * Sets the title-bar height and updates minimized geometry when necessary.
    *
-   * @param value finite, non-negative title-bar height
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value non-negative title-bar height
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setTitleHeight(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Window title height must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Window title height must be non-negative: "
           + value);
     }
     titleHeight = value;

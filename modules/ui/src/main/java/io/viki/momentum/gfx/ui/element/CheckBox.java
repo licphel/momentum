@@ -33,7 +33,6 @@ import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
-import java.util.Objects;
 
 /**
  * Represents a toggleable checkbox with pointer, keyboard, hover, and focus state.
@@ -63,7 +62,7 @@ public final class CheckBox extends Element {
    */
   public CheckBox(Rectangle bounds, Text label, boolean checked) {
     super(bounds);
-    this.label = Objects.requireNonNull(label, "label");
+    this.label = label;
     this.checked = checked;
   }
 
@@ -145,12 +144,12 @@ public final class CheckBox extends Element {
   /**
    * Sets the rendered checkbox box size.
    *
-   * @param value the finite, non-negative box size
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative box size
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setBoxSize(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Checkbox box size must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Checkbox box size must be non-negative: "
           + value);
     }
     boxSize = value;
@@ -163,7 +162,7 @@ public final class CheckBox extends Element {
    * @throws IllegalArgumentException if the value is outside the supported range
    */
   public void setCheckMarkInset(float value) {
-    if (!Float.isFinite(value) || value < 0.0F || value > 0.5F) {
+    if (value < 0.0F || value > 0.5F) {
       throw new IllegalArgumentException("Checkbox check mark inset must be in [0, 0.5]: "
           + value);
     }
@@ -181,7 +180,7 @@ public final class CheckBox extends Element {
    * @param value the new rich label
    */
   public void setLabel(Text value) {
-    label = Objects.requireNonNull(value, "value");
+    label = value;
   }
 
   /**

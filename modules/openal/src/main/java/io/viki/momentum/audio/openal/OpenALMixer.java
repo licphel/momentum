@@ -26,6 +26,7 @@ package io.viki.momentum.audio.openal;
 
 import io.viki.momentum.audio.Clip;
 import io.viki.momentum.audio.Mixer;
+import io.viki.momentum.audio.StreamingClip;
 import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
@@ -64,6 +65,7 @@ public final class OpenALMixer implements Mixer {
   private static final int QUEUE_CAPACITY = 128;
 
   private final List<OpenALClip> trackingList = new CopyOnWriteArrayList<>();
+  private final List<OpenALStreamingClip> streamingTrackingList = new CopyOnWriteArrayList<>();
   private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
@@ -121,10 +123,11 @@ public final class OpenALMixer implements Mixer {
        * Note that we do not close them. This is not our duty here.
        */
       for (OpenALClip clip : trackingList) {
+        clip.applyVolume();
         clip.state = alGetSourcei(clip.source, AL_SOURCE_STATE);
         clip.offset = alGetSourcef(clip.source, AL_SEC_OFFSET);
 
-        if (!clip.isPlaying()) {
+        if (clip.state == AL_STOPPED) {
           if (clip.remainingLoops <= 0) {
             gc.add(clip);
             clip.shouldClose = true;
@@ -135,12 +138,22 @@ public final class OpenALMixer implements Mixer {
       }
 
       trackingList.removeAll(gc);
+
+      for (OpenALStreamingClip clip : streamingTrackingList) {
+        clip.poll();
+      }
+      streamingTrackingList.removeIf(OpenALStreamingClip::shouldClose);
     });
   }
 
   @Override
   public Clip getClip() {
     return new OpenALClip(this);
+  }
+
+  @Override
+  public StreamingClip getStreamingClip() {
+    return new OpenALStreamingClip(this);
   }
 
   /**
@@ -153,6 +166,10 @@ public final class OpenALMixer implements Mixer {
    */
   @Override
   public void submit(Runnable work) {
+    if (Thread.currentThread() == audioThread) {
+      work.run();
+      return;
+    }
     try {
       queue.put(work);
     } catch (InterruptedException e) {
@@ -240,5 +257,15 @@ public final class OpenALMixer implements Mixer {
    */
   void untrack(OpenALClip clip) {
     trackingList.remove(clip);
+  }
+
+  void track(OpenALStreamingClip clip) {
+    if (!streamingTrackingList.contains(clip)) {
+      streamingTrackingList.addLast(clip);
+    }
+  }
+
+  void untrack(OpenALStreamingClip clip) {
+    streamingTrackingList.remove(clip);
   }
 }

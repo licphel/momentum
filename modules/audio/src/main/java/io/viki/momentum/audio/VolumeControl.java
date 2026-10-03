@@ -24,6 +24,7 @@
 
 package io.viki.momentum.audio;
 
+import io.viki.momentum.util.FloatSupplier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
@@ -41,7 +42,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  *
  * @see Clip
  */
-public final class VolumeControl {
+public final class VolumeControl implements FloatSupplier {
   private final String name;
   private final List<VolumeControl> children = new CopyOnWriteArrayList<>();
   private @Nullable VolumeControl parent;
@@ -150,5 +151,11 @@ public final class VolumeControl {
   public String toString() {
     return String.format("VolumeControl[name='%s', volume=%.2f, effective=%.2f, children=%d]", name, volume,
         effectiveVolume(), children.size());
+  }
+
+  // For direct use in music base volume.
+  @Override
+  public float getAsFloat() {
+    return effectiveVolume();
   }
 }

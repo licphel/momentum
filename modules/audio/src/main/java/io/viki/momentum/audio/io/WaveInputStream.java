@@ -24,8 +24,8 @@
 
 package io.viki.momentum.audio.io;
 
-import io.viki.momentum.audio.AudioFormat;
 import io.viki.momentum.audio.AudioEncoding;
+import io.viki.momentum.audio.AudioFormat;
 
 import java.io.BufferedInputStream;
 import java.io.EOFException;

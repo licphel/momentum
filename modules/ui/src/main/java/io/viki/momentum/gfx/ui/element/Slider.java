@@ -34,7 +34,6 @@ import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.function.DoubleConsumer;
 import java.util.function.Function;
 import java.util.function.IntConsumer;
@@ -74,7 +73,7 @@ public final class Slider extends Element {
    */
   public Slider(Rectangle bounds, double minimum, double maximum, double value) {
     super(bounds);
-    if (!Double.isFinite(minimum) || !Double.isFinite(maximum) || minimum >= maximum) {
+    if (minimum >= maximum) {
       throw new IllegalArgumentException("Slider range must be finite and increasing: "
           + minimum + ".." + maximum);
     }
@@ -96,11 +95,10 @@ public final class Slider extends Element {
    */
   public Slider(Rectangle bounds, List<Text> options, int selectedIndex) {
     super(bounds);
-    Objects.requireNonNull(options, "options");
     if (options.isEmpty()) {
       throw new IllegalArgumentException("Option slider requires at least one option");
     }
-    this.options = options.stream().map(option -> Objects.requireNonNull(option, "option")).toList();
+    this.options = List.copyOf(options);
     minimum = 0.0;
     maximum = options.size() - 1.0;
     step = 1.0;
@@ -159,16 +157,16 @@ public final class Slider extends Element {
   /**
    * Sets the numeric snap increment.
    *
-   * @param newStep the finite, positive step
+   * @param newStep the positive step
    * @throws IllegalStateException if this is an option slider
-   * @throws IllegalArgumentException if {@code newStep} is not finite and positive
+   * @throws IllegalArgumentException if {@code newStep} is not positive
    */
   public void setStep(double newStep) {
     if (isOptionSlider()) {
       throw new IllegalStateException("Option sliders always use one option per step");
     }
-    if (!Double.isFinite(newStep) || newStep <= 0.0) {
-      throw new IllegalArgumentException("Slider step must be finite and positive: " + newStep);
+    if (newStep <= 0.0) {
+      throw new IllegalArgumentException("Slider step must be positive: " + newStep);
     }
     step = newStep;
     updateValue(value, false);
@@ -280,7 +278,7 @@ public final class Slider extends Element {
   /**
    * Sets the rendered track thickness.
    *
-   * @param value the finite, non-negative thickness
+   * @param value the non-negative thickness
    * @throws IllegalArgumentException if the value is invalid
    */
   public void setTrackThickness(float value) {
@@ -290,7 +288,7 @@ public final class Slider extends Element {
   /**
    * Sets the rendered thumb width.
    *
-   * @param value the finite, non-negative width
+   * @param value the non-negative width
    * @throws IllegalArgumentException if the value is invalid
    */
   public void setThumbWidth(float value) {
@@ -300,7 +298,7 @@ public final class Slider extends Element {
   /**
    * Sets the inset between the slider bounds and track.
    *
-   * @param value the finite, non-negative inset
+   * @param value the non-negative inset
    * @throws IllegalArgumentException if the value is invalid
    */
   public void setTrackInset(float value) {
@@ -310,7 +308,7 @@ public final class Slider extends Element {
   /**
    * Sets the gap between the track and formatted value text.
    *
-   * @param value the finite, non-negative gap
+   * @param value the non-negative gap
    * @throws IllegalArgumentException if the value is invalid
    */
   public void setValueGap(float value) {
@@ -515,9 +513,6 @@ public final class Slider extends Element {
   }
 
   private double snap(double candidate) {
-    if (!Double.isFinite(candidate)) {
-      throw new IllegalArgumentException("Slider value must be finite: " + candidate);
-    }
     double snapped = minimum + Math.round((candidate - minimum) / step) * step;
     return Math.clamp(snapped, minimum, maximum);
   }
@@ -552,8 +547,8 @@ public final class Slider extends Element {
   }
 
   private static float requireNonNegative(String name, float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException(name + " must be finite and non-negative: " + value);
+    if (value < 0.0F) {
+      throw new IllegalArgumentException(name + " must be non-negative: " + value);
     }
     return value;
   }

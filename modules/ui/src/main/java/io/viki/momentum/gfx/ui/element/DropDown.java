@@ -36,7 +36,6 @@ import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.function.IntConsumer;
 
 /**
@@ -73,14 +72,13 @@ public final class DropDown extends Element {
    */
   public DropDown(Rectangle bounds, List<Text> options, int selectedIndex) {
     super(bounds);
-    Objects.requireNonNull(options, "options");
     if (options.isEmpty()) {
       throw new IllegalArgumentException("Drop-down requires at least one option");
     }
     if (selectedIndex < 0 || selectedIndex >= options.size()) {
       throw new IndexOutOfBoundsException("Selected option index out of range: " + selectedIndex);
     }
-    this.options = options.stream().map(option -> Objects.requireNonNull(option, "option")).toList();
+    this.options = List.copyOf(options);
     this.selectedIndex = selectedIndex;
     popup = new Popup();
     addPart(popup);
@@ -246,12 +244,12 @@ public final class DropDown extends Element {
   /**
    * Sets popup scrollbar thickness.
    *
-   * @param value the finite, non-negative thickness
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative thickness
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setScrollbarThickness(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Drop-down scrollbar thickness must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Drop-down scrollbar thickness must be non-negative: "
           + value);
     }
     scrollbarThickness = value;
@@ -270,12 +268,12 @@ public final class DropDown extends Element {
   /**
    * Sets the gap between popup entries and its scrollbar.
    *
-   * @param value the finite, non-negative gap
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative gap
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setScrollbarGap(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Drop-down scrollbar gap must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Drop-down scrollbar gap must be non-negative: "
           + value);
     }
     scrollbarGap = value;

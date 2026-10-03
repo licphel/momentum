@@ -27,6 +27,8 @@ package io.viki.momentum.audio.openal;
 import io.viki.momentum.audio.AudioException;
 import io.viki.momentum.audio.AudioFormat;
 import io.viki.momentum.audio.Clip;
+import io.viki.momentum.audio.Mixer;
+import io.viki.momentum.audio.VolumeControl;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
@@ -57,6 +59,8 @@ public final class OpenALClip implements Clip {
   private boolean open = false;
   private volatile float pitch = 1.0F;
   private volatile float volume = 1.0F;
+  private volatile VolumeControl volumeControl = Mixer.EFFECTS;
+  private float appliedVolume = -1;
 
   OpenALClip(OpenALMixer mixer) {
     this.mixer = mixer;
@@ -111,6 +115,16 @@ public final class OpenALClip implements Clip {
   }
 
   @Override
+  public void resume() {
+    if (!open || shouldClose) throw new IllegalStateException("Clip is not available for resumed playback");
+    mixer.submit(() -> {
+      applyVolume();
+      alSourcePlay(source);
+      mixer.track(this);
+    });
+  }
+
+  @Override
   public void stop() {
     mixer.submit(() -> {
       alSourceStop(source);
@@ -119,6 +133,9 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void loop(int count) {
+    if (!open) {
+      throw new IllegalStateException("Clip is not open");
+    }
     if (count < 0) {
       throw new IllegalArgumentException("Loop count must be >= 0");
     }
@@ -127,8 +144,10 @@ public final class OpenALClip implements Clip {
      * OpenAL only supports infinite looping natively.
      */
     remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
+    shouldClose = false;
 
     mixer.submit(() -> {
+      applyVolume();
       alSourcePlay(source);
       mixer.track(this); // track at last. This prevents the clip from being removed instantly.
     });
@@ -151,7 +170,27 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void setVolume(float value) {
-    mixer.submit(() -> alSourcef(source, AL_GAIN, volume = Math.max(value, 0.0F)));
+    volume = Math.max(value, 0.0F);
+    mixer.submit(this::applyVolume);
+  }
+
+  @Override
+  public VolumeControl volumeControl() {
+    return volumeControl;
+  }
+
+  @Override
+  public void setVolumeControl(VolumeControl control) {
+    volumeControl = control;
+    mixer.submit(this::applyVolume);
+  }
+
+  void applyVolume() {
+    float effective = volume * volumeControl.effectiveVolume();
+    if (appliedVolume != effective) {
+      alSourcef(source, AL_GAIN, effective);
+      appliedVolume = effective;
+    }
   }
 
   @Override

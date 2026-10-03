@@ -110,8 +110,8 @@ public final class ScrollBar extends Element {
    * @throws IllegalArgumentException if any value is invalid
    */
   public void setRange(double minimum, double maximum, double pageSize) {
-    if (!Double.isFinite(minimum) || !Double.isFinite(maximum) || maximum < minimum
-        || !Double.isFinite(pageSize) || pageSize < 0.0) {
+    if (maximum < minimum
+        || pageSize < 0.0) {
       throw new IllegalArgumentException("Invalid scrollbar range: " + minimum + ".." + maximum
           + ", page " + pageSize);
     }
@@ -152,12 +152,12 @@ public final class ScrollBar extends Element {
   /**
    * Sets the wheel and keyboard increment.
    *
-   * @param value the finite, positive increment
-   * @throws IllegalArgumentException if {@code value} is not finite and positive
+   * @param value the positive increment
+   * @throws IllegalArgumentException if {@code value} is not positive
    */
   public void setStep(double value) {
-    if (!Double.isFinite(value) || value <= 0.0) {
-      throw new IllegalArgumentException("Scrollbar step must be finite and positive: " + value);
+    if (value <= 0.0) {
+      throw new IllegalArgumentException("Scrollbar step must be positive: " + value);
     }
     step = value;
   }
@@ -222,12 +222,12 @@ public final class ScrollBar extends Element {
   /**
    * Sets the minimum rendered thumb size.
    *
-   * @param value the finite, non-negative minimum size
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative minimum size
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setMinimumThumbSize(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Scrollbar minimum thumb size must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Scrollbar minimum thumb size must be non-negative: "
           + value);
     }
     minimumThumbSize = value;
@@ -373,9 +373,6 @@ public final class ScrollBar extends Element {
   }
 
   private void updateValue(double candidate, boolean notify) {
-    if (!Double.isFinite(candidate)) {
-      throw new IllegalArgumentException("Scrollbar value must be finite: " + candidate);
-    }
     double clamped = Math.clamp(candidate, minimum, maximum);
     if (Double.compare(value, clamped) == 0) {
       return;

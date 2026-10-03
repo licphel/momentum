@@ -1,46 +1,41 @@
-/*
- * MIT License
- *
- * Copyright (c) 2026 Licphel
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 package io.viki.momentum.util;
 
 /**
- * General-purpose engine utilities, most notably a fixed-timestep main loop
- * with an interpolated render phase: logic advances at a constant rate while
- * rendering stays smooth between ticks.
+ * Fixed-timestep main loop with interpolated rendering.
+ *
+ * <p>Logic advances at a constant rate ({@code tps}), while rendering runs
+ * as fast as the frame limiter allows. The render pass receives
+ * {@link #partialTicks()} to interpolate between the previous and current
+ * tick state.
+ *
+ * <p>This class is a process-wide singleton bound to the render thread.
+ * It must only be driven from a single thread.
  */
 public final class Loop {
-  /** Maximum number of catch-up ticks per frame. */
-  private static final int MAX_LEAP = 5;
+  /** Maximum number of catch-up ticks per frame before the loop is considered "slow". */
+  private static final int MAX_CATCH_UP_TICKS = 5;
+
+  /** If the tick schedule falls behind by this many tick lengths, reset instead of catching up. */
+  private static final double RESET_THRESHOLD_TICKS = 4.0;
+
+  /** Stats are recomputed at this interval, in nanoseconds. */
+  private static final long STATS_INTERVAL_NANOS = 500_000_000L;
+
+  /** Busy-wait is used only for sleeps shorter than this, to avoid OS scheduler jitter. */
+  private static final long SPIN_THRESHOLD_NANOS = 1_000_000L;
 
   private static volatile boolean stopped;
   private static int maxTps;
+
   private static long tickCount;
   private static boolean hasTicked;
+  private static boolean runningSlowly;
+
   private static float delta;
   private static float partialTicks;
   private static float tickTime;
   private static float frameTime;
+  private static float realFrameTime;
   private static volatile int currentFps;
   private static volatile int currentTps;
 
@@ -48,12 +43,7 @@ public final class Loop {
   }
 
   /**
-   * Runs the main loop until {@link #stop()} is called: {@code tick} fires
-   * at a fixed rate of {@code maxTps} per second, catching up at most
-   * {@value #MAX_LEAP} ticks per frame and resetting the schedule when the
-   * loop falls far behind, then {@code draw} runs once per frame with
-   * {@link #partialTicks()} holding the interpolation between the last two
-   * ticks.
+   * Runs the main loop until {@link #stop()} is called, with no frame rate limit.
    *
    * @param maxTps the fixed logic tick rate
    * @param tick   the logic update, invoked once per tick step
@@ -64,107 +54,150 @@ public final class Loop {
   }
 
   /**
-   * Runs the main loop until {@link #stop()} is called: {@code tick} fires
-   * at a fixed rate of {@code maxTps} per second, catching up at most
-   * {@value #MAX_LEAP} ticks per frame and resetting the schedule when the
-   * loop falls far behind, then {@code draw} runs once per frame with
-   * {@link #partialTicks()} holding the interpolation between the last two
-   * ticks.
+   * Runs the main loop until {@link #stop()} is called.
+   *
+   * <p>{@code tick} fires at a fixed rate of {@code maxTps} per second,
+   * catching up at most {@value #MAX_CATCH_UP_TICKS} ticks per frame. If the
+   * schedule falls behind by more than {@value #RESET_THRESHOLD_TICKS} tick
+   * lengths, the schedule resets rather than spiraling. {@code draw} runs
+   * once per frame, with {@link #partialTicks()} holding the interpolation
+   * between the last two ticks.
    *
    * @param maxTps the fixed logic tick rate
    * @param maxFps maximum frames per second (0 = unlimited)
    * @param tick   the logic update, invoked once per tick step
    * @param draw   the render pass, invoked once per frame
    */
-  @SuppressWarnings("BusyWait")
   public static void launch(int maxTps, int maxFps, Runnable tick, Runnable draw) {
+    if (maxTps <= 0) {
+      throw new IllegalArgumentException("maxTps must be positive");
+    }
+    if (maxFps < 0) {
+      throw new IllegalArgumentException("maxFps must not be negative");
+    }
+
     double tickLength = 1_000_000_000.0 / maxTps;
-    double nextTick = System.nanoTime();
+    double frameLength = maxFps > 0 ? 1_000_000_000.0 / maxFps : 0.0;
 
     Loop.maxTps = maxTps;
+    Loop.delta = (float) (1.0 / maxTps);
     stopped = false;
-    long frameCounter = 0;
-    long tickCounterSnapshot = 0;
-    long lastStatsNano = System.nanoTime();
-    currentFps = 0;
-    currentTps = 0;
+    tickTime = 0F;
+    frameTime = 0F;
+    tickCount = 0L;
 
-    // FPS limiting
-    double frameLength = maxFps > 0 ? 1_000_000_000.0 / maxFps : 0;
-    double nextFrame = System.nanoTime();
+    long frameCounter = 0L;
+    long lastTickCountSnapshot = 0L;
+    long lastStatsNanos = System.nanoTime();
+    long previousFrameNanos = lastStatsNanos;
+
+    double nextTickNanos = System.nanoTime();
+    double nextFrameNanos = nextTickNanos;
 
     while (!stopped) {
-      int loops = 0;
-      hasTicked = false;
+      long frameStartNanos = System.nanoTime();
 
-      // fell too far behind: reset the schedule instead of spiraling
-      if (System.nanoTime() - nextTick > tickLength * 4) {
-        nextTick = System.nanoTime();
+      // Real elapsed time since the previous frame, in seconds.
+      realFrameTime = (float) ((frameStartNanos - previousFrameNanos) / 1_000_000_000.0);
+      previousFrameNanos = frameStartNanos;
+
+      // If we fell too far behind, reset the schedule instead of spiraling.
+      if (frameStartNanos - nextTickNanos > tickLength * RESET_THRESHOLD_TICKS) {
+        nextTickNanos = frameStartNanos;
       }
 
-      while (System.nanoTime() > nextTick && loops < MAX_LEAP) {
+      // Catch up on ticks.
+      hasTicked = false;
+      int loops = 0;
+      while (frameStartNanos > nextTickNanos && loops < MAX_CATCH_UP_TICKS) {
         hasTicked = true;
-        delta = 1F / maxTps;
         tickTime += delta;
-        nextTick += tickLength;
-        loops++;
+        nextTickNanos += tickLength;
         tickCount++;
+        loops++;
         tick.run();
       }
 
-      partialTicks = (float) ((System.nanoTime() + tickLength - nextTick) / tickLength);
-      frameTime = tickTime + partialTicks * delta;
-      draw.run();
+      // If we hit the catch-up limit, we are running slowly.
+      runningSlowly = loops >= MAX_CATCH_UP_TICKS && frameStartNanos > nextTickNanos;
 
+      // Interpolation between the previous and next tick.
+      // When caught up, nextTickNanos > frameStartNanos, so this is in [0, 1).
+      // After a reset, nextTickNanos == frameStartNanos, so this is 1.0 by the formula below.
+      double partial = (frameStartNanos + tickLength - nextTickNanos) / tickLength;
+      partialTicks = (float) Math.max(0.0, Math.min(partial, 1.0));
+
+      // Frame time for rendering: accumulated tick time plus the interpolated step.
+      frameTime = tickTime + partialTicks * delta;
+
+      draw.run();
       frameCounter++;
 
-      // Frame rate limiting - sleep if we're ahead of schedule
+      // Frame rate limiting.
       if (maxFps > 0) {
-        nextFrame += frameLength;
+        nextFrameNanos += frameLength;
         long now = System.nanoTime();
-        double sleepNanos = (long) (nextFrame - now);
+        double sleepNanos = nextFrameNanos - now;
 
         if (sleepNanos > 0) {
-          // Use busy-wait for short sleeps (< 1ms) to avoid OS scheduling jitter
-          if (sleepNanos < 1_000_000) {
-            long start = System.nanoTime();
-            while (System.nanoTime() - start < sleepNanos) {
-              Thread.onSpinWait();
-            }
-          } else {
-            try {
-              // Convert to millis + nanos for precise sleeping
-              long sleepMillis = (long) (sleepNanos / 1_000_000);
-              int sleepNanosRemaining = (int) (sleepNanos % 1_000_000);
-              Thread.sleep(sleepMillis, sleepNanosRemaining);
-            } catch (InterruptedException e) {
-              Thread.currentThread().interrupt();
-              break;
-            }
-          }
+          sleepPrecise(sleepNanos);
         } else {
-          // If we're behind schedule, don't accumulate debt - just reset nextFrame
-          // to now to prevent a cascade of missed frames
-          nextFrame = System.nanoTime();
+          // We are behind schedule. Do not accumulate debt.
+          nextFrameNanos = System.nanoTime();
         }
       }
 
-      long nowNano = System.nanoTime();
-      long elapsedNano = nowNano - lastStatsNano;
-
-      if (elapsedNano >= 500_000_000) {
-        double elapsedSeconds = elapsedNano / 1_000_000_000.0;
-
+      // Stats update.
+      long nowNanos = System.nanoTime();
+      long elapsedNanos = nowNanos - lastStatsNanos;
+      if (elapsedNanos >= STATS_INTERVAL_NANOS) {
+        double elapsedSeconds = elapsedNanos / 1_000_000_000.0;
         currentFps = (int) (frameCounter / elapsedSeconds);
-
-        long currentTickCount = tickCount;
-        long ticksSinceLastUpdate = currentTickCount - tickCounterSnapshot;
-        currentTps = (int) (ticksSinceLastUpdate / elapsedSeconds);
-
-        frameCounter = 0;
-        tickCounterSnapshot = currentTickCount;
-        lastStatsNano = nowNano;
+        long ticksSinceLast = tickCount - lastTickCountSnapshot;
+        currentTps = (int) (ticksSinceLast / elapsedSeconds);
+        frameCounter = 0L;
+        lastTickCountSnapshot = tickCount;
+        lastStatsNanos = nowNanos;
       }
+    }
+  }
+
+  /**
+   * Sleeps for the requested duration, using busy-wait for very short sleeps
+   * to avoid OS scheduler jitter and {@link Thread#sleep} for longer ones.
+   */
+  private static void sleepPrecise(double nanos) {
+    long start = System.nanoTime();
+    long target = start + (long) nanos;
+
+    // For very short sleeps, spin.
+    if (nanos < SPIN_THRESHOLD_NANOS) {
+      while (System.nanoTime() < target) {
+        Thread.onSpinWait();
+      }
+      return;
+    }
+
+    // For longer sleeps, sleep most of it, then spin the remainder.
+    long remainingNanos = target - System.nanoTime();
+    long spinTailNanos = Math.min(SPIN_THRESHOLD_NANOS, remainingNanos / 2);
+
+    long sleepNanos = remainingNanos - spinTailNanos;
+    if (sleepNanos > 0) {
+      long millis = sleepNanos / 1_000_000L;
+      int nanosPart = (int) (sleepNanos % 1_000_000L);
+      try {
+        Thread.sleep(millis, nanosPart);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        stopped = true;
+        return;
+      }
+    }
+
+    // Spin the tail for precision.
+    while (System.nanoTime() < target) {
+      Thread.onSpinWait();
     }
   }
 
@@ -176,14 +209,15 @@ public final class Loop {
   /**
    * Whether {@link #stop()} has been requested.
    *
-   * @return if the app has stopped
+   * @return whether stop has been requested
    */
   public static boolean stopped() {
     return stopped;
   }
 
   /**
-   * The fixed tick step in seconds.
+   * The fixed tick step in seconds. This is a constant for a given
+   * {@code maxTps}; it is not the time elapsed since the last tick.
    *
    * @return the fixed time step
    */
@@ -192,7 +226,8 @@ public final class Loop {
   }
 
   /**
-   * The render interpolation between the last two ticks, in {@code [0, 1)}.
+   * The render interpolation between the previous and current tick, in
+   * {@code [0, 1]}.
    *
    * @return the render partial ticks
    */
@@ -210,12 +245,23 @@ public final class Loop {
   }
 
   /**
-   * Interpolated frame time in seconds, for animation and shaders.
+   * Interpolated frame time in seconds, for animation and shaders. Equals the
+   * accumulated tick time plus {@code partialTicks() * delta()}.
    *
-   * @return frame time in seconds
+   * @return interpolated frame time in seconds
    */
   public static float frameTime() {
     return frameTime;
+  }
+
+  /**
+   * Real elapsed time since the previous frame, in seconds. Use this for
+   * animations that should follow real time rather than logic time.
+   *
+   * @return real frame time in seconds
+   */
+  public static float realFrameTime() {
+    return realFrameTime;
   }
 
   /**
@@ -228,7 +274,7 @@ public final class Loop {
   }
 
   /**
-   * Returns whether at least one tick ran before the current draw.
+   * Whether at least one tick ran before the current draw.
    *
    * @return whether at least one tick ran before the current draw
    */
@@ -237,7 +283,18 @@ public final class Loop {
   }
 
   /**
-   * Returns the current frames per second (updated every 0.5 seconds).
+   * Whether the loop hit its catch-up limit during the current frame.
+   * Games can use this to degrade gracefully (skip particles, lower AI
+   * frequency, etc.).
+   *
+   * @return whether the loop is running slowly
+   */
+  public static boolean isRunningSlowly() {
+    return runningSlowly;
+  }
+
+  /**
+   * The current frames per second (updated every 0.5 seconds).
    *
    * @return the current FPS
    */
@@ -246,7 +303,7 @@ public final class Loop {
   }
 
   /**
-   * Returns the current ticks per second (updated every 0.5 seconds).
+   * The current ticks per second (updated every 0.5 seconds).
    *
    * @return the current TPS
    */
@@ -255,14 +312,11 @@ public final class Loop {
   }
 
   /**
-   * Linear interpolation between {@code a} and {@code b} by {@code t}
-   * ({@code 0} = {@code a}, {@code 1} = {@code b}). Intended for
-   * render-time interpolation between the previous and the current tick
-   * state with {@link #partialTicks()}.
+   * Linear interpolation between {@code a} and {@code b} by {@code t}.
    *
    * @param a the value at {@code t = 0}
    * @param b the value at {@code t = 1}
-   * @param t the interpolation factor (not clamped)
+   * @param t the interpolation factor
    * @return {@code a + (b - a) * t}
    */
   public static float lerp(float a, float b, float t) {
@@ -270,14 +324,12 @@ public final class Loop {
   }
 
   /**
-   * Linear interpolation between {@code a} and {@code b} by {@code t}
-   * ({@code 0} = {@code a}, {@code 1} = {@code b}). Intended for
-   * render-time interpolation between the previous and the current tick
-   * state with {@link #partialTicks()}.
+   * Linear interpolation between {@code a} and {@code b} by the current
+   * {@link #partialTicks()}.
    *
    * @param a the value at {@code t = 0}
    * @param b the value at {@code t = 1}
-   * @return {@code a + (b - a) * t}
+   * @return {@code a + (b - a) * partialTicks()}
    */
   public static float lerp(float a, float b) {
     return a + (b - a) * partialTicks;

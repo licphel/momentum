@@ -4,4 +4,6 @@ plugins {
 
 dependencies {
   api project(':momentum-core')
+
+  implementation 'com.github.stephengold:j-ogg-vorbis:1.0.6'
 }

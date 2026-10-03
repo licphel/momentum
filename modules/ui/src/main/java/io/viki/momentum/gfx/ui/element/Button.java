@@ -36,7 +36,6 @@ import io.viki.momentum.gfx.ui.render.ButtonRenderer;
 import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import org.jspecify.annotations.Nullable;
 
-import java.util.Objects;
 
 
 /**
@@ -75,7 +74,7 @@ public final class Button extends Element {
    */
   public Button(Rectangle bounds, Text label) {
     this(bounds);
-    this.label = Objects.requireNonNull(label, "label");
+    this.label = label;
   }
 
   /**
@@ -95,7 +94,7 @@ public final class Button extends Element {
    * @param value the new rich label
    */
   public void setLabel(Text value) {
-    label = Objects.requireNonNull(value, "value");
+    label = value;
   }
 
   /**

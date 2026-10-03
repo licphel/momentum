@@ -123,7 +123,7 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   private static void validateWidth(float value, String name) {
-    if (!Float.isFinite(value) || value < SYSTEM_WIDTH) {
+    if (value < SYSTEM_WIDTH) {
       throw new IllegalArgumentException(name + " must be finite and non-negative: " + value);
     }
   }

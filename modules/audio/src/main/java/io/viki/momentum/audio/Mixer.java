@@ -34,6 +34,13 @@ package io.viki.momentum.audio;
  * @see Clip
  */
 public interface Mixer extends AutoCloseable {
+  /** Global root gain shared by all output devices and playback categories. */
+  VolumeControl MASTER = new VolumeControl("master");
+  /** Default effects category, supporting application-defined child categories. */
+  VolumeControl EFFECTS = MASTER.derive("effects");
+  /** Default category for managed music playback. */
+  VolumeControl MUSIC = MASTER.derive("music");
+
   /**
    * Processes pending mixer events.
    *
@@ -48,6 +55,13 @@ public interface Mixer extends AutoCloseable {
    * @return a new clip in unopened state
    */
   Clip getClip();
+
+  /**
+   * Creates a new, unopened streaming clip backed by this mixer.
+   *
+   * @return a new streaming clip in unopened state
+   */
+  StreamingClip getStreamingClip();
 
   /**
    * Enqueues a block of work to run on the audio thread.

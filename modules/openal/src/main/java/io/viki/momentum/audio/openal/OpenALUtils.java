@@ -25,9 +25,12 @@
 package io.viki.momentum.audio.openal;
 
 import io.viki.momentum.audio.AudioFormat;
+import io.viki.momentum.audio.AudioEncoding;
 import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.openal.AL10.*;
+import static org.lwjgl.openal.EXTFloat32.AL_FORMAT_MONO_FLOAT32;
+import static org.lwjgl.openal.EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
 
 /**
  * Static helper methods for OpenAL format mapping.
@@ -42,7 +45,7 @@ public final class OpenALUtils {
   /**
    * Converts an {@link AudioFormat} to the corresponding OpenAL format constant.
    *
-   * <p>Supports 8-bit and 16-bit mono and stereo PCM formats.
+   * <p>Supports 8-bit and 16-bit integer PCM, and 32-bit floating-point PCM, in mono and stereo.
    *
    * @param format the audio format to convert
    * @return OpenAL format constant (e.g. {@code AL_FORMAT_MONO16})
@@ -51,6 +54,17 @@ public final class OpenALUtils {
   static int convertFormat(AudioFormat format) {
     int channels = format.channels();
     int sampleSizeInBits = format.sampleSizeInBits();
+
+    if (format.encoding() == AudioEncoding.PCM_FLOAT) {
+      if (sampleSizeInBits != Float.SIZE) {
+        throw new IllegalArgumentException("Unsupported floating-point sample size: " + sampleSizeInBits);
+      }
+      return switch (channels) {
+        case 1 -> AL_FORMAT_MONO_FLOAT32;
+        case 2 -> AL_FORMAT_STEREO_FLOAT32;
+        default -> throw new IllegalArgumentException("Unsupported channel count: " + channels);
+      };
+    }
 
     if (channels == 1) {
       return switch (sampleSizeInBits) {

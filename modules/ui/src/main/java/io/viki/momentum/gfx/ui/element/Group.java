@@ -141,12 +141,12 @@ public final class Group extends Element {
   /**
    * Sets the inner padding and rearranges children.
    *
-   * @param value the finite, non-negative padding
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative padding
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setPadding(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Group padding must be finite and non-negative: " + value);
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Group padding must be non-negative: " + value);
     }
     padding = value;
     layoutChildren();
@@ -164,12 +164,12 @@ public final class Group extends Element {
   /**
    * Sets the spacing between adjacent children and rearranges them.
    *
-   * @param value the finite, non-negative gap
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative gap
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setGap(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Group gap must be finite and non-negative: " + value);
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Group gap must be non-negative: " + value);
     }
     gap = value;
     layoutChildren();

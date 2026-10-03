@@ -67,11 +67,11 @@ public final class Resolution {
     if (width <= 0 || height <= 0) {
       throw new IllegalArgumentException("Framebuffer size must be positive: " + width + "x" + height);
     }
-    if (!Float.isFinite(logicalWidth) || !Float.isFinite(logicalHeight) || logicalWidth <= 0.0F || logicalHeight <= 0.0F) {
-      throw new IllegalArgumentException("Logical size must be finite and positive: " + logicalWidth + "x" + logicalHeight);
+    if (logicalWidth <= 0.0F || logicalHeight <= 0.0F) {
+      throw new IllegalArgumentException("Logical size must be positive: " + logicalWidth + "x" + logicalHeight);
     }
-    if (!Float.isFinite(fixedScale) || fixedScale <= 0.0F) {
-      throw new IllegalArgumentException("Resolution scale must be finite and positive: " + fixedScale);
+    if (fixedScale <= 0.0F) {
+      throw new IllegalArgumentException("Resolution scale must be positive: " + fixedScale);
     }
     this.width = width;
     this.height = height;

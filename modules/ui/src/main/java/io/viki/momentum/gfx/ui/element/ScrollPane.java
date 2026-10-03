@@ -111,11 +111,11 @@ public final class ScrollPane extends Element {
    *
    * @param width the content width
    * @param height the content height
-   * @throws IllegalArgumentException if a dimension is negative or not finite
+   * @throws IllegalArgumentException if a dimension is negative
    */
   public void setContentSize(float width, float height) {
-    if (!Float.isFinite(width) || !Float.isFinite(height) || width < 0.0F || height < 0.0F) {
-      throw new IllegalArgumentException("Scroll content size must be finite and non-negative: "
+    if (width < 0.0F || height < 0.0F) {
+      throw new IllegalArgumentException("Scroll content size must be non-negative: "
           + width + "x" + height);
     }
     if (contentWidth == width && contentHeight == height) {
@@ -175,12 +175,12 @@ public final class ScrollPane extends Element {
   /**
    * Sets the scrollbar thickness and recalculates the layout.
    *
-   * @param value the finite, non-negative thickness
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative thickness
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setBarThickness(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Scroll bar thickness must be finite and non-negative: "
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Scroll bar thickness must be non-negative: "
           + value);
     }
     barThickness = value;
@@ -199,12 +199,12 @@ public final class ScrollPane extends Element {
   /**
    * Sets the gap between content and scrollbar tracks.
    *
-   * @param value the finite, non-negative gap
-   * @throws IllegalArgumentException if {@code value} is negative or not finite
+   * @param value the non-negative gap
+   * @throws IllegalArgumentException if {@code value} is negative
    */
   public void setBarGap(float value) {
-    if (!Float.isFinite(value) || value < 0.0F) {
-      throw new IllegalArgumentException("Scroll bar gap must be finite and non-negative: " + value);
+    if (value < 0.0F) {
+      throw new IllegalArgumentException("Scroll bar gap must be non-negative: " + value);
     }
     barGap = value;
     updateLayout();

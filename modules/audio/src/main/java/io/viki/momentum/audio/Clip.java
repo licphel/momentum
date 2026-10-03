@@ -42,11 +42,25 @@ public interface Clip extends AutoCloseable {
    * Opens this clip with raw PCM data.
    *
    * @param format format describing the PCM data
-   * @param data raw PCM bytes matching {@code format}
-   * @throws IllegalStateException if this clip is already open
+   * @param data   raw PCM bytes matching {@code format}
+   * @throws IllegalStateException    if this clip is already open
    * @throws IllegalArgumentException if the format or data is unsupported
    */
   void open(AudioFormat format, byte[] data);
+
+  /**
+   * Opens reusable decoded samples without taking responsibility for playback or release.
+   *
+   * <p>The caller owns this clip, directly or through {@link ClipManager}. This method
+   * neither starts playback nor registers the clip with a manager.
+   *
+   * @param sound the decoded samples to open
+   * @throws IllegalStateException    if this clip is already open
+   * @throws IllegalArgumentException if the sample format is unsupported
+   */
+  default void open(Sound sound) {
+    open(sound.format(), sound.data());
+  }
 
   /**
    * Returns whether this clip is open for playback.
@@ -61,6 +75,13 @@ public interface Clip extends AutoCloseable {
    * <p>Pausing preserves each voice's playback position.
    */
   void pause();
+
+  /**
+   * Starts or continues playback without resetting its position or repetition count.
+   *
+   * @throws IllegalStateException if this clip is not open or has completed playback
+   */
+  void resume();
 
   /**
    * Stops every active voice belonging to this clip.
@@ -111,6 +132,23 @@ public interface Clip extends AutoCloseable {
   void setVolume(float volume);
 
   /**
+   * Returns the category whose ancestor gains affect playback independently of local gain.
+   *
+   * @return this clip's volume category
+   */
+  VolumeControl volumeControl();
+
+  /**
+   * Routes playback through a category without changing the clip's local gain.
+   *
+   * <p>Category and ancestor changes take effect when the mixer processes playback events.
+   * Categories do not own or release clips.
+   *
+   * @param control the category to use for playback
+   */
+  void setVolumeControl(VolumeControl control);
+
+  /**
    * Returns the current playback speed multiplier.
    *
    * @return playback speed multiplier
@@ -145,6 +183,12 @@ public interface Clip extends AutoCloseable {
    */
   @Nullable AudioFormat format();
 
+  /**
+   * Stops playback and releases backend resources owned by this clip.
+   *
+   * <p>Playback completion does not close a clip automatically. The caller or a lifecycle
+   * manager must invoke this method when its resources are no longer needed.
+   */
   @Override
   void close();
 }
