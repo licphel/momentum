@@ -28,9 +28,10 @@ import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.MutableText;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.text.raster.Raster;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.HeadlessTextEditor;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.TextBoxRenderer;
+import io.viki.momentum.gfx.ui.look.TextBoxPresentation;
+import io.viki.momentum.gfx.ui.look.auto.TextBoxRenderer;
 import io.viki.momentum.input.InputModifiers;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
@@ -48,10 +49,10 @@ import java.util.function.Consumer;
  */
 public final class TextBox extends Element {
   private final HeadlessTextEditor editor;
-  private @Nullable Layout actualLayout;
-  private @Nullable Layout displayLayout;
   private final float minimumContentWidth;
   private final float minimumContentHeight;
+  private @Nullable Layout actualLayout;
+  private @Nullable Layout displayLayout;
   private boolean enabled = true;
   private boolean focused;
   private boolean draggingSelection;
@@ -63,7 +64,7 @@ public final class TextBox extends Element {
    * Creates a text box initialized with the supplied text.
    *
    * @param bounds the text box's local bounds
-   * @param text the initial text
+   * @param text   the initial text
    */
   public TextBox(Rectangle bounds, String text) {
     super(bounds);
@@ -75,7 +76,7 @@ public final class TextBox extends Element {
       if (onChanged != null) {
         onChanged.accept(value);
       }
-      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+      presentation().scrollCursorIntoView(this);
     });
     editor.setOnSubmit(value -> {
       if (onSubmit != null) {
@@ -96,31 +97,11 @@ public final class TextBox extends Element {
     return editor;
   }
 
-  @Override
-  protected ElementRenderer defaultRenderer() {
-    return TextBoxRenderer.INSTANCE;
-  }
-
-  /**
-   * Stores one cached text layout used by this text box.
-   *
-   * <p>The entry is immutable, while its text component belongs exclusively to this text box.
-   *
-   * @param value source text represented by the layout
-   * @param format style used to rasterize the source text
-   * @param width effective line width used by the layout
-   * @param component rasterizable text component
-   * @param raster rasterized representation of the component
-   */
-  public record Layout(String value, TextFormat format, float width, MutableText component,
-                       Raster raster) {
-  }
-
   /**
    * Returns the cached actual-text layout for rendering or hit testing.
    *
    * @param format text style used for the actual value
-   * @param width available content width
+   * @param width  available content width
    * @return cached or newly built actual-text layout
    */
   public Layout actualLayoutForRender(TextFormat format, float width) {
@@ -130,9 +111,9 @@ public final class TextBox extends Element {
   /**
    * Returns the cached display layout for placeholder or actual text.
    *
-   * @param value text to display
+   * @param value  text to display
    * @param format text style used for the display value
-   * @param width available content width
+   * @param width  available content width
    * @return cached or newly built display layout
    */
   public Layout displayLayoutForRender(String value, TextFormat format, float width) {
@@ -216,7 +197,7 @@ public final class TextBox extends Element {
   public boolean undo() {
     boolean changed = editor.undo();
     if (changed) {
-      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+      presentation().scrollCursorIntoView(this);
     }
     return changed;
   }
@@ -229,7 +210,7 @@ public final class TextBox extends Element {
   public boolean redo() {
     boolean changed = editor.redo();
     if (changed) {
-      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+      presentation().scrollCursorIntoView(this);
     }
     return changed;
   }
@@ -265,7 +246,7 @@ public final class TextBox extends Element {
     if (scrollPane != null) {
       scrollPane.contentLayoutChanged();
     }
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -289,7 +270,7 @@ public final class TextBox extends Element {
     if (scrollPane != null) {
       scrollPane.contentLayoutChanged();
     }
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -310,7 +291,7 @@ public final class TextBox extends Element {
   public void setAutomaticTrailingNewline(boolean value) {
     editor.setAutomaticTrailingNewline(value);
     invalidateLayout();
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -375,7 +356,7 @@ public final class TextBox extends Element {
    *
    * @param value the non-negative maximum length
    * @throws IllegalArgumentException if the value is negative
-   * @throws IllegalStateException if existing text exceeds the value
+   * @throws IllegalStateException    if existing text exceeds the value
    */
   public void setMaximumLength(int value) {
     editor.setMaximumLength(value);
@@ -398,7 +379,7 @@ public final class TextBox extends Element {
    */
   public void setCursorIndex(int value) {
     editor.setCursorIndex(value);
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -432,12 +413,12 @@ public final class TextBox extends Element {
    * Selects a UTF-16 range.
    *
    * @param start the anchor index
-   * @param end the active end index
+   * @param end   the active end index
    * @throws IndexOutOfBoundsException if either index is invalid
    */
   public void select(int start, int end) {
     editor.select(start, end);
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -445,7 +426,7 @@ public final class TextBox extends Element {
    */
   public void selectAll() {
     editor.selectAll();
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
   }
 
   /**
@@ -502,11 +483,16 @@ public final class TextBox extends Element {
   }
 
   @Override
+  protected ElementRenderer defaultRenderer() {
+    return TextBoxRenderer.INSTANCE;
+  }
+
+  @Override
   public boolean onMouseMove(float x, float y) {
     if (enabled && draggingSelection) {
-      editor.setCursorIndex(Math.min(TextBoxRenderer.INSTANCE.hitIndex(this, x, y),
+      editor.setCursorIndex(Math.min(presentation().hitIndex(this, x, y),
           editor.text().length()), true);
-      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+      presentation().scrollCursorIntoView(this);
     }
     return enabled;
   }
@@ -516,7 +502,7 @@ public final class TextBox extends Element {
     if (!enabled || button != KeyCode.MOUSE_LEFT || action == KeyAction.REPEAT) {
       return false;
     }
-    int index = Math.min(TextBoxRenderer.INSTANCE.hitIndex(this, x, y), editor.text().length());
+    int index = Math.min(presentation().hitIndex(this, x, y), editor.text().length());
     if (action == KeyAction.PRESS) {
       editor.setCursorIndex(index, (modifiers & InputModifiers.SHIFT) != 0);
       draggingSelection = true;
@@ -524,16 +510,8 @@ public final class TextBox extends Element {
       editor.setCursorIndex(index, true);
       draggingSelection = false;
     }
-    TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+    presentation().scrollCursorIntoView(this);
     return true;
-  }
-
-  @Override
-  public boolean onCharacter(int codepoint) {
-    if (!enabled) {
-      return false;
-    }
-    return editor.onCharacter(codepoint);
   }
 
   @Override
@@ -559,9 +537,17 @@ public final class TextBox extends Element {
     }
     boolean handled = editor.onKey(key, action, modifiers);
     if (handled) {
-      TextBoxRenderer.INSTANCE.scrollCursorIntoView(this);
+      presentation().scrollCursorIntoView(this);
     }
     return handled;
+  }
+
+  @Override
+  public boolean onCharacter(int codepoint) {
+    if (!enabled) {
+      return false;
+    }
+    return editor.onCharacter(codepoint);
   }
 
   @Override
@@ -625,6 +611,13 @@ public final class TextBox extends Element {
     return null;
   }
 
+  private TextBoxPresentation presentation() {
+    // Resolve dynamically: changing an override or inherited look also changes editor metrics.
+    ElementRenderer renderer = renderer();
+    return renderer instanceof TextBoxPresentation presentation
+        ? presentation : TextBoxRenderer.INSTANCE;
+  }
+
   private void copySelection() {
     if (editor.selectionStart() == editor.selectionEnd()) {
       return;
@@ -633,5 +626,20 @@ public final class TextBox extends Element {
     if (canvas != null) {
       canvas.copyToClipboard(editor.selectedText());
     }
+  }
+
+  /**
+   * Stores one cached text layout used by this text box.
+   *
+   * <p>The entry is immutable, while its text component belongs exclusively to this text box.
+   *
+   * @param value     source text represented by the layout
+   * @param format    style used to rasterize the source text
+   * @param width     effective line width used by the layout
+   * @param component rasterizable text component
+   * @param raster    rasterized representation of the component
+   */
+  public record Layout(String value, TextFormat format, float width, MutableText component,
+                       Raster raster) {
   }
 }

@@ -22,27 +22,34 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look;
 
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
 /**
- * Rendering strategy for one UI element.
+ * No-op renderer for elements that provide layout or interaction without drawing a surface.
  *
- * <p>An element renderer is responsible only for the element's own visual content. Input
- * handling, layout, child traversal, and clipping remain in the widget and dispatcher layers,
- * which makes custom renderers easy to install without changing widget behavior.
+ * <p>The singleton is used by the canvas root and by base elements that intentionally leave
+ * their appearance to descendants or a custom renderer.
  */
-@FunctionalInterface
-public interface ElementRenderer {
+public final class EmptyRenderer implements ElementRenderer {
+  /** Shared no-op renderer instance. */
+  public static final EmptyRenderer INSTANCE = new EmptyRenderer();
+
+  private EmptyRenderer() {
+  }
+
   /**
-   * Renders only the element's own visual content.
+   * Intentionally performs no drawing.
    *
-   * @param graphics graphics context receiving the visual content
-   * @param element element whose state should be represented
-   * @param absoluteBounds element bounds in the graphics coordinate system
+   * @param graphics graphics context, left unchanged
+   * @param element  element with no built-in visual content
+   * @param area     absolute element bounds
    */
-  void render(Graphics graphics, Element element, Rectangle absoluteBounds);
+  @Override
+  public void render(Graphics graphics, Element element, Rectangle area) {
+  }
 }

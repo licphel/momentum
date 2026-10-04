@@ -22,8 +22,9 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.ScrollBar;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -40,27 +41,6 @@ public final class ScrollBarRenderer implements ElementRenderer {
   public static final ScrollBarRenderer INSTANCE = new ScrollBarRenderer();
 
   private ScrollBarRenderer() {
-  }
-
-  /**
-   * Draws the scrollbar frame and current thumb geometry.
-   *
-   * @param graphics graphics context receiving the scrollbar
-   * @param raw scrollbar element to render
-   * @param area absolute scrollbar bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    ScrollBar scrollBar = (ScrollBar) raw;
-    // Draw the scrollbar's independent outer frame.
-    drawFrame(graphics, scrollBar, area);
-    // Compute the thumb geometry in the current orientation.
-    Rectangle thumb = scrollBar.thumbBounds(area);
-    Rectangle visual = visualThumb(area, thumb);
-    // Draw the thumb fill over the track.
-    drawThumbSurface(graphics, visual);
-    // Draw the thumb frame separately from the scrollbar frame.
-    drawThumbFrame(graphics, scrollBar, visual);
   }
 
   private static void drawFrame(Graphics graphics, ScrollBar scrollBar, Rectangle area) {
@@ -85,5 +65,26 @@ public final class ScrollBarRenderer implements ElementRenderer {
     var border = scrollBar.focused() ? RendererSupport.OUTLINE_FOCUS
         : scrollBar.hovered() ? RendererSupport.OUTLINE_HOVER : RendererSupport.OUTLINE;
     RendererSupport.drawBoundary(graphics, visual, border);
+  }
+
+  /**
+   * Draws the scrollbar frame and current thumb geometry.
+   *
+   * @param graphics graphics context receiving the scrollbar
+   * @param raw      scrollbar element to render
+   * @param area     absolute scrollbar bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    ScrollBar scrollBar = (ScrollBar) raw;
+    // Draw the scrollbar's independent outer frame.
+    drawFrame(graphics, scrollBar, area);
+    // Compute the thumb geometry in the current orientation.
+    Rectangle thumb = scrollBar.thumbBounds(area);
+    Rectangle visual = visualThumb(area, thumb);
+    // Draw the thumb fill over the track.
+    drawThumbSurface(graphics, visual);
+    // Draw the thumb frame separately from the scrollbar frame.
+    drawThumbFrame(graphics, scrollBar, visual);
   }
 }

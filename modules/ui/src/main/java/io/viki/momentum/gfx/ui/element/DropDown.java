@@ -25,10 +25,10 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.DropDownOptionRenderer;
-import io.viki.momentum.gfx.ui.render.DropDownPopupRenderer;
-import io.viki.momentum.gfx.ui.render.DropDownRenderer;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.DropDownOptionRenderer;
+import io.viki.momentum.gfx.ui.look.auto.DropDownPopupRenderer;
+import io.viki.momentum.gfx.ui.look.auto.DropDownRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -64,10 +64,10 @@ public final class DropDown extends Element {
   /**
    * Creates a drop-down menu from immutable option text.
    *
-   * @param bounds the header's local bounds
-   * @param options the non-empty rich option list
+   * @param bounds        the header's local bounds
+   * @param options       the non-empty rich option list
    * @param selectedIndex the initial selected option index
-   * @throws IllegalArgumentException if {@code options} is empty
+   * @throws IllegalArgumentException  if {@code options} is empty
    * @throws IndexOutOfBoundsException if {@code selectedIndex} is outside the option list
    */
   public DropDown(Rectangle bounds, List<Text> options, int selectedIndex) {
@@ -148,11 +148,6 @@ public final class DropDown extends Element {
    */
   public boolean focused() {
     return focused;
-  }
-
-  @Override
-  protected ElementRenderer defaultRenderer() {
-    return DropDownRenderer.INSTANCE;
   }
 
   /**
@@ -287,6 +282,11 @@ public final class DropDown extends Element {
   }
 
   @Override
+  protected ElementRenderer defaultRenderer() {
+    return DropDownRenderer.INSTANCE;
+  }
+
+  @Override
   public boolean onMouseMove(float x, float y) {
     return enabled;
   }
@@ -413,6 +413,11 @@ public final class DropDown extends Element {
       return DropDownPopupRenderer.INSTANCE;
     }
 
+    @Override
+    protected Rectangle childrenClip(Rectangle area) {
+      return area;
+    }
+
     /**
      * Returns the menu that owns this popup.
      *
@@ -420,11 +425,6 @@ public final class DropDown extends Element {
      */
     public DropDown owner() {
       return DropDown.this;
-    }
-
-    @Override
-    protected Rectangle childrenClip(Rectangle area) {
-      return area;
     }
 
     @Override

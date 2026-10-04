@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.SliderRenderer;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.SliderRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -65,10 +65,10 @@ public final class Slider extends Element {
   /**
    * Creates a numeric slider.
    *
-   * @param bounds the slider's local bounds
+   * @param bounds  the slider's local bounds
    * @param minimum the inclusive numeric lower bound
    * @param maximum the exclusive numeric upper bound for range validation
-   * @param value the initial numeric value
+   * @param value   the initial numeric value
    * @throws IllegalArgumentException if the range is not finite and increasing
    */
   public Slider(Rectangle bounds, double minimum, double maximum, double value) {
@@ -87,10 +87,10 @@ public final class Slider extends Element {
   /**
    * Creates a discrete option slider.
    *
-   * @param bounds the slider's local bounds
-   * @param options the non-empty rich option labels
+   * @param bounds        the slider's local bounds
+   * @param options       the non-empty rich option labels
    * @param selectedIndex the initial option index
-   * @throws IllegalArgumentException if {@code options} is empty
+   * @throws IllegalArgumentException  if {@code options} is empty
    * @throws IndexOutOfBoundsException if {@code selectedIndex} is invalid
    */
   public Slider(Rectangle bounds, List<Text> options, int selectedIndex) {
@@ -106,6 +106,13 @@ public final class Slider extends Element {
       throw new IndexOutOfBoundsException("Selected option index out of range: " + selectedIndex);
     }
     value = selectedIndex;
+  }
+
+  private static float requireNonNegative(String name, float value) {
+    if (value < 0.0F) {
+      throw new IllegalArgumentException(name + " must be non-negative: " + value);
+    }
+    return value;
   }
 
   /**
@@ -158,7 +165,7 @@ public final class Slider extends Element {
    * Sets the numeric snap increment.
    *
    * @param newStep the positive step
-   * @throws IllegalStateException if this is an option slider
+   * @throws IllegalStateException    if this is an option slider
    * @throws IllegalArgumentException if {@code newStep} is not positive
    */
   public void setStep(double newStep) {
@@ -215,7 +222,7 @@ public final class Slider extends Element {
    * Selects an option without notifying the selection listener.
    *
    * @param index the option index
-   * @throws IllegalStateException if this is a numeric slider
+   * @throws IllegalStateException     if this is a numeric slider
    * @throws IndexOutOfBoundsException if {@code index} is invalid
    */
   public void setSelectedIndex(int index) {
@@ -458,11 +465,6 @@ public final class Slider extends Element {
   }
 
   @Override
-  public void onPointerCancel(KeyCode button) {
-    dragging = false;
-  }
-
-  @Override
   public void onPointerEnter() {
     hovered = true;
   }
@@ -470,6 +472,11 @@ public final class Slider extends Element {
   @Override
   public void onPointerExit() {
     hovered = false;
+  }
+
+  @Override
+  public void onPointerCancel(KeyCode button) {
+    dragging = false;
   }
 
   @Override
@@ -544,12 +551,5 @@ public final class Slider extends Element {
     if (!isOptionSlider()) {
       throw new IllegalStateException("This slider contains numeric values, not text options");
     }
-  }
-
-  private static float requireNonNegative(String name, float value) {
-    if (value < 0.0F) {
-      throw new IllegalArgumentException(name + " must be non-negative: " + value);
-    }
-    return value;
   }
 }

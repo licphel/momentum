@@ -24,12 +24,11 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.MutableText;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.TextViewRenderer;
+import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.TextViewRenderer;
 import io.viki.momentum.math.shape.Rectangle;
-
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -52,7 +51,7 @@ public final class TextView extends Element {
    * Creates a rich text view.
    *
    * @param bounds the view's local bounds
-   * @param text the rich content to display
+   * @param text   the rich content to display
    */
   public TextView(Rectangle bounds, Text text) {
     super(bounds);

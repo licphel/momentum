@@ -22,33 +22,16 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.pass.RenderTarget;
-import io.viki.momentum.gfx.pipe.Blend;
-import io.viki.momentum.gfx.pipe.Depth;
-import io.viki.momentum.gfx.pipe.Pipeline;
-import io.viki.momentum.gfx.pipe.PipelineDesc;
-import io.viki.momentum.gfx.pipe.RasterizationDesc;
-import io.viki.momentum.gfx.pipe.Scissor;
-import io.viki.momentum.gfx.shader.MatrixUtil;
-import io.viki.momentum.gfx.shader.ResourceSet;
-import io.viki.momentum.gfx.shader.ResourceSetLayout;
-import io.viki.momentum.gfx.shader.ShaderProgram;
-import io.viki.momentum.gfx.shader.ShaderLanguage;
-import io.viki.momentum.gfx.shader.ShaderType;
-import io.viki.momentum.gfx.shader.ResourceType;
-import io.viki.momentum.gfx.shader.Slot;
-import io.viki.momentum.gfx.shader.VertexLayout;
-import io.viki.momentum.gfx.texture.Sampler;
-import io.viki.momentum.gfx.texture.SamplerDesc;
-import io.viki.momentum.gfx.texture.Texture;
-import io.viki.momentum.gfx.texture.TextureFilter;
-import io.viki.momentum.gfx.texture.TextureWrap;
+import io.viki.momentum.gfx.pipe.*;
+import io.viki.momentum.gfx.shader.*;
+import io.viki.momentum.gfx.texture.*;
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -128,6 +111,32 @@ public final class BackdropBlurEffect implements AutoCloseable {
     resources.bindUniform(2, blurUniform, BLUR_UNIFORM_SIZE);
   }
 
+  private static Rectangle sourceArea(Camera2D camera, Rectangle viewport, Rectangle area) {
+    Vector2 min = camera.project(new Vector2(area.minX(), area.minY()), viewport);
+    Vector2 max = camera.project(new Vector2(area.maxX(), area.maxY()), viewport);
+    float sourceX = Math.min(min.x(), max.x());
+    float sourceY = Math.min(min.y(), max.y());
+    float sourceWidth = Math.max(1.0F, Math.abs(max.x() - min.x()));
+    float sourceHeight = Math.max(1.0F, Math.abs(max.y() - min.y()));
+    return Rectangle.of(sourceX, sourceY, sourceWidth, sourceHeight);
+  }
+
+  private static Scissor captureScissor(Camera2D camera, Rectangle viewport, Rectangle area,
+                                        Scissor parentScissor) {
+    Rectangle projected = sourceArea(camera, viewport, area);
+    int x = (int) Math.floor(projected.minX());
+    int y = (int) Math.floor(projected.minY());
+    int maxX = (int) Math.ceil(projected.maxX());
+    int maxY = (int) Math.ceil(projected.maxY());
+    if (parentScissor.enable()) {
+      x = Math.max(x, parentScissor.x());
+      y = Math.max(y, parentScissor.y());
+      maxX = Math.min(maxX, parentScissor.x() + parentScissor.width());
+      maxY = Math.min(maxY, parentScissor.y() + parentScissor.height());
+    }
+    return new Scissor(x, y, Math.max(0, maxX - x), Math.max(0, maxY - y), true);
+  }
+
   /**
    * Renders the current framebuffer behind a world-space UI rectangle with a soft blur.
    *
@@ -136,7 +145,7 @@ public final class BackdropBlurEffect implements AutoCloseable {
    * empty. The effect is not usable after {@link #close()}.
    *
    * @param graphics graphics context containing the backdrop and destination target
-   * @param area world-space rectangle receiving the blurred image
+   * @param area     world-space rectangle receiving the blurred image
    * @return {@code true} when the backdrop was captured and drawn
    */
   public boolean draw(Graphics graphics, Rectangle area) {
@@ -214,31 +223,5 @@ public final class BackdropBlurEffect implements AutoCloseable {
     captureWidth = width;
     captureHeight = height;
     return capture;
-  }
-
-  private static Rectangle sourceArea(Camera2D camera, Rectangle viewport, Rectangle area) {
-    Vector2 min = camera.project(new Vector2(area.minX(), area.minY()), viewport);
-    Vector2 max = camera.project(new Vector2(area.maxX(), area.maxY()), viewport);
-    float sourceX = Math.min(min.x(), max.x());
-    float sourceY = Math.min(min.y(), max.y());
-    float sourceWidth = Math.max(1.0F, Math.abs(max.x() - min.x()));
-    float sourceHeight = Math.max(1.0F, Math.abs(max.y() - min.y()));
-    return Rectangle.of(sourceX, sourceY, sourceWidth, sourceHeight);
-  }
-
-  private static Scissor captureScissor(Camera2D camera, Rectangle viewport, Rectangle area,
-                                         Scissor parentScissor) {
-    Rectangle projected = sourceArea(camera, viewport, area);
-    int x = (int) Math.floor(projected.minX());
-    int y = (int) Math.floor(projected.minY());
-    int maxX = (int) Math.ceil(projected.maxX());
-    int maxY = (int) Math.ceil(projected.maxY());
-    if (parentScissor.enable()) {
-      x = Math.max(x, parentScissor.x());
-      y = Math.max(y, parentScissor.y());
-      maxX = Math.min(maxX, parentScissor.x() + parentScissor.width());
-      maxY = Math.min(maxY, parentScissor.y() + parentScissor.height());
-    }
-    return new Scissor(x, y, Math.max(0, maxX - x), Math.max(0, maxY - y), true);
   }
 }

@@ -27,8 +27,8 @@ package io.viki.momentum.gfx.ui;
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
  * Maps a dynamically sized logical UI canvas onto the entire framebuffer.
@@ -46,20 +46,19 @@ public final class Resolution {
   public static final float SCALE_START = 0.5F;
   /** Scale increment used by automatic resolution selection. */
   public static final float SCALE_STEP = 0.5F;
-
-  private float logicalWidth;
-  private float logicalHeight;
-  private final float MINIMUM_LOGICAL_WIDTH;
-  private final float MINIMUM_LOGICAL_HEIGHT;
+  private final float minimumLogicalWidth;
+  private final float minimumLogicalHeight;
   private final boolean automatic;
   private final boolean onlyInteger;
   private final float fixedScale;
+  private final Camera2D camera;
+  private float logicalWidth;
+  private float logicalHeight;
   private int width;
   private int height;
   private float scale;
   private Rectangle viewport;
   private Vector2 logicalSize;
-  private final Camera2D camera;
 
   /** Creates a resolution mapping with validated framebuffer and logical dimensions. */
   private Resolution(int width, int height, float logicalWidth, float logicalHeight,
@@ -77,8 +76,8 @@ public final class Resolution {
     this.height = height;
     this.logicalWidth = logicalWidth;
     this.logicalHeight = logicalHeight;
-    MINIMUM_LOGICAL_WIDTH = logicalWidth;
-    MINIMUM_LOGICAL_HEIGHT = logicalHeight;
+    this.minimumLogicalWidth = logicalWidth;
+    this.minimumLogicalHeight = logicalHeight;
     this.automatic = automatic;
     this.onlyInteger = onlyInteger;
     this.fixedScale = fixedScale;
@@ -86,14 +85,14 @@ public final class Resolution {
     camera.setFlipY(true);
     recalculate();
   }
-  
+
   /**
    * Creates an automatically scaled mapping using the default logical canvas size.
    *
-   * @param width the framebuffer width in pixels
-   * @param height the framebuffer height in pixels
+   * @param width       the framebuffer width in pixels
+   * @param height      the framebuffer height in pixels
    * @param onlyInteger whether the selected scale must be an integer
-   * @param handler the backend coordinate conversion handler
+   * @param handler     the backend coordinate conversion handler
    * @return the configured resolution mapping
    */
   public static Resolution auto(int width, int height, boolean onlyInteger, TransformHandler handler) {
@@ -103,25 +102,25 @@ public final class Resolution {
   /**
    * Creates an automatically scaled mapping for a custom logical canvas.
    *
-   * @param width the framebuffer width in pixels
-   * @param height the framebuffer height in pixels
-   * @param logicalWidth the logical canvas width
+   * @param width         the framebuffer width in pixels
+   * @param height        the framebuffer height in pixels
+   * @param logicalWidth  the logical canvas width
    * @param logicalHeight the logical canvas height
-   * @param onlyInteger whether the selected scale must be an integer
-   * @param handler the backend coordinate conversion handler
+   * @param onlyInteger   whether the selected scale must be an integer
+   * @param handler       the backend coordinate conversion handler
    * @return the configured resolution mapping
    */
   public static Resolution auto(int width, int height, float logicalWidth, float logicalHeight,
-      boolean onlyInteger, TransformHandler handler) {
+                                boolean onlyInteger, TransformHandler handler) {
     return new Resolution(width, height, logicalWidth, logicalHeight, true, onlyInteger, SCALE_START, handler);
   }
 
   /**
    * Creates a fixed-scale mapping using the default logical canvas size.
    *
-   * @param width the framebuffer width in pixels
-   * @param height the framebuffer height in pixels
-   * @param scale the logical-to-framebuffer scale
+   * @param width   the framebuffer width in pixels
+   * @param height  the framebuffer height in pixels
+   * @param scale   the logical-to-framebuffer scale
    * @param handler the backend coordinate conversion handler
    * @return the configured resolution mapping
    */
@@ -132,17 +131,28 @@ public final class Resolution {
   /**
    * Creates a fixed-scale mapping for a custom logical canvas.
    *
-   * @param width the framebuffer width in pixels
-   * @param height the framebuffer height in pixels
-   * @param logicalWidth the logical canvas width
+   * @param width         the framebuffer width in pixels
+   * @param height        the framebuffer height in pixels
+   * @param logicalWidth  the logical canvas width
    * @param logicalHeight the logical canvas height
-   * @param scale the logical-to-framebuffer scale
-   * @param handler the backend coordinate conversion handler
+   * @param scale         the logical-to-framebuffer scale
+   * @param handler       the backend coordinate conversion handler
    * @return the configured resolution mapping
    */
   public static Resolution fixed(int width, int height, float logicalWidth, float logicalHeight,
-      float scale, TransformHandler handler) {
+                                 float scale, TransformHandler handler) {
     return new Resolution(width, height, logicalWidth, logicalHeight, false, false, scale, handler);
+  }
+
+  private static float resolveScale(int width, int height, float logicalWidth, float logicalHeight, boolean onlyInteger) {
+    float required = Math.min(width / logicalWidth, height / logicalHeight);
+    // Fit even a framebuffer smaller than the minimum logical dimensions.
+    float factor = required < SCALE_START ? required
+        : (float) (Math.floor(required / SCALE_STEP) * SCALE_STEP);
+    if (onlyInteger) {
+      factor = required < 1.0F ? required : (float) Math.floor(required);
+    }
+    return factor;
   }
 
   /**
@@ -229,7 +239,7 @@ public final class Resolution {
   /**
    * Resizes the framebuffer mapping and logical dimensions while preserving camera identity.
    *
-   * @param width the new framebuffer width in pixels
+   * @param width  the new framebuffer width in pixels
    * @param height the new framebuffer height in pixels
    */
   public void resize(int width, int height) {
@@ -295,9 +305,9 @@ public final class Resolution {
   /**
    * Converts coordinates from an arbitrary input surface into logical coordinates.
    *
-   * @param x the input-space X coordinate
-   * @param y the input-space Y coordinate
-   * @param inputWidth the input surface width
+   * @param x           the input-space X coordinate
+   * @param y           the input-space Y coordinate
+   * @param inputWidth  the input surface width
    * @param inputHeight the input surface height
    * @return the corresponding logical point
    */
@@ -314,8 +324,8 @@ public final class Resolution {
   /**
    * Converts a logical point into an arbitrary input surface.
    *
-   * @param point the logical point
-   * @param inputWidth the input surface width
+   * @param point       the logical point
+   * @param inputWidth  the input surface width
    * @param inputHeight the input surface height
    * @return the corresponding input-space point
    * @throws IllegalArgumentException if an input dimension is not positive
@@ -383,7 +393,7 @@ public final class Resolution {
 
   private void recalculate() {
     if (automatic) {
-      scale = resolveScale(width, height, MINIMUM_LOGICAL_WIDTH, MINIMUM_LOGICAL_HEIGHT, onlyInteger);
+      scale = resolveScale(width, height, this.minimumLogicalWidth, this.minimumLogicalHeight, onlyInteger);
     } else {
       scale = fixedScale;
     }
@@ -393,16 +403,5 @@ public final class Resolution {
     logicalSize = new Vector2(logicalWidth, logicalHeight);
     viewport = Rectangle.of(0.0F, 0.0F, width, height);
     apply(camera);
-  }
-
-  private static float resolveScale(int width, int height, float logicalWidth, float logicalHeight, boolean onlyInteger) {
-    float required = Math.min(width / logicalWidth, height / logicalHeight);
-    // Fit even a framebuffer smaller than the minimum logical dimensions.
-    float factor = required < SCALE_START ? required
-        : (float) (Math.floor(required / SCALE_STEP) * SCALE_STEP);
-    if (onlyInteger) {
-      factor = required < 1.0F ? required : (float) Math.floor(required);
-    }
-    return factor;
   }
 }

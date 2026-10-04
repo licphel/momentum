@@ -48,9 +48,9 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Creates a detached context using the default logical canvas size.
    *
-   * @param framebufferWidth the initial framebuffer width
+   * @param framebufferWidth  the initial framebuffer width
    * @param framebufferHeight the initial framebuffer height
-   * @param transformHandler the backend coordinate conversion handler
+   * @param transformHandler  the backend coordinate conversion handler
    */
   public DpiContext(int framebufferWidth, int framebufferHeight,
                     TransformHandler transformHandler) {
@@ -61,12 +61,12 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Creates a detached context with a custom logical canvas.
    *
-   * @param framebufferWidth the initial framebuffer width
+   * @param framebufferWidth  the initial framebuffer width
    * @param framebufferHeight the initial framebuffer height
-   * @param logicalWidth the logical canvas width
-   * @param logicalHeight the logical canvas height
-   * @param onlyIntegerScale whether automatic scaling must use an integer factor
-   * @param transformHandler the backend coordinate conversion handler
+   * @param logicalWidth      the logical canvas width
+   * @param logicalHeight     the logical canvas height
+   * @param onlyIntegerScale  whether automatic scaling must use an integer factor
+   * @param transformHandler  the backend coordinate conversion handler
    */
   public DpiContext(int framebufferWidth, int framebufferHeight, float logicalWidth,
                     float logicalHeight, boolean onlyIntegerScale,
@@ -79,7 +79,7 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Creates a view-backed context using the default logical canvas size.
    *
-   * @param view the view whose dimensions and input size are followed
+   * @param view             the view whose dimensions and input size are followed
    * @param transformHandler the backend coordinate conversion handler
    */
   public DpiContext(View view, TransformHandler transformHandler) {
@@ -90,9 +90,9 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Creates a view-backed context with a custom logical canvas.
    *
-   * @param view the view whose dimensions and input size are followed
-   * @param logicalWidth the logical canvas width
-   * @param logicalHeight the logical canvas height
+   * @param view             the view whose dimensions and input size are followed
+   * @param logicalWidth     the logical canvas width
+   * @param logicalHeight    the logical canvas height
    * @param onlyIntegerScale whether automatic scaling must use an integer factor
    * @param transformHandler the backend coordinate conversion handler
    */
@@ -111,6 +111,14 @@ public final class DpiContext implements AutoCloseable {
     this.resolution = resolution;
     this.transformHandler = transformHandler;
   }
+
+  private static void validateSize(float width, float height, String name) {
+    if (!Float.isFinite(width) || !Float.isFinite(height) || width <= 0.0F || height <= 0.0F) {
+      throw new IllegalArgumentException(name + " size must be finite and positive: "
+          + width + "x" + height);
+    }
+  }
+
   /**
    * Returns the input surface size used for coordinate conversion.
    *
@@ -122,6 +130,7 @@ public final class DpiContext implements AutoCloseable {
   public Vector2 getInputSize() {
     return view == null ? inputSize : view.getInputSize();
   }
+
   /**
    * Returns the logical dimensions assigned to this context.
    *
@@ -132,6 +141,7 @@ public final class DpiContext implements AutoCloseable {
   public Vector2 getLogicalSize() {
     return resolution.logicalSize();
   }
+
   /**
    * Returns the transform handler used by the graphics backend.
    *
@@ -142,6 +152,7 @@ public final class DpiContext implements AutoCloseable {
   public TransformHandler getTransformHandler() {
     return transformHandler;
   }
+
   /**
    * Returns the mutable resolution mapping maintained by this context.
    *
@@ -169,9 +180,9 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Sets the input surface size for a detached context.
    *
-   * @param width the input width
+   * @param width  the input width
    * @param height the input height
-   * @throws IllegalStateException if this context follows a view
+   * @throws IllegalStateException    if this context follows a view
    * @throws IllegalArgumentException if either dimension is not finite and positive
    */
   public void setInputSize(float width, float height) {
@@ -186,7 +197,7 @@ public final class DpiContext implements AutoCloseable {
   /**
    * Updates the framebuffer dimensions and recalculates the logical viewport.
    *
-   * @param framebufferWidth the new framebuffer width
+   * @param framebufferWidth  the new framebuffer width
    * @param framebufferHeight the new framebuffer height
    * @throws IllegalStateException if this context has been closed
    */
@@ -219,13 +230,6 @@ public final class DpiContext implements AutoCloseable {
   private void ensureOpen() {
     if (closed) {
       throw new IllegalStateException("UI logical context is closed");
-    }
-  }
-
-  private static void validateSize(float width, float height, String name) {
-    if (!Float.isFinite(width) || !Float.isFinite(height) || width <= 0.0F || height <= 0.0F) {
-      throw new IllegalArgumentException(name + " size must be finite and positive: "
-          + width + "x" + height);
     }
   }
 }

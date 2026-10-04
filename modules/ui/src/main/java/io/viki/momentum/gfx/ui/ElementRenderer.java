@@ -10,8 +10,8 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -22,31 +22,27 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui;
 
-import io.viki.momentum.gfx.text.MutableText;
 import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.ui.element.TextView;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
-/** Stateless renderer; each TextView owns its layout cache on the UI thread. */
-public final class TextViewRenderer implements ElementRenderer {
-  public static final TextViewRenderer INSTANCE = new TextViewRenderer();
-
-  /** Creates an empty text-view renderer cache. */
-  public TextViewRenderer() {
-  }
-
-  @Override
-  public void render(Graphics graphics, Element element, Rectangle area) {
-    TextView view = (TextView) element;
-    MutableText component = view.layoutForRender(area.width());
-    graphics.pushScissor(area);
-    try {
-      graphics.drawText(component, area.minX(), area.minY());
-    } finally {
-      graphics.popScissor();
-    }
-  }
+/**
+ * Rendering strategy for one UI element.
+ *
+ * <p>An element renderer is responsible only for the element's own visual content. Input
+ * handling, layout, child traversal, and clipping remain in the widget and dispatcher layers,
+ * which makes custom renderers easy to install without changing widget behavior.
+ */
+@FunctionalInterface
+public interface ElementRenderer {
+  /**
+   * Renders only the element's own visual content.
+   *
+   * @param graphics       graphics context receiving the visual content
+   * @param element        element whose state should be represented
+   * @param absoluteBounds element bounds in the graphics coordinate system
+   */
+  void render(Graphics graphics, Element element, Rectangle absoluteBounds);
 }

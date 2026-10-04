@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.CheckBox;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -41,29 +42,6 @@ public final class CheckBoxRenderer implements ElementRenderer {
   public static final CheckBoxRenderer INSTANCE = new CheckBoxRenderer();
 
   private CheckBoxRenderer() {
-  }
-
-  /**
-   * Draws a checkbox using the state encoded by the supplied widget.
-   *
-   * @param graphics graphics context receiving the checkbox
-   * @param raw checkbox element to render
-   * @param area absolute checkbox bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    CheckBox checkBox = (CheckBox) raw;
-    float size = Math.min(area.height(), checkBox.boxSizeForRender());
-    Rectangle box = Rectangle.of(area.minX(), area.minY() + (area.height() - size) * 0.5F,
-        size, size);
-    // Draw the checkbox surface for checked, hovered, pressed, or idle state.
-    drawSurface(graphics, checkBox, box);
-    // Draw the checkbox outline with the current focus/hover emphasis.
-    drawBorder(graphics, checkBox, box);
-    // Draw the inner mark that represents the checked state.
-    drawCheckStatus(graphics, checkBox, box, size);
-    // Draw the label beside the checkbox square.
-    drawLabel(graphics, checkBox, area, box);
   }
 
   private static void drawSurface(Graphics graphics, CheckBox checkBox, Rectangle box) {
@@ -97,5 +75,28 @@ public final class CheckBoxRenderer implements ElementRenderer {
                                 Rectangle box) {
     graphics.drawText(checkBox.label(), box.maxX() + RendererSupport.PADDING,
         area.centralY(), RendererSupport.LEFT_CENTER);
+  }
+
+  /**
+   * Draws a checkbox using the state encoded by the supplied widget.
+   *
+   * @param graphics graphics context receiving the checkbox
+   * @param raw      checkbox element to render
+   * @param area     absolute checkbox bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    CheckBox checkBox = (CheckBox) raw;
+    float size = Math.min(area.height(), checkBox.boxSizeForRender());
+    Rectangle box = Rectangle.of(area.minX(), area.minY() + (area.height() - size) * 0.5F,
+        size, size);
+    // Draw the checkbox surface for checked, hovered, pressed, or idle state.
+    drawSurface(graphics, checkBox, box);
+    // Draw the checkbox outline with the current focus/hover emphasis.
+    drawBorder(graphics, checkBox, box);
+    // Draw the inner mark that represents the checked state.
+    drawCheckStatus(graphics, checkBox, box, size);
+    // Draw the label beside the checkbox square.
+    drawLabel(graphics, checkBox, area, box);
   }
 }

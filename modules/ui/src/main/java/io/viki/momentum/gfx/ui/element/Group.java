@@ -90,6 +90,12 @@ public final class Group extends Element {
   }
 
   @Override
+  public void setBounds(Rectangle value) {
+    super.setBounds(value);
+    layoutChildren();
+  }
+
+  @Override
   public void addChild(Element child) {
     super.addChild(child);
     layoutChildren();
@@ -107,12 +113,6 @@ public final class Group extends Element {
   @Override
   public void clearChildren() {
     super.clearChildren();
-    layoutChildren();
-  }
-
-  @Override
-  public void setBounds(Rectangle value) {
-    super.setBounds(value);
     layoutChildren();
   }
 

@@ -24,11 +24,11 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.ScrollPaneRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.ScrollPaneRenderer;
 
 /**
  * Provides a clipped viewport that equips one content element with automatic scrollbars.
@@ -53,7 +53,7 @@ public final class ScrollPane extends Element {
   /**
    * Creates a scroll pane around the supplied content element.
    *
-   * @param bounds the pane's local bounds
+   * @param bounds  the pane's local bounds
    * @param content the element to display and scroll
    */
   public ScrollPane(Rectangle bounds, Element content) {
@@ -72,6 +72,16 @@ public final class ScrollPane extends Element {
     addChild(horizontalBar);
     addChild(verticalBar);
     updateLayout();
+  }
+
+  private static double reveal(double offset, float viewportSize, float minimum, float maximum) {
+    if (minimum < offset) {
+      return minimum;
+    }
+    if (maximum > offset + viewportSize) {
+      return maximum - viewportSize;
+    }
+    return offset;
   }
 
   /**
@@ -101,15 +111,10 @@ public final class ScrollPane extends Element {
     return verticalBar;
   }
 
-  @Override
-  protected ElementRenderer defaultRenderer() {
-    return ScrollPaneRenderer.INSTANCE;
-  }
-
   /**
    * Sets the logical content dimensions used to determine scrollbar visibility.
    *
-   * @param width the content width
+   * @param width  the content width
    * @param height the content height
    * @throws IllegalArgumentException if a dimension is negative
    */
@@ -214,7 +219,7 @@ public final class ScrollPane extends Element {
    * Scrolls just far enough to reveal a descendant region.
    *
    * @param descendant the descendant containing the local region
-   * @param localArea the region expressed in descendant-local coordinates
+   * @param localArea  the region expressed in descendant-local coordinates
    * @throws IllegalArgumentException if the descendant is not inside this pane
    */
   public void scrollToVisible(Element descendant, Rectangle localArea) {
@@ -243,6 +248,11 @@ public final class ScrollPane extends Element {
   public void setBounds(Rectangle value) {
     super.setBounds(value);
     updateLayout();
+  }
+
+  @Override
+  protected ElementRenderer defaultRenderer() {
+    return ScrollPaneRenderer.INSTANCE;
   }
 
   @Override
@@ -319,16 +329,6 @@ public final class ScrollPane extends Element {
 
   void contentLayoutChanged() {
     updateLayout();
-  }
-
-  private static double reveal(double offset, float viewportSize, float minimum, float maximum) {
-    if (minimum < offset) {
-      return minimum;
-    }
-    if (maximum > offset + viewportSize) {
-      return maximum - viewportSize;
-    }
-    return offset;
   }
 
   /** Content-only clipping layer; scrollbars deliberately remain siblings outside this clip. */

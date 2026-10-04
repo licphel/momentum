@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Slider;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -41,32 +42,6 @@ public final class SliderRenderer implements ElementRenderer {
   public static final SliderRenderer INSTANCE = new SliderRenderer();
 
   private SliderRenderer() {
-  }
-
-  /**
-   * Draws a slider using its current value and interaction state.
-   *
-   * @param graphics graphics context receiving the slider
-   * @param raw slider element to render
-   * @param area absolute slider bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    Slider slider = (Slider) raw;
-    Rectangle track = slider.trackAreaForRender(area);
-    float trackHeight = slider.trackThicknessForRender();
-    float thumbWidth = Math.min(track.width(), slider.thumbWidthForRender());
-    float value = Math.clamp(slider.normalizedValueForRender(), 0.0F, 1.0F);
-    // Draw the hover/pressed/focused state wash behind the slider track.
-    drawInteractionSurface(graphics, slider, track);
-    // Draw the unfilled slider track.
-    drawTrack(graphics, slider, track, trackHeight);
-    // Draw the filled portion of the slider track.
-    drawTrackFill(graphics, slider, track, trackHeight, value);
-    // Draw the rounded slider thumb at the normalized value.
-    drawThumb(graphics, slider, track, thumbWidth, value);
-    // Draw the formatted value outside the slider bounds.
-    drawValue(graphics, slider, area);
   }
 
   private static void drawInteractionSurface(Graphics graphics, Slider slider, Rectangle track) {
@@ -118,5 +93,31 @@ public final class SliderRenderer implements ElementRenderer {
     RendererSupport.drawText(graphics, slider.displayValue(),
         area.maxX() + slider.valueGapForRender(), area.centralY(),
         RendererSupport.LEFT_CENTER);
+  }
+
+  /**
+   * Draws a slider using its current value and interaction state.
+   *
+   * @param graphics graphics context receiving the slider
+   * @param raw      slider element to render
+   * @param area     absolute slider bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    Slider slider = (Slider) raw;
+    Rectangle track = slider.trackAreaForRender(area);
+    float trackHeight = slider.trackThicknessForRender();
+    float thumbWidth = Math.min(track.width(), slider.thumbWidthForRender());
+    float value = Math.clamp(slider.normalizedValueForRender(), 0.0F, 1.0F);
+    // Draw the hover/pressed/focused state wash behind the slider track.
+    drawInteractionSurface(graphics, slider, track);
+    // Draw the unfilled slider track.
+    drawTrack(graphics, slider, track, trackHeight);
+    // Draw the filled portion of the slider track.
+    drawTrackFill(graphics, slider, track, trackHeight, value);
+    // Draw the rounded slider thumb at the normalized value.
+    drawThumb(graphics, slider, track, thumbWidth, value);
+    // Draw the formatted value outside the slider bounds.
+    drawValue(graphics, slider, area);
   }
 }

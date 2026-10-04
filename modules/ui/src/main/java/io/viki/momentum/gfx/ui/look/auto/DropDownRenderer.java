@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -41,26 +42,6 @@ public final class DropDownRenderer implements ElementRenderer {
   public static final DropDownRenderer INSTANCE = new DropDownRenderer();
 
   private DropDownRenderer() {
-  }
-
-  /**
-   * Draws a drop-down header using the state encoded by the supplied widget.
-   *
-   * @param graphics graphics context receiving the header
-   * @param raw drop-down element to render
-   * @param area absolute header bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    DropDown dropDown = (DropDown) raw;
-    // Draw the expanded, hovered, or idle header surface.
-    drawSurface(graphics, dropDown, area);
-    // Draw the header border with focus and disabled emphasis.
-    drawBorder(graphics, dropDown, area);
-    // Draw the currently selected option text.
-    drawSelectedOption(graphics, dropDown, area);
-    // Draw the collapse/expand triangle indicator.
-    drawCollapseIndicator(graphics, dropDown, area);
   }
 
   private static void drawSurface(Graphics graphics, DropDown dropDown, Rectangle area) {
@@ -96,5 +77,25 @@ public final class DropDownRenderer implements ElementRenderer {
           centerX + halfSize, centerY - halfSize, centerX, centerY + halfSize);
     }
     graphics.setTint(Color.WHITE);
+  }
+
+  /**
+   * Draws a drop-down header using the state encoded by the supplied widget.
+   *
+   * @param graphics graphics context receiving the header
+   * @param raw      drop-down element to render
+   * @param area     absolute header bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    DropDown dropDown = (DropDown) raw;
+    // Draw the expanded, hovered, or idle header surface.
+    drawSurface(graphics, dropDown, area);
+    // Draw the header border with focus and disabled emphasis.
+    drawBorder(graphics, dropDown, area);
+    // Draw the currently selected option text.
+    drawSelectedOption(graphics, dropDown, area);
+    // Draw the collapse/expand triangle indicator.
+    drawCollapseIndicator(graphics, dropDown, area);
   }
 }

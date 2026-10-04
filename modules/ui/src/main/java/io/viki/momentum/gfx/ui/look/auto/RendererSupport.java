@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.TextFormat;

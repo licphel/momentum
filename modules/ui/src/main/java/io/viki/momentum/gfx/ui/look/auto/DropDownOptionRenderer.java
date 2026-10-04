@@ -22,8 +22,9 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -42,26 +43,6 @@ public final class DropDownOptionRenderer implements ElementRenderer {
   private DropDownOptionRenderer() {
   }
 
-  /**
-   * Draws an option row when its owning drop-down is expanded.
-   *
-   * @param graphics graphics context receiving the row
-   * @param raw option-part element to render
-   * @param area absolute row bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    DropDown.OptionPart option = (DropDown.OptionPart) raw;
-    DropDown owner = option.owner();
-    if (!owner.expanded()) {
-      return;
-    }
-    // Draw the selected or hovered option row surface.
-    drawStateSurface(graphics, option, owner, area);
-    // Draw the option label inside the popup row.
-    drawOptionLabel(graphics, owner, option, area);
-  }
-
   private static void drawStateSurface(Graphics graphics, DropDown.OptionPart option,
                                        DropDown owner, Rectangle area) {
     if (option.index() == owner.selectedIndex()) {
@@ -75,5 +56,25 @@ public final class DropDownOptionRenderer implements ElementRenderer {
                                       DropDown.OptionPart option, Rectangle area) {
     RendererSupport.drawText(graphics, owner.options().get(option.index()),
         area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER);
+  }
+
+  /**
+   * Draws an option row when its owning drop-down is expanded.
+   *
+   * @param graphics graphics context receiving the row
+   * @param raw      option-part element to render
+   * @param area     absolute row bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    DropDown.OptionPart option = (DropDown.OptionPart) raw;
+    DropDown owner = option.owner();
+    if (!owner.expanded()) {
+      return;
+    }
+    // Draw the selected or hovered option row surface.
+    drawStateSurface(graphics, option, owner, area);
+    // Draw the option label inside the popup row.
+    drawOptionLabel(graphics, owner, option, area);
   }
 }

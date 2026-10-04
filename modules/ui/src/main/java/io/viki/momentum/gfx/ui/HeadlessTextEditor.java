@@ -46,7 +46,8 @@ import java.util.function.Consumer;
 public final class HeadlessTextEditor {
   /** Default number of edit states retained for undo and redo. */
   private static final int DEFAULT_HISTORY_LIMIT = 128;
-
+  private final Deque<HistoryState> undoHistory = new ArrayDeque<>();
+  private final Deque<HistoryState> redoHistory = new ArrayDeque<>();
   private String text;
   private int cursor;
   private int selectionAnchor;
@@ -57,8 +58,6 @@ public final class HeadlessTextEditor {
   private boolean automaticTrailingNewline;
   private boolean editable = true;
   private int historyLimit = DEFAULT_HISTORY_LIMIT;
-  private final Deque<HistoryState> undoHistory = new ArrayDeque<>();
-  private final Deque<HistoryState> redoHistory = new ArrayDeque<>();
   private boolean restoringHistory;
   private @Nullable Consumer<String> onChanged;
   private @Nullable Consumer<String> onSubmit;
@@ -78,6 +77,19 @@ public final class HeadlessTextEditor {
     cursor = this.text.length();
     selectionAnchor = cursor;
   }
+
+  private static String normalizeNewlines(String value) {
+    return value.replace("\r\n", "\n").replace('\r', '\n');
+  }
+
+  private static String withoutNewlines(String value) {
+    return value.replace('\n', ' ');
+  }
+
+  private static String withTrailingNewline(String value) {
+    return value.endsWith("\n") ? value : value + "\n";
+  }
+
   /**
    * Returns the complete normalized editor text.
    *
@@ -86,6 +98,7 @@ public final class HeadlessTextEditor {
   public String text() {
     return text;
   }
+
   /**
    * Returns the maximum number of history entries retained in each direction.
    *
@@ -282,6 +295,7 @@ public final class HeadlessTextEditor {
   public void setEditable(boolean value) {
     editable = value;
   }
+
   /**
    * Returns the maximum accepted text length.
    *
@@ -296,7 +310,7 @@ public final class HeadlessTextEditor {
    *
    * @param value the non-negative maximum length
    * @throws IllegalArgumentException if {@code value} is negative
-   * @throws IllegalStateException if the current text is longer than {@code value}
+   * @throws IllegalStateException    if the current text is longer than {@code value}
    */
   public void setMaximumLength(int value) {
     if (value < 0) {
@@ -307,6 +321,7 @@ public final class HeadlessTextEditor {
     }
     maximumLength = value;
   }
+
   /**
    * Returns the current caret position.
    *
@@ -329,7 +344,7 @@ public final class HeadlessTextEditor {
   /**
    * Moves the caret, optionally retaining the current selection anchor.
    *
-   * @param value the target caret index
+   * @param value             the target caret index
    * @param preserveSelection whether the existing anchor should be retained
    * @throws IndexOutOfBoundsException if the index is outside the editable text or splits a code point
    */
@@ -373,7 +388,7 @@ public final class HeadlessTextEditor {
    * Selects a UTF-16 range.
    *
    * @param start the selection anchor index
-   * @param end the active selection end index
+   * @param end   the active selection end index
    * @throws IndexOutOfBoundsException if either index is invalid or splits a code point
    */
   public void select(int start, int end) {
@@ -435,8 +450,8 @@ public final class HeadlessTextEditor {
    * <p>Clipboard shortcuts remain the responsibility of the host control because clipboard
    * ownership belongs to the surrounding UI context.
    *
-   * @param key the key that changed
-   * @param action the key action
+   * @param key       the key that changed
+   * @param action    the key action
    * @param modifiers the active modifier mask
    * @return whether the key was handled
    */
@@ -685,18 +700,6 @@ public final class HeadlessTextEditor {
 
   private int nextIndex(int index) {
     return index == text.length() ? index : text.offsetByCodePoints(index, 1);
-  }
-
-  private static String normalizeNewlines(String value) {
-    return value.replace("\r\n", "\n").replace('\r', '\n');
-  }
-
-  private static String withoutNewlines(String value) {
-    return value.replace('\n', ' ');
-  }
-
-  private static String withTrailingNewline(String value) {
-    return value.endsWith("\n") ? value : value + "\n";
   }
 
   private record HistoryState(String text, int cursor, int selectionAnchor) {

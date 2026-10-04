@@ -25,13 +25,12 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.WindowRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.WindowRenderer;
 import org.jspecify.annotations.Nullable;
-
 
 /**
  * Provides a simulated window with a title bar, optional controls, and a clipped content area.
@@ -65,7 +64,7 @@ public final class Window extends Element {
    * Creates a window at the supplied local bounds.
    *
    * @param bounds initial local bounds
-   * @param title rich title displayed in the title bar
+   * @param title  rich title displayed in the title bar
    */
   public Window(Rectangle bounds, Text title) {
     super(bounds);
@@ -140,6 +139,32 @@ public final class Window extends Element {
     super.setBounds(Rectangle.of(constrained.minX(), constrained.minY(), constrained.width(),
         Math.min(titleHeight, normalHeight)));
   }
+
+  @Override
+  public boolean isRenderLayerBoundary() {
+    return true;
+  }
+
+  @Override
+  protected ElementRenderer defaultRenderer() {
+    return WindowRenderer.INSTANCE;
+  }
+
+  @Override
+  protected Rectangle childrenClip(Rectangle absoluteBounds) {
+    float titleHeight = effectiveTitleHeight();
+    return Rectangle.of(
+        absoluteBounds.minX(),
+        absoluteBounds.minY() + titleHeight,
+        absoluteBounds.width(),
+        Math.max(0.0F, absoluteBounds.height() - titleHeight));
+  }
+
+  @Override
+  protected void onAttached() {
+    setBounds(bounds());
+  }
+
   /**
    * Returns the normal title-bar height used by this window.
    *
@@ -169,6 +194,7 @@ public final class Window extends Element {
           Math.min(value, height)));
     }
   }
+
   /**
    * Reports whether title-bar dragging is enabled.
    *
@@ -189,6 +215,7 @@ public final class Window extends Element {
       dragging = false;
     }
   }
+
   /**
    * Reports whether the close button is enabled.
    *
@@ -197,6 +224,7 @@ public final class Window extends Element {
   public boolean closable() {
     return closable;
   }
+
   /**
    * Reports whether the minimize button is enabled.
    *
@@ -218,6 +246,7 @@ public final class Window extends Element {
       minimizePressed = false;
     }
   }
+
   /**
    * Reports whether the pointer is over the close button.
    *
@@ -226,6 +255,7 @@ public final class Window extends Element {
   public boolean closeHovered() {
     return closeHovered;
   }
+
   /**
    * Reports whether the close button is being pressed.
    *
@@ -234,6 +264,7 @@ public final class Window extends Element {
   public boolean closePressed() {
     return closePressed;
   }
+
   /**
    * Reports whether the pointer is over the minimize button.
    *
@@ -242,6 +273,7 @@ public final class Window extends Element {
   public boolean minimizeHovered() {
     return minimizeHovered;
   }
+
   /**
    * Reports whether the minimize button is being pressed.
    *
@@ -250,6 +282,7 @@ public final class Window extends Element {
   public boolean minimizePressed() {
     return minimizePressed;
   }
+
   /**
    * Reports whether the window is currently collapsed to its title bar.
    *
@@ -258,6 +291,7 @@ public final class Window extends Element {
   public boolean minimized() {
     return minimized;
   }
+
   /**
    * Returns the effective title-bar height used by the renderer.
    *
@@ -279,6 +313,7 @@ public final class Window extends Element {
       closePressed = false;
     }
   }
+
   /**
    * Reports whether the window has been closed.
    *
@@ -379,31 +414,6 @@ public final class Window extends Element {
   }
 
   @Override
-  protected ElementRenderer defaultRenderer() {
-    return WindowRenderer.INSTANCE;
-  }
-
-  @Override
-  public boolean isRenderLayerBoundary() {
-    return true;
-  }
-
-  @Override
-  protected Rectangle childrenClip(Rectangle absoluteBounds) {
-    float titleHeight = effectiveTitleHeight();
-    return Rectangle.of(
-        absoluteBounds.minX(),
-        absoluteBounds.minY() + titleHeight,
-        absoluteBounds.width(),
-        Math.max(0.0F, absoluteBounds.height() - titleHeight));
-  }
-
-  @Override
-  protected void onAttached() {
-    setBounds(bounds());
-  }
-
-  @Override
   public boolean onMouseMove(float x, float y) {
     if (dragging) {
       Rectangle current = bounds();
@@ -470,16 +480,16 @@ public final class Window extends Element {
   }
 
   @Override
+  public void onPointerExit() {
+    closeHovered = false;
+    minimizeHovered = false;
+  }
+
+  @Override
   public void onPointerCancel(KeyCode button) {
     dragging = false;
     closePressed = false;
     minimizePressed = false;
-  }
-
-  @Override
-  public void onPointerExit() {
-    closeHovered = false;
-    minimizeHovered = false;
   }
 
   private float effectiveTitleHeight() {

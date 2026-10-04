@@ -181,7 +181,8 @@ public final class OpenALMixer implements Mixer {
    * Stops the audio thread and releases the OpenAL context and device.
    *
    * <p>Interrupts the audio thread; context and device destruction happen
-   * asynchronously on that thread after it wakes up.
+   * asynchronously on that thread after pending commands have been completed.
+   * Close owned clips before closing their mixer so queued cleanup can finish.
    */
   @Override
   public void close() {
@@ -220,11 +221,7 @@ public final class OpenALMixer implements Mixer {
         batch.add(queue.take());
         queue.drainTo(batch);
         for (Runnable task : batch) {
-          try {
-            task.run();
-          } catch (Exception e) {
-            LOGGER.warn("OpenAL consumer fault", e);
-          }
+          consume(task);
         }
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
@@ -232,8 +229,22 @@ public final class OpenALMixer implements Mixer {
       }
     }
 
+    // Clip owners queue cleanup before stopping the mixer; release streams
+    // and native objects while their context still exists.
+    Runnable pending;
+    while ((pending = queue.poll()) != null) {
+      consume(pending);
+    }
     alcDestroyContext(context);
     alcCloseDevice(device);
+  }
+
+  private void consume(Runnable task) {
+    try {
+      task.run();
+    } catch (Exception exception) {
+      LOGGER.warn("OpenAL consumer fault", exception);
+    }
   }
 
   /**

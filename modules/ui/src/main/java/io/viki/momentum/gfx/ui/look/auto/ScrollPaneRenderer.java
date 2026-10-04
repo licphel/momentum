@@ -22,28 +22,38 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.look.auto;
 
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.ui.element.ScrollPane;
+import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
-import java.util.List;
-
 /**
- * Defines how a container positions its child elements inside a local area.
+ * Draws the viewport surface associated with a {@link ScrollPane}.
  *
- * <p>Layouts mutate child bounds during a container's layout pass and do not own the child list.
- * Implementations should preserve the supplied gap where space permits and may clamp geometry
- * when the available area is smaller than the requested content.
+ * <p>Scrollbar parts and content are rendered by their own elements. This renderer owns only the
+ * fixed viewport surface and frame, so the decoration remains stationary while content scrolls.
  */
-@FunctionalInterface
-public interface Layout {
+public final class ScrollPaneRenderer implements ElementRenderer {
+  /** Shared stateless renderer used by scroll panes. */
+  public static final ScrollPaneRenderer INSTANCE = new ScrollPaneRenderer();
+
+  private ScrollPaneRenderer() {
+  }
+
   /**
-   * Arranges the supplied children within the given area.
+   * Draws the scroll pane's fixed viewport surface and frame.
    *
-   * @param area     the local region available to the children
-   * @param children the children whose bounds may be updated
-   * @param gap      the spacing to preserve between adjacent children
+   * @param graphics graphics context receiving the viewport
+   * @param raw      scroll-pane element to render
+   * @param area     absolute scroll-pane bounds
    */
-  void arrange(Rectangle area, List<Element> children, float gap);
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    ScrollPane pane = (ScrollPane) raw;
+    Rectangle viewport = Rectangle.of(area.minX(), area.minY(), pane.viewportWidth(), pane.viewportHeight());
+    RendererSupport.drawScrollPaneBackground(graphics, viewport);
+  }
 }

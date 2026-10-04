@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.ui.element.Element;
@@ -78,6 +78,43 @@ public final class UiRenderDispatcher implements AutoCloseable {
     return new UiRenderDispatcher(device);
   }
 
+  private static Rectangle absoluteBounds(Element element, float parentX, float parentY) {
+    Rectangle local = element.bounds();
+    return Rectangle.of(parentX + local.minX(), parentY + local.minY(),
+        local.width(), local.height());
+  }
+
+  private static void appendUncovered(Rectangle area, List<Rectangle> covered,
+                                      int coveredIndex, int coveredCount) {
+    for (int index = coveredIndex; index < coveredCount; index++) {
+      Rectangle blocker = covered.get(index);
+      if (!area.intersects(blocker)) {
+        continue;
+      }
+      Rectangle overlap = Rectangle.getIntersection(area, blocker);
+      appendRegion(area.minX(), area.minY(), overlap.minX(), area.maxY(),
+          covered, index + 1, coveredCount);
+      appendRegion(overlap.maxX(), area.minY(), area.maxX(), area.maxY(),
+          covered, index + 1, coveredCount);
+      appendRegion(overlap.minX(), area.minY(), overlap.maxX(), overlap.minY(),
+          covered, index + 1, coveredCount);
+      appendRegion(overlap.minX(), overlap.maxY(), overlap.maxX(), area.maxY(),
+          covered, index + 1, coveredCount);
+      return;
+    }
+    covered.add(area);
+  }
+
+  private static void appendRegion(float minX, float minY, float maxX, float maxY,
+                                   List<Rectangle> covered, int coveredIndex,
+                                   int coveredCount) {
+    if (maxX <= minX || maxY <= minY) {
+      return;
+    }
+    appendUncovered(new Rectangle(minX, minY, maxX, maxY), covered,
+        coveredIndex, coveredCount);
+  }
+
   /**
    * Renders a root element and all of its visible descendants.
    *
@@ -85,7 +122,7 @@ public final class UiRenderDispatcher implements AutoCloseable {
    * each element's clipping policy while descending into its children.
    *
    * @param graphics graphics context receiving the UI
-   * @param root root element to render
+   * @param root     root element to render
    */
   public void render(Graphics graphics, Element root) {
     Rectangle absolute = root.absoluteBounds();
@@ -174,12 +211,6 @@ public final class UiRenderDispatcher implements AutoCloseable {
     }
   }
 
-  private static Rectangle absoluteBounds(Element element, float parentX, float parentY) {
-    Rectangle local = element.bounds();
-    return Rectangle.of(parentX + local.minX(), parentY + local.minY(),
-        local.width(), local.height());
-  }
-
   private void drawOccludedBackdrop(Graphics graphics, Rectangle windowBounds) {
     if (backdropBlur == null) {
       return;
@@ -204,36 +235,5 @@ public final class UiRenderDispatcher implements AutoCloseable {
       return;
     }
     drawOccludedBackdrop(graphics, windowBounds);
-  }
-
-  private static void appendUncovered(Rectangle area, List<Rectangle> covered,
-                                      int coveredIndex, int coveredCount) {
-    for (int index = coveredIndex; index < coveredCount; index++) {
-      Rectangle blocker = covered.get(index);
-      if (!area.intersects(blocker)) {
-        continue;
-      }
-      Rectangle overlap = Rectangle.getIntersection(area, blocker);
-      appendRegion(area.minX(), area.minY(), overlap.minX(), area.maxY(),
-          covered, index + 1, coveredCount);
-      appendRegion(overlap.maxX(), area.minY(), area.maxX(), area.maxY(),
-          covered, index + 1, coveredCount);
-      appendRegion(overlap.minX(), area.minY(), overlap.maxX(), overlap.minY(),
-          covered, index + 1, coveredCount);
-      appendRegion(overlap.minX(), overlap.maxY(), overlap.maxX(), area.maxY(),
-          covered, index + 1, coveredCount);
-      return;
-    }
-    covered.add(area);
-  }
-
-  private static void appendRegion(float minX, float minY, float maxX, float maxY,
-                                   List<Rectangle> covered, int coveredIndex,
-                                   int coveredCount) {
-    if (maxX <= minX || maxY <= minY) {
-      return;
-    }
-    appendUncovered(new Rectangle(minX, minY, maxX, maxY), covered,
-        coveredIndex, coveredCount);
   }
 }

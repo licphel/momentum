@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Window;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -41,39 +42,6 @@ public final class WindowRenderer implements ElementRenderer {
   public static final WindowRenderer INSTANCE = new WindowRenderer();
 
   private WindowRenderer() {
-  }
-
-  /**
-   * Draws a window using its current title, control visibility, and interaction state.
-   *
-   * @param graphics graphics context receiving the window
-   * @param raw window element to render
-   * @param area absolute window bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    renderWindow(graphics, raw, area);
-  }
-
-  private void renderWindow(Graphics graphics, Element raw, Rectangle area) {
-    Window window = (Window) raw;
-    // Draw the glass surface and outer frame after the dispatcher backdrop pass.
-    RendererSupport.drawWindowBackground(graphics, area, window.shadowEnabled());
-    // Draw the title-bar surface and separator frame.
-    float titleHeight = Math.min(area.height(), window.titleHeightForRender());
-    Rectangle titleArea = Rectangle.of(area.minX(), area.minY(), area.width(), titleHeight);
-    drawTitleBar(graphics, window, titleArea);
-    if (window.minimizable()) {
-      // Draw the minimize button and its horizontal icon.
-      Rectangle minimizeArea = buttonArea(titleArea, titleHeight,
-          window.closable() ? 1 : 0);
-      drawMinimizeButton(graphics, window, minimizeArea, titleHeight);
-    }
-    if (window.closable()) {
-      // Draw the close button hover/pressed surface and its X icon.
-      Rectangle closeArea = buttonArea(titleArea, titleHeight, 0);
-      drawCloseButton(graphics, window, closeArea, titleHeight);
-    }
   }
 
   private static void drawTitleBar(Graphics graphics, Window window, Rectangle titleArea) {
@@ -117,5 +85,38 @@ public final class WindowRenderer implements ElementRenderer {
   private static Rectangle buttonArea(Rectangle titleArea, float titleHeight, int fromRight) {
     float minX = titleArea.maxX() - titleHeight * (fromRight + 1.0F);
     return Rectangle.of(minX, titleArea.minY(), titleHeight, titleHeight);
+  }
+
+  /**
+   * Draws a window using its current title, control visibility, and interaction state.
+   *
+   * @param graphics graphics context receiving the window
+   * @param raw      window element to render
+   * @param area     absolute window bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    renderWindow(graphics, raw, area);
+  }
+
+  private void renderWindow(Graphics graphics, Element raw, Rectangle area) {
+    Window window = (Window) raw;
+    // Draw the glass surface and outer frame after the dispatcher backdrop pass.
+    RendererSupport.drawWindowBackground(graphics, area, window.shadowEnabled());
+    // Draw the title-bar surface and separator frame.
+    float titleHeight = Math.min(area.height(), window.titleHeightForRender());
+    Rectangle titleArea = Rectangle.of(area.minX(), area.minY(), area.width(), titleHeight);
+    drawTitleBar(graphics, window, titleArea);
+    if (window.minimizable()) {
+      // Draw the minimize button and its horizontal icon.
+      Rectangle minimizeArea = buttonArea(titleArea, titleHeight,
+          window.closable() ? 1 : 0);
+      drawMinimizeButton(graphics, window, minimizeArea, titleHeight);
+    }
+    if (window.closable()) {
+      // Draw the close button hover/pressed surface and its X icon.
+      Rectangle closeArea = buttonArea(titleArea, titleHeight, 0);
+      drawCloseButton(graphics, window, closeArea, titleHeight);
+    }
   }
 }

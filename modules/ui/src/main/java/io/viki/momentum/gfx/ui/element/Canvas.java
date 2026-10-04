@@ -26,14 +26,14 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.ui.Resolution;
+import io.viki.momentum.gfx.ui.look.auto.UiRenderDispatcher;
 import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.gfx.ui.render.UiRenderDispatcher;
 import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
@@ -66,7 +66,7 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Creates a canvas with an explicitly selected renderer dispatcher.
    *
-   * @param context logical coordinate and input mapping for this canvas
+   * @param context  logical coordinate and input mapping for this canvas
    * @param renderer dispatcher used to render the element tree
    */
   public Canvas(DpiContext context, UiRenderDispatcher renderer) {
@@ -79,7 +79,7 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Opens a canvas mapped to a view using that view's current logical size policy.
    *
-   * @param view view providing framebuffer size and input events
+   * @param view             view providing framebuffer size and input events
    * @param transformHandler handler used for input and graphics transforms
    * @return a newly opened canvas
    */
@@ -100,7 +100,7 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Opens a canvas around an existing context and renderer dispatcher.
    *
-   * @param context logical coordinate and input mapping for the canvas
+   * @param context  logical coordinate and input mapping for the canvas
    * @param renderer dispatcher used to render the element tree
    * @return a newly opened canvas
    */
@@ -111,10 +111,10 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Opens a canvas with an explicit logical resolution policy.
    *
-   * @param view view providing framebuffer size and input events
+   * @param view             view providing framebuffer size and input events
    * @param transformHandler handler used for input and graphics transforms
-   * @param logicalWidth logical canvas width
-   * @param logicalHeight logical canvas height
+   * @param logicalWidth     logical canvas width
+   * @param logicalHeight    logical canvas height
    * @param onlyIntegerScale whether scaling must use an integer factor
    * @return a newly opened canvas
    */
@@ -126,12 +126,12 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Opens a canvas with an explicit resolution policy and renderer dispatcher.
    *
-   * @param view view providing framebuffer size and input events
+   * @param view             view providing framebuffer size and input events
    * @param transformHandler handler used for input and graphics transforms
-   * @param logicalWidth logical canvas width
-   * @param logicalHeight logical canvas height
+   * @param logicalWidth     logical canvas width
+   * @param logicalHeight    logical canvas height
    * @param onlyIntegerScale whether scaling must use an integer factor
-   * @param renderer dispatcher used to render the element tree
+   * @param renderer         dispatcher used to render the element tree
    * @return a newly opened canvas
    */
   public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
@@ -139,6 +139,18 @@ public final class Canvas extends Element implements AutoCloseable {
                             UiRenderDispatcher renderer) {
     return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale, transformHandler), renderer);
   }
+
+  private static boolean isEffectivelyVisible(Element element) {
+    @Nullable Element current = element;
+    while (current != null) {
+      if (!current.visible()) {
+        return false;
+      }
+      current = current.parent();
+    }
+    return true;
+  }
+
   /**
    * Returns the coordinate and input mapping owned by this canvas.
    *
@@ -149,6 +161,7 @@ public final class Canvas extends Element implements AutoCloseable {
   public DpiContext context() {
     return context;
   }
+
   /**
    * Returns the current logical-to-framebuffer resolution mapping.
    *
@@ -160,6 +173,7 @@ public final class Canvas extends Element implements AutoCloseable {
   public Resolution resolution() {
     return context.resolution();
   }
+
   /**
    * Returns the most recent input snapshot used by the router.
    *
@@ -188,10 +202,10 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Routes a mouse button event to the element under the pointer.
    *
-   * @param button mouse button key code
-   * @param action press or release action
-   * @param inputX input-space horizontal coordinate
-   * @param inputY input-space vertical coordinate
+   * @param button    mouse button key code
+   * @param action    press or release action
+   * @param inputX    input-space horizontal coordinate
+   * @param inputY    input-space vertical coordinate
    * @param modifiers active modifier mask
    * @return {@code true} when an element consumed the event
    * @throws IllegalStateException if the canvas has been closed
@@ -218,8 +232,8 @@ public final class Canvas extends Element implements AutoCloseable {
   /**
    * Routes a key event to the focused element.
    *
-   * @param key key code
-   * @param action press, repeat, or release action
+   * @param key       key code
+   * @param action    press, repeat, or release action
    * @param modifiers active modifier mask
    * @return {@code true} when the focused element consumed the event
    * @throws IllegalStateException if the canvas has been closed
@@ -243,7 +257,7 @@ public final class Canvas extends Element implements AutoCloseable {
    * Adds a top-level element to the canvas.
    *
    * @param element element to attach
-   * @throws IllegalStateException if the canvas has been closed
+   * @throws IllegalStateException    if the canvas has been closed
    * @throws IllegalArgumentException if the element is already attached
    */
   public void add(Element element) {
@@ -344,7 +358,7 @@ public final class Canvas extends Element implements AutoCloseable {
    *
    * @param element element that should receive keyboard input
    * @throws IllegalArgumentException if the element is detached, hidden, or not focusable
-   * @throws IllegalStateException if the canvas has been closed
+   * @throws IllegalStateException    if the canvas has been closed
    */
   public void requestFocus(Element element) {
     ensureOpen();
@@ -452,17 +466,6 @@ public final class Canvas extends Element implements AutoCloseable {
     if (target != null) {
       target.onFocusChanged(true);
     }
-  }
-
-  private static boolean isEffectivelyVisible(Element element) {
-    @Nullable Element current = element;
-    while (current != null) {
-      if (!current.visible()) {
-        return false;
-      }
-      current = current.parent();
-    }
-    return true;
   }
 
   private void ensureOpen() {

@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -43,27 +44,6 @@ public final class DropDownPopupRenderer implements ElementRenderer {
   private DropDownPopupRenderer() {
   }
 
-  /**
-   * Draws the popup surface only while its owning drop-down is expanded.
-   *
-   * @param graphics graphics context receiving the popup
-   * @param raw popup-part element to render
-   * @param area absolute popup bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    DropDown.Popup popup = (DropDown.Popup) raw;
-    if (!popup.owner().expanded()) {
-      return;
-    }
-    // Draw the popup surface behind all option rows.
-    drawPopupSurface(graphics, area);
-    // Draw the popup frame independent of the option rows.
-    drawPopupBorder(graphics, area);
-    // Draw the subtle top-edge highlight.
-    drawTopHighlight(graphics, area);
-  }
-
   private static void drawPopupSurface(Graphics graphics, Rectangle area) {
     RendererSupport.fill(graphics, area, RendererSupport.POPUP_SURFACE);
   }
@@ -79,5 +59,26 @@ public final class DropDownPopupRenderer implements ElementRenderer {
         Math.max(0.0F, area.width() - RendererSupport.BORDER_WIDTH * 2.0F),
         RendererSupport.BORDER_WIDTH);
     graphics.setTint(Color.WHITE);
+  }
+
+  /**
+   * Draws the popup surface only while its owning drop-down is expanded.
+   *
+   * @param graphics graphics context receiving the popup
+   * @param raw      popup-part element to render
+   * @param area     absolute popup bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    DropDown.Popup popup = (DropDown.Popup) raw;
+    if (!popup.owner().expanded()) {
+      return;
+    }
+    // Draw the popup surface behind all option rows.
+    drawPopupSurface(graphics, area);
+    // Draw the popup frame independent of the option rows.
+    drawPopupBorder(graphics, area);
+    // Draw the subtle top-edge highlight.
+    drawTopHighlight(graphics, area);
   }
 }

@@ -223,12 +223,12 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @return ray parameter {@code t}, or {@code Float.NaN} if no intersection
    */
   public float intersectsTriangle(Vector3 v0, Vector3 v1, Vector3 v2) {
-    final float EPSILON = 1E-7F;
+    final float epsilon = 1E-7F;
     Vector3 e1 = v1.subtract(v0);
     Vector3 e2 = v2.subtract(v0);
     Vector3 h = direction.cross(e2);
     float a = e1.dot(h);
-    if (Math.abs(a) < EPSILON) {
+    if (Math.abs(a) < epsilon) {
       return Float.NaN; // Parallel
     }
 
@@ -246,7 +246,7 @@ public record Ray(Vector3 origin, Vector3 direction) {
     }
 
     float t = f * e2.dot(q);
-    return t >= EPSILON ? t : Float.NaN;
+    return t >= epsilon ? t : Float.NaN;
   }
 
   /**

@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -51,9 +51,9 @@ public final class TooltipRenderer {
    * tooltip surface is sized to the widest entry and the sum of all entry heights.
    *
    * @param graphics graphics context receiving the tooltip
-   * @param values rich text entries to draw
-   * @param x left coordinate of the tooltip surface
-   * @param y top coordinate of the tooltip surface
+   * @param values   rich text entries to draw
+   * @param x        left coordinate of the tooltip surface
+   * @param y        top coordinate of the tooltip surface
    */
   public static void render(Graphics graphics, List<Text> values, float x, float y) {
     if (values.isEmpty()) {

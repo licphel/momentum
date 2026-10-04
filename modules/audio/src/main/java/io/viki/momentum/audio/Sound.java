@@ -3,8 +3,10 @@ package io.viki.momentum.audio;
 /**
  * Decoded PCM samples without any playback or resource ownership.
  *
- * <p>Sample storage is copied on construction and retrieval. Instances are immutable and
- * safe to share between threads; opening a sound never transfers a clip's ownership.
+ * <p>Sample storage is copied on construction. The record exposes its sample array;
+ * callers must not modify it during playback or concurrent access. Sharing is safe
+ * when callers treat those samples as read-only. Opening a sound never transfers
+ * a clip's ownership.
  *
  * @param format the PCM sample layout
  * @param data   complete PCM frames matching the format

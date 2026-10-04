@@ -24,6 +24,7 @@
 
 package io.viki.momentum.audio;
 
+import io.viki.momentum.util.FloatSupplier;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -125,28 +126,22 @@ public interface Clip extends AutoCloseable {
   float getVolume();
 
   /**
-   * Sets the gain multiplier.
+   * Sets a fixed gain multiplier, replacing any dynamic gain source.
    *
    * @param volume new gain multiplier; negative values are clamped to zero
    */
   void setVolume(float volume);
 
   /**
-   * Returns the category whose ancestor gains affect playback independently of local gain.
+   * Obtains gain dynamically during playback rather than capturing its initial value.
    *
-   * @return this clip's volume category
+   * <p>The source is sampled when playback events are processed. A {@link VolumeControl}
+   * may be supplied directly; the source never takes ownership of this clip. The supplier
+   * must support invocation from the backend's audio thread and from gain observation.
+   *
+   * @param volume supplies a nonnegative gain multiplier
    */
-  VolumeControl volumeControl();
-
-  /**
-   * Routes playback through a category without changing the clip's local gain.
-   *
-   * <p>Category and ancestor changes take effect when the mixer processes playback events.
-   * Categories do not own or release clips.
-   *
-   * @param control the category to use for playback
-   */
-  void setVolumeControl(VolumeControl control);
+  void setVolume(FloatSupplier volume);
 
   /**
    * Returns the current playback speed multiplier.

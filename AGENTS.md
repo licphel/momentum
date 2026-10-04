@@ -5,14 +5,15 @@
 - Use Jspecify library for null safety
 - Apply `@NullMarked` for each package-info, never use `@NonNull`
 - Use `@Nullable` explicitly for parameters/returns that may be null
-- Never accept null where a meaningful default exists
-- Never check nullability when a nonnull value is passed
+- **Never** accept null where a meaningful default exists
+- **Never** check nullability unless it definitely is `@Nullable`
 
 ### Exception Handling
 
 - Extend `RuntimeException` for unchecked exceptions
 - For exception classes, include `@Serial` with `serialVersionUID` set to `YYYYMMDD00` format
 - Provide descriptive exception messages with context
+- **Never overcheck**. For example, check a float is finite or not NaN is useless unless it really counts
 
 ### Record Usage
 
@@ -42,7 +43,6 @@
 
 ### Constants
 
-- Use `UPPER_SNAKE_CASE` for final fields
 - Define magic numbers as named constants with documentation
 
 ### Performance Considerations

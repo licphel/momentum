@@ -24,8 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.ScrollBarRenderer;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.ScrollBarRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -57,7 +57,7 @@ public final class ScrollBar extends Element {
   /**
    * Creates a scrollbar with an initially empty range.
    *
-   * @param bounds the scrollbar's local bounds
+   * @param bounds      the scrollbar's local bounds
    * @param orientation the axis represented by the scrollbar
    */
   public ScrollBar(Rectangle bounds, Orientation orientation) {
@@ -104,8 +104,8 @@ public final class ScrollBar extends Element {
   /**
    * Sets the range and visible page extent.
    *
-   * @param minimum the lower range bound
-   * @param maximum the upper range bound
+   * @param minimum  the lower range bound
+   * @param maximum  the upper range bound
    * @param pageSize the visible page extent
    * @throws IllegalArgumentException if any value is invalid
    */
@@ -316,11 +316,6 @@ public final class ScrollBar extends Element {
   }
 
   @Override
-  public void onPointerCancel(KeyCode button) {
-    dragging = false;
-  }
-
-  @Override
   public void onPointerEnter() {
     hovered = true;
   }
@@ -328,6 +323,11 @@ public final class ScrollBar extends Element {
   @Override
   public void onPointerExit() {
     hovered = false;
+  }
+
+  @Override
+  public void onPointerCancel(KeyCode button) {
+    dragging = false;
   }
 
   @Override

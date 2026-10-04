@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.ui.render.TooltipRenderer;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.gfx.view.DesktopView;
@@ -32,21 +31,14 @@ import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.event.CharEvent;
-import io.viki.momentum.input.event.CursorEnterEvent;
-import io.viki.momentum.input.event.FocusEvent;
-import io.viki.momentum.input.event.KeyEvent;
-import io.viki.momentum.input.event.MouseButtonEvent;
-import io.viki.momentum.input.event.MouseMoveEvent;
-import io.viki.momentum.input.event.ResizeEvent;
-import io.viki.momentum.input.event.ScrollEvent;
+import io.viki.momentum.input.event.*;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
-import java.util.List;
 import java.util.ArrayList;
+import java.util.List;
 
 /** Routes view input to one canvas; not thread-safe. */
 @InternalApi
@@ -74,6 +66,14 @@ final class InputRouter implements AutoCloseable {
     if (view != null) {
       registerViewCallbacks(view);
       registered = true;
+    }
+  }
+
+  private static void cancelCapture(Element target, KeyCode key) {
+    if (key.mouseId() >= 0) {
+      target.onPointerCancel(key);
+    } else {
+      target.onKeyCancel(key);
     }
   }
 
@@ -238,7 +238,8 @@ final class InputRouter implements AutoCloseable {
     if (System.nanoTime() - hoveredSinceNanos < delayNanos) {
       return;
     }
-    TooltipRenderer.render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
+    hoveredElement.look().tooltipRenderer()
+        .render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
   }
 
   @Override
@@ -366,7 +367,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonContent(Element element, float x, float y,
-      KeyCode button, KeyAction action, int modifiers) {
+                                                    KeyCode button, KeyAction action, int modifiers) {
     if (!element.containsLocal(x, y)) {
       return null;
     }
@@ -378,7 +379,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonParts(Element element, float x, float y,
-      KeyCode button, KeyAction action, int modifiers) {
+                                                  KeyCode button, KeyAction action, int modifiers) {
     Element target = routeMouseButton(element.parts(), x, y, button, action, modifiers);
     if (target != null) {
       return target;
@@ -395,7 +396,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonContent(List<Element> elements, float x, float y,
-      KeyCode button, KeyAction action, int modifiers) {
+                                                    KeyCode button, KeyAction action, int modifiers) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       Element child = elements.get(i);
       Element target = routeMouseButtonContent(child,
@@ -433,7 +434,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeScrollContent(Element element, float x, float y,
-      double deltaX, double deltaY) {
+                                               double deltaX, double deltaY) {
     if (!element.containsLocal(x, y)) {
       return null;
     }
@@ -445,7 +446,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeScrollParts(Element element, float x, float y,
-      double deltaX, double deltaY) {
+                                             double deltaX, double deltaY) {
     Element target = routeScroll(element.parts(), x, y, deltaX, deltaY);
     if (target != null) {
       return target;
@@ -462,7 +463,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeScrollContent(List<Element> elements, float x, float y,
-      double deltaX, double deltaY) {
+                                               double deltaX, double deltaY) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       Element child = elements.get(i);
       Element target = routeScrollContent(child,
@@ -558,14 +559,6 @@ final class InputRouter implements AutoCloseable {
       current = current.parent();
     }
     return null;
-  }
-
-  private static void cancelCapture(Element target, KeyCode key) {
-    if (key.mouseId() >= 0) {
-      target.onPointerCancel(key);
-    } else {
-      target.onKeyCancel(key);
-    }
   }
 
   private void ensureOpen() {

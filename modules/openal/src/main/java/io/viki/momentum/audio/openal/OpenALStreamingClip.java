@@ -27,15 +27,13 @@ package io.viki.momentum.audio.openal;
 import io.viki.momentum.audio.AudioException;
 import io.viki.momentum.audio.AudioFormat;
 import io.viki.momentum.audio.StreamingClip;
-import io.viki.momentum.audio.Mixer;
-import io.viki.momentum.audio.VolumeControl;
+import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.audio.io.AudioInputStream;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.Objects;
 import java.util.function.Supplier;
 
 import static org.lwjgl.openal.AL11.*;
@@ -59,7 +57,7 @@ public final class OpenALStreamingClip implements StreamingClip {
   private volatile float position;
   private volatile float pitch = 1.0F;
   private volatile float volume = 1.0F;
-  private volatile VolumeControl volumeControl = Mixer.MUSIC;
+  private volatile @Nullable FloatSupplier volumeSource;
   private float appliedVolume = -1;
   private volatile boolean open;
   private volatile boolean shouldClose;
@@ -69,6 +67,7 @@ public final class OpenALStreamingClip implements StreamingClip {
   private boolean endOfStream;
   private volatile boolean started;
   private boolean terminal;
+  private boolean closed;
   private int remainingLoops;
   private long processedBytes;
 
@@ -84,15 +83,16 @@ public final class OpenALStreamingClip implements StreamingClip {
 
   @Override
   public void open(Supplier<? extends AudioInputStream> streamSupplier) {
+    if (closed) throw new IllegalStateException("Streaming clip is closed");
     if (open) {
       throw new IllegalStateException("Streaming clip already open");
     }
 
-    AudioInputStream stream = Objects.requireNonNull(streamSupplier.get(), "streamSupplier returned null");
+    AudioInputStream stream = streamSupplier.get();
+    this.stream = stream;
     AudioFormat streamFormat = stream.format();
     OpenALUtils.convertFormat(streamFormat);
     format = streamFormat;
-    this.stream = stream;
     this.streamSupplier = streamSupplier;
     open = true;
 
@@ -188,28 +188,25 @@ public final class OpenALStreamingClip implements StreamingClip {
 
   @Override
   public float getVolume() {
-    return volume;
+    FloatSupplier source = volumeSource;
+    return source == null ? volume : source.getAsFloat();
   }
 
   @Override
   public void setVolume(float value) {
+    volumeSource = null;
     volume = Math.max(value, 0.0F);
     mixer.submit(this::applyVolume);
   }
 
   @Override
-  public VolumeControl volumeControl() {
-    return volumeControl;
-  }
-
-  @Override
-  public void setVolumeControl(VolumeControl control) {
-    volumeControl = control;
+  public void setVolume(FloatSupplier volume) {
+    volumeSource = volume;
     mixer.submit(this::applyVolume);
   }
 
   private void applyVolume() {
-    float effective = volume * volumeControl.effectiveVolume();
+    float effective = Math.max(0, getVolume());
     if (appliedVolume != effective) {
       alSourcef(source, AL_GAIN, effective);
       appliedVolume = effective;
@@ -238,9 +235,10 @@ public final class OpenALStreamingClip implements StreamingClip {
 
   @Override
   public void close() {
-    if (!open) {
+    if (closed) {
       return;
     }
+    closed = true;
     open = false;
     mixer.untrack(this);
     mixer.submit(() -> {
@@ -361,7 +359,7 @@ public final class OpenALStreamingClip implements StreamingClip {
 
     AudioInputStream nextStream;
     try {
-      nextStream = Objects.requireNonNull(supplier.get(), "streamSupplier returned null");
+      nextStream = supplier.get();
     } catch (RuntimeException e) {
       fail(new AudioException("Failed to open the next streaming audio repetition", e));
       return;

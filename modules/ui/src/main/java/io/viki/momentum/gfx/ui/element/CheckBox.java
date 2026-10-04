@@ -25,8 +25,8 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.CheckBoxRenderer;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.CheckBoxRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -56,8 +56,8 @@ public final class CheckBox extends Element {
   /**
    * Creates a checkbox with the supplied label, initial value, and bounds.
    *
-   * @param bounds the checkbox's local bounds
-   * @param label the rich text displayed beside the box
+   * @param bounds  the checkbox's local bounds
+   * @param label   the rich text displayed beside the box
    * @param checked the initial checked state
    */
   public CheckBox(Rectangle bounds, Text label, boolean checked) {

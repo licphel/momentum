@@ -26,17 +26,11 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyBinding;
-import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.KeyMatch;
-import io.viki.momentum.input.InputSnapshot;
+import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.ButtonRenderer;
+import io.viki.momentum.input.*;
 import io.viki.momentum.math.shape.Rectangle;
-import io.viki.momentum.gfx.ui.render.ButtonRenderer;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
 import org.jspecify.annotations.Nullable;
-
-
 
 /**
  * Represents an activatable logical-space button with pointer and keyboard input handling.
@@ -70,11 +64,29 @@ public final class Button extends Element {
    * Creates a button with a rich label and the supplied bounds.
    *
    * @param bounds the button's local bounds
-   * @param label rich label displayed by the button
+   * @param label  rich label displayed by the button
    */
   public Button(Rectangle bounds, Text label) {
     this(bounds);
     this.label = label;
+  }
+
+  /**
+   * Creates the conventional mouse, Enter, and Space activation binding for one input snapshot.
+   *
+   * @param snapshot the input snapshot used to build transition matches
+   * @return a binding that recognizes the standard button activation keys
+   */
+  public static KeyBinding makeConventionalActivationKeyBinding(InputSnapshot snapshot) {
+    return new KeyBinding("button.activate",
+        KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
+        KeyMatch.of(snapshot.key(KeyCode.ENTER)),
+        KeyMatch.of(snapshot.key(KeyCode.KP_ENTER)),
+        KeyMatch.of(snapshot.key(KeyCode.SPACE)));
+  }
+
+  private static boolean isDefaultKeyboardActivation(KeyCode key) {
+    return key == KeyCode.ENTER || key == KeyCode.KP_ENTER || key == KeyCode.SPACE;
   }
 
   /**
@@ -97,19 +109,6 @@ public final class Button extends Element {
     label = value;
   }
 
-  /**
-   * Creates the conventional mouse, Enter, and Space activation binding for one input snapshot.
-   *
-   * @param snapshot the input snapshot used to build transition matches
-   * @return a binding that recognizes the standard button activation keys
-   */
-  public static KeyBinding makeConventionalActivationKeyBinding(InputSnapshot snapshot) {
-    return new KeyBinding("button.activate",
-        KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
-        KeyMatch.of(snapshot.key(KeyCode.ENTER)),
-        KeyMatch.of(snapshot.key(KeyCode.KP_ENTER)),
-        KeyMatch.of(snapshot.key(KeyCode.SPACE)));
-  }
   /**
    * Returns the interaction state currently exposed to the renderer.
    *
@@ -264,6 +263,15 @@ public final class Button extends Element {
   }
 
   @Override
+  public void onKeyCancel(KeyCode key) {
+    if (keyboardKey == key) {
+      keyboardPressed = false;
+      keyboardKey = null;
+      refreshState();
+    }
+  }
+
+  @Override
   public boolean acceptsFocus() {
     return enabled;
   }
@@ -271,15 +279,6 @@ public final class Button extends Element {
   @Override
   public void onFocusChanged(boolean focused) {
     this.focused = focused;
-  }
-
-  @Override
-  public void onKeyCancel(KeyCode key) {
-    if (keyboardKey == key) {
-      keyboardPressed = false;
-      keyboardKey = null;
-      refreshState();
-    }
   }
 
   private void refreshState() {
@@ -298,10 +297,6 @@ public final class Button extends Element {
 
   private @Nullable KeyBinding activationBinding() {
     return activationBinding;
-  }
-
-  private static boolean isDefaultKeyboardActivation(KeyCode key) {
-    return key == KeyCode.ENTER || key == KeyCode.KP_ENTER || key == KeyCode.SPACE;
   }
 
   /**

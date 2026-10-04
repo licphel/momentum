@@ -27,8 +27,7 @@ package io.viki.momentum.audio.openal;
 import io.viki.momentum.audio.AudioException;
 import io.viki.momentum.audio.AudioFormat;
 import io.viki.momentum.audio.Clip;
-import io.viki.momentum.audio.Mixer;
-import io.viki.momentum.audio.VolumeControl;
+import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
@@ -57,9 +56,10 @@ public final class OpenALClip implements Clip {
   private int buffer = 0;
   private @Nullable AudioFormat format;
   private boolean open = false;
+  private boolean closed;
   private volatile float pitch = 1.0F;
   private volatile float volume = 1.0F;
-  private volatile VolumeControl volumeControl = Mixer.EFFECTS;
+  private volatile @Nullable FloatSupplier volumeSource;
   private float appliedVolume = -1;
 
   OpenALClip(OpenALMixer mixer) {
@@ -76,6 +76,7 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void open(AudioFormat format, byte[] data) {
+    if (closed) throw new IllegalStateException("Clip is closed");
     if (open) {
       throw new IllegalStateException("Clip already open");
     }
@@ -165,28 +166,25 @@ public final class OpenALClip implements Clip {
 
   @Override
   public float getVolume() {
-    return volume;
+    FloatSupplier source = volumeSource;
+    return source == null ? volume : source.getAsFloat();
   }
 
   @Override
   public void setVolume(float value) {
+    volumeSource = null;
     volume = Math.max(value, 0.0F);
     mixer.submit(this::applyVolume);
   }
 
   @Override
-  public VolumeControl volumeControl() {
-    return volumeControl;
-  }
-
-  @Override
-  public void setVolumeControl(VolumeControl control) {
-    volumeControl = control;
+  public void setVolume(FloatSupplier volume) {
+    volumeSource = volume;
     mixer.submit(this::applyVolume);
   }
 
   void applyVolume() {
-    float effective = volume * volumeControl.effectiveVolume();
+    float effective = Math.max(0, getVolume());
     if (appliedVolume != effective) {
       alSourcef(source, AL_GAIN, effective);
       appliedVolume = effective;
@@ -220,9 +218,10 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void close() {
-    if (!open) {
+    if (closed) {
       return;
     }
+    closed = true;
     open = false;
 
     mixer.submit(() -> {

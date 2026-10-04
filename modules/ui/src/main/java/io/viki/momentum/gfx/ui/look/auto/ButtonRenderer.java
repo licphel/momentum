@@ -22,9 +22,10 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.render;
+package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Button;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.Alignment;
@@ -42,25 +43,6 @@ public final class ButtonRenderer implements ElementRenderer {
   public static final ButtonRenderer INSTANCE = new ButtonRenderer();
 
   private ButtonRenderer() {
-  }
-
-  /**
-   * Draws a button using the state encoded by the supplied widget.
-   *
-   * @param graphics graphics context receiving the button
-   * @param raw button element to render
-   * @param area absolute button bounds
-   */
-  @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    Button button = (Button) raw;
-    Button.State state = button.state();
-    // Draw the button surface for its current interaction state.
-    drawSurface(graphics, area, button, state);
-    // Draw the button outline, including focused and disabled variants.
-    drawBorder(graphics, area, button, state);
-    // Draw the button label centered inside the control.
-    drawLabel(graphics, button, area);
   }
 
   private static void drawSurface(Graphics graphics, Rectangle area, Button button,
@@ -86,5 +68,24 @@ public final class ButtonRenderer implements ElementRenderer {
 
   private static void drawLabel(Graphics graphics, Button button, Rectangle area) {
     graphics.drawText(button.label(), area.centralX(), area.centralY(), Alignment.CENTRAL);
+  }
+
+  /**
+   * Draws a button using the state encoded by the supplied widget.
+   *
+   * @param graphics graphics context receiving the button
+   * @param raw      button element to render
+   * @param area     absolute button bounds
+   */
+  @Override
+  public void render(Graphics graphics, Element raw, Rectangle area) {
+    Button button = (Button) raw;
+    Button.State state = button.state();
+    // Draw the button surface for its current interaction state.
+    drawSurface(graphics, area, button, state);
+    // Draw the button outline, including focused and disabled variants.
+    drawBorder(graphics, area, button, state);
+    // Draw the button label centered inside the control.
+    drawLabel(graphics, button, area);
   }
 }

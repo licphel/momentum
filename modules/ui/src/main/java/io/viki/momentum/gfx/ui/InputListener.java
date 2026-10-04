@@ -49,10 +49,10 @@ public interface InputListener {
   /**
    * Handles a mouse-button transition in element-local coordinates.
    *
-   * @param x the local pointer X coordinate
-   * @param y the local pointer Y coordinate
-   * @param button the button that changed
-   * @param action the button action
+   * @param x         the local pointer X coordinate
+   * @param y         the local pointer Y coordinate
+   * @param button    the button that changed
+   * @param action    the button action
    * @param modifiers the active keyboard modifier mask
    * @return whether the event was consumed
    */
@@ -63,8 +63,8 @@ public interface InputListener {
   /**
    * Handles a pointer-wheel event in element-local coordinates.
    *
-   * @param x the local pointer X coordinate
-   * @param y the local pointer Y coordinate
+   * @param x      the local pointer X coordinate
+   * @param y      the local pointer Y coordinate
    * @param deltaX the horizontal scroll amount
    * @param deltaY the vertical scroll amount
    * @return whether the event was consumed
@@ -76,8 +76,8 @@ public interface InputListener {
   /**
    * Handles a keyboard transition delivered to the element.
    *
-   * @param key the key that changed
-   * @param action the key action
+   * @param key       the key that changed
+   * @param action    the key action
    * @param modifiers the active keyboard modifier mask
    * @return whether the event was consumed
    */

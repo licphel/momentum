@@ -18,7 +18,7 @@ public final class ImageView extends Element {
    * Creates an image view backed by an arbitrary drawable.
    *
    * @param bounds local destination bounds
-   * @param image drawable to display
+   * @param image  drawable to display
    */
   public ImageView(Rectangle bounds, Drawable2D image) {
     super(bounds);
@@ -29,7 +29,7 @@ public final class ImageView extends Element {
    * Creates an image view that displays the complete texture.
    *
    * @param bounds local destination bounds
-   * @param image texture to display
+   * @param image  texture to display
    */
   public ImageView(Rectangle bounds, Texture image) {
     this(bounds, new TexturePart(image));

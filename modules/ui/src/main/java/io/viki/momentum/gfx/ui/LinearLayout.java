@@ -58,18 +58,6 @@ public record LinearLayout(Axis axis, CrossAxisAlignment crossAxisAlignment) imp
     return new LinearLayout(Axis.VERTICAL, CrossAxisAlignment.STRETCH);
   }
 
-  
-  @Override
-  public Axis axis() {
-    return axis;
-  }
-
-  
-  @Override
-  public CrossAxisAlignment crossAxisAlignment() {
-    return crossAxisAlignment;
-  }
-
   @Override
   public void arrange(Rectangle area, List<Element> children, float gap) {
     float cursor = axis == Axis.HORIZONTAL ? area.minX() : area.minY();

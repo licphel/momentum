@@ -25,15 +25,15 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.InputListener;
-import io.viki.momentum.gfx.ui.DefaultLook;
-import io.viki.momentum.gfx.ui.Look;
 import io.viki.momentum.gfx.ui.Locator;
-import io.viki.momentum.math.Vector2;
-import io.viki.momentum.gfx.ui.render.ElementRenderer;
-import io.viki.momentum.gfx.ui.render.EmptyRenderer;
-import io.viki.momentum.gfx.ui.render.UiRenderDispatcher;
+import io.viki.momentum.gfx.ui.Look;
+import io.viki.momentum.gfx.ui.look.AutoLook;
+import io.viki.momentum.gfx.ui.look.EmptyRenderer;
+import io.viki.momentum.gfx.ui.look.auto.UiRenderDispatcher;
 import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
@@ -49,19 +49,18 @@ import java.util.List;
  */
 public abstract class Element implements InputListener {
   private static final long DEFAULT_TOOLTIP_DELAY_MILLIS = 500L;
-
-  private Rectangle bounds;
   private final List<Element> children = new ArrayList<>();
   private final List<Element> parts = new ArrayList<>();
   private final List<Element> childrenView = Collections.unmodifiableList(children);
   private final List<Element> partsView = Collections.unmodifiableList(parts);
+  private final List<Text> defaultTooltip = new ArrayList<>();
+  private final List<Text> defaultTooltipView = Collections.unmodifiableList(defaultTooltip);
+  private Rectangle bounds;
   private @Nullable Element parent;
   private @Nullable ElementRenderer rendererOverride;
   private @Nullable Look lookOverride;
   private @Nullable Locator locator;
   private @Nullable Vector2 previousParentSize;
-  private final List<Text> defaultTooltip = new ArrayList<>();
-  private final List<Text> defaultTooltipView = Collections.unmodifiableList(defaultTooltip);
   private long tooltipDelayMillis = DEFAULT_TOOLTIP_DELAY_MILLIS;
   private boolean visible = true;
 
@@ -148,7 +147,7 @@ public abstract class Element implements InputListener {
     if (lookOverride != null) {
       return lookOverride;
     }
-    return parent == null ? DefaultLook.get() : parent.look();
+    return parent == null ? AutoLook.get() : parent.look();
   }
 
   /**
@@ -516,7 +515,7 @@ public abstract class Element implements InputListener {
   /**
    * Attaches an element to one of this element's ordered descendant collections.
    *
-   * @param child element to attach
+   * @param child       element to attach
    * @param destination child or visual-part collection receiving the element
    * @throws IllegalArgumentException if attachment would create a cycle or a second parent
    */
