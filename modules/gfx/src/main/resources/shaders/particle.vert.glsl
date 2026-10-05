@@ -21,14 +21,14 @@ void main() {
     float sine = sin(in_rotation);
     float cosine = cos(in_rotation);
     vec2 rotated = vec2(
-        centered.x * cosine - centered.y * sine,
-        centered.x * sine + centered.y * cosine
+            centered.x * cosine - centered.y * sine,
+            centered.x * sine + centered.y * cosine
     );
     vec4 world = vec4(rotated + in_position, 0.0, 1.0);
     vertex_color = in_color;
     vertex_uv = in_texture_uv.xy + in_quad_uv * in_texture_uv.zw;
     gl_Position = u_vp[0] * world.x
-        + u_vp[1] * world.y
-        + u_vp[2] * world.z
-        + u_vp[3] * world.w;
+    + u_vp[1] * world.y
+    + u_vp[2] * world.z
+    + u_vp[3] * world.w;
 }

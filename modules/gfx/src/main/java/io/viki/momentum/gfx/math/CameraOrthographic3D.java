@@ -105,6 +105,19 @@ public class CameraOrthographic3D extends Camera3D {
   }
 
   /**
+   * Sets the zoom factor. Values below {@code 0.01} are clamped.
+   *
+   * @param value zoom factor
+   */
+  public void setZoom(float value) {
+    float clamped = Math.max(value, 0.01F);
+    if (zoom != clamped) {
+      zoom = clamped;
+      dirty = true;
+    }
+  }
+
+  /**
    * Returns whether increasing world-space Y is mapped toward the bottom of the viewport.
    *
    * @return {@code true} when the camera uses a downward screen-space Y direction
@@ -124,19 +137,6 @@ public class CameraOrthographic3D extends Camera3D {
   public void setFlipY(boolean flipY) {
     if (this.flipY != flipY) {
       this.flipY = flipY;
-      dirty = true;
-    }
-  }
-
-  /**
-   * Sets the zoom factor. Values below {@code 0.01} are clamped.
-   *
-   * @param value zoom factor
-   */
-  public void setZoom(float value) {
-    float clamped = Math.max(value, 0.01F);
-    if (zoom != clamped) {
-      zoom = clamped;
       dirty = true;
     }
   }

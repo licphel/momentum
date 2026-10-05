@@ -40,14 +40,14 @@ import java.util.Map;
  * frames remains owned by the caller and follows the thread-safety contract of {@link Texture}.
  *
  * @param frames ordered frame list, which must contain at least one frame
- * @param loop whether playback restarts after the last frame
+ * @param loop   whether playback restarts after the last frame
  */
 public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Creates an animation definition.
    *
    * @param frames ordered frame list, which must contain at least one frame
-   * @param loop whether playback restarts after the last frame
+   * @param loop   whether playback restarts after the last frame
    * @throws IllegalArgumentException if {@code frames} is empty
    */
   public Animation {
@@ -69,11 +69,11 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Slices every frame in every other row of a sprite sheet.
    *
-   * @param sheet source texture
-   * @param frameWidth frame width in pixels
+   * @param sheet       source texture
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
    * @return animation containing the even rows
    */
   public static Animation fromEvenRows(Texture sheet, int frameWidth, int frameHeight,
@@ -84,13 +84,13 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Slices every frame in every other row of a sprite sheet from an offset.
    *
-   * @param sheet source texture
-   * @param frameWidth frame width in pixels
+   * @param sheet       source texture
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
-   * @param offsetX X coordinate of the first frame
-   * @param offsetY Y coordinate of the first frame
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
+   * @param offsetX     X coordinate of the first frame
+   * @param offsetY     Y coordinate of the first frame
    * @return animation containing the even rows
    */
   public static Animation fromEvenRows(Texture sheet, int frameWidth, int frameHeight,
@@ -110,11 +110,11 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Slices every frame in every other column of a sprite sheet.
    *
-   * @param sheet source texture
-   * @param frameWidth frame width in pixels
+   * @param sheet       source texture
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
    * @return animation containing the even columns
    */
   public static Animation fromEvenCols(Texture sheet, int frameWidth, int frameHeight,
@@ -125,13 +125,13 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Slices every frame in every other column of a sprite sheet from an offset.
    *
-   * @param sheet source texture
-   * @param frameWidth frame width in pixels
+   * @param sheet       source texture
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
-   * @param offsetX X coordinate of the first frame
-   * @param offsetY Y coordinate of the first frame
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
+   * @param offsetX     X coordinate of the first frame
+   * @param offsetY     Y coordinate of the first frame
    * @return animation containing the even columns
    */
   public static Animation fromEvenCols(Texture sheet, int frameWidth, int frameHeight,
@@ -151,13 +151,13 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Creates a horizontal animation and records pixels matching the supplied anchor color.
    *
-   * @param sheet source texture with top-left pixel coordinates
+   * @param sheet       source texture with top-left pixel coordinates
    * @param anchorColor color identifying the attachment pixel
-   * @param frameWidth frame width in pixels
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param frameCount number of consecutive frames
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
+   * @param frameCount  number of consecutive frames
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
    * @return animation containing the horizontal frames
    */
   public static Animation fromHorizontalRow(Texture sheet, Color anchorColor,
@@ -170,15 +170,15 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Creates a horizontal animation at the supplied texture offset and anchor color.
    *
-   * @param sheet source texture with top-left pixel coordinates
+   * @param sheet       source texture with top-left pixel coordinates
    * @param anchorColor color identifying the attachment pixel
-   * @param frameWidth frame width in pixels
+   * @param frameWidth  frame width in pixels
    * @param frameHeight frame height in pixels
-   * @param frameCount number of consecutive frames
-   * @param duration duration of each frame in seconds
-   * @param loop whether playback restarts after the last frame
-   * @param offsetX X coordinate of the first frame
-   * @param offsetY Y coordinate of the first frame
+   * @param frameCount  number of consecutive frames
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
+   * @param offsetX     X coordinate of the first frame
+   * @param offsetY     Y coordinate of the first frame
    * @return animation containing the horizontal frames
    */
   public static Animation fromHorizontalRow(Texture sheet, Color anchorColor,
@@ -220,17 +220,17 @@ public record Animation(List<Frame> frames, boolean loop) {
   /**
    * Describes one drawable frame and its source-image anchor locations.
    *
-   * @param region texture region to draw
+   * @param region   texture region to draw
    * @param duration frame duration in seconds
-   * @param anchors anchor colors and their pixel positions relative to the frame
+   * @param anchors  anchor colors and their pixel positions relative to the frame
    */
   public record Frame(TexturePart region, float duration, Map<Color, Vector2> anchors) {
     /**
      * Creates a frame and freezes its anchor metadata.
      *
-     * @param region texture region to draw
+     * @param region   texture region to draw
      * @param duration frame duration in seconds
-     * @param anchors anchor colors and their pixel positions relative to the frame
+     * @param anchors  anchor colors and their pixel positions relative to the frame
      */
     public Frame {
       anchors = Map.copyOf(anchors);
@@ -239,7 +239,7 @@ public record Animation(List<Frame> frames, boolean loop) {
     /**
      * Creates a frame without anchors.
      *
-     * @param region texture region to draw
+     * @param region   texture region to draw
      * @param duration frame duration in seconds
      */
     public Frame(TexturePart region, float duration) {

@@ -49,6 +49,28 @@ public interface Text {
   String text();
 
   /**
+   * Returns a styled slice without changing this component.
+   * Indices count UTF-16 code units, like {@link String#substring(int, int)}.
+   *
+   * @param begin  the first included character index
+   * @param length the number of code units to retain
+   * @return the sliced text, preserving span styles and metadata
+   * @throws IndexOutOfBoundsException if the range is outside this text
+   */
+  Text cut(int begin, int length);
+
+  /**
+   * Returns inline metadata at a UTF-16 character index obtained by hit-testing.
+   * The returned array is borrowed and must not be modified.
+   *
+   * @param index the character index, or a hit-test miss
+   * @return the metadata, or {@code null} if absent or outside the content
+   */
+  default Meta @Nullable [] getMeta(int index) {
+    return null;
+  }
+
+  /**
    * Appends a child component, returning a new {@link MutableText} that
    * starts with this component followed by the given one.
    *

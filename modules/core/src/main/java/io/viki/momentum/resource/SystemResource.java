@@ -56,6 +56,19 @@ public record SystemResource(Path basePath) implements Resource {
   }
 
   @Override
+  public SystemResource resolve(String directory) {
+    String child = Resource.normalizePath(directory);
+    if (child.isEmpty()) {
+      return this;
+    }
+    Path root = basePath.resolve(child).normalize();
+    if (!root.startsWith(basePath)) {
+      throw new IllegalArgumentException("Path escapes resource root: " + directory);
+    }
+    return new SystemResource(root);
+  }
+
+  @Override
   public InputStream open(String path) throws IOException {
     return Files.newInputStream(Resource.resolve(basePath, path));
   }

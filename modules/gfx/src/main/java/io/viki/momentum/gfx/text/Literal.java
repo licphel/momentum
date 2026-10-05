@@ -94,6 +94,19 @@ public final class Literal implements Text {
   }
 
   @Override
+  public Literal cut(int begin, int length) {
+    Objects.checkFromIndexSize(begin, length, text.length());
+    Literal result = Literal.of(text.substring(begin, begin + length)).with(fmt);
+    result.meta = meta == null ? null : meta.clone();
+    return result;
+  }
+
+  @Override
+  public Meta @Nullable [] getMeta(int index) {
+    return index >= 0 && index < text.length() ? meta : null;
+  }
+
+  @Override
   public MutableText append(Text component) {
     return new MutableText().append(this).append(component);
   }

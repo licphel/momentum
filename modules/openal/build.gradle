@@ -4,7 +4,7 @@ plugins {
 
 dependencies {
   api project(':momentum-core')
-  api project(':momentum-audio')
+  api project(':momentum-sfx')
 
   compileOnly "org.lwjgl:lwjgl:${lwjgl_version}"
   compileOnly "org.lwjgl:lwjgl-openal:${lwjgl_version}"

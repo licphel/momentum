@@ -27,8 +27,8 @@ package io.viki.momentum.gfx.text.raster;
 import com.ibm.icu.text.BreakIterator;
 import io.viki.momentum.gfx.text.Meta;
 import io.viki.momentum.gfx.tint.Gradient;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
@@ -196,7 +196,8 @@ public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float 
    * @param metaInfo  optional metadata, or {@code null} if none
    * @param charIndex the absolute character index in the merged source text
    */
-  public record Entry(@Nullable Glyph glyph, Gradient gradient, Rectangle bounds, float scale, Meta @Nullable [] metaInfo,
+  public record Entry(@Nullable Glyph glyph, Gradient gradient, Rectangle bounds, float scale,
+                      Meta @Nullable [] metaInfo,
                       int charIndex) {
   }
 

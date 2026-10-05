@@ -48,6 +48,19 @@ public final class CombinedResource implements Resource {
   }
 
   @Override
+  public CombinedResource resolve(String directory) {
+    String child = Resource.normalizePath(directory);
+    if (child.isEmpty()) {
+      return this;
+    }
+    Resource[] resolved = new Resource[providers.length];
+    for (int i = 0; i < providers.length; i++) {
+      resolved[i] = providers[i].resolve(child);
+    }
+    return new CombinedResource(resolved);
+  }
+
+  @Override
   public @Nullable InputStream open(String path) throws IOException {
     for (Resource provider : providers) {
       try {

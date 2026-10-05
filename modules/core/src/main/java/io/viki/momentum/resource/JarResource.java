@@ -38,15 +38,27 @@ import java.util.stream.Stream;
  * A {@link Resource} backed by a JAR file.
  *
  * @param jarPath the JAR file
+ * @param root the normalized resource root inside the JAR
  */
-public record JarResource(Path jarPath) implements Resource {
+public record JarResource(Path jarPath, String root) implements Resource {
   /**
    * Creates a JAR-backed provider.
    *
    * @param jarPath the JAR file
    */
   public JarResource(Path jarPath) {
-    this.jarPath = jarPath.toAbsolutePath().normalize();
+    this(jarPath, "");
+  }
+
+  /**
+   * Creates a JAR-backed provider.
+   *
+   * @param jarPath the JAR file
+   * @param root the normalized resource root inside the JAR
+   */
+  public JarResource {
+    jarPath = jarPath.toAbsolutePath().normalize();
+    root = Resource.normalizePath(root);
   }
 
   /**
@@ -60,8 +72,19 @@ public record JarResource(Path jarPath) implements Resource {
   }
 
   @Override
+  public JarResource resolve(String directory) {
+    String child = Resource.normalizePath(directory);
+    return child.isEmpty() ? this : new JarResource(jarPath, rootedPath(child));
+  }
+
+  private String rootedPath(String path) {
+    String child = Resource.normalizePath(path);
+    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
+  }
+
+  @Override
   public @Nullable InputStream open(String path) throws IOException {
-    String entryPath = Resource.normalizePath(path);
+    String entryPath = rootedPath(path);
     JarFile jar = new JarFile(jarPath.toFile());
     JarEntry entry = jar.getJarEntry(entryPath);
     if (entry == null || entry.isDirectory()) {
@@ -78,13 +101,15 @@ public record JarResource(Path jarPath) implements Resource {
 
   @Override
   public Stream<String> walk(String relativeDir) throws IOException {
-    String normalized = Resource.normalizePath(relativeDir);
+    String normalized = rootedPath(relativeDir);
     String prefix = normalized.isEmpty() ? "" : normalized + "/";
+    int rootLength = root.isEmpty() ? 0 : root.length() + 1;
     try (JarFile jar = new JarFile(jarPath.toFile())) {
       return jar.stream()
           .filter(entry -> !entry.isDirectory())
           .map(JarEntry::getName)
           .filter(name -> prefix.isEmpty() || name.startsWith(prefix))
+          .map(name -> name.substring(rootLength))
           .sorted()
           .toList()
           .stream();

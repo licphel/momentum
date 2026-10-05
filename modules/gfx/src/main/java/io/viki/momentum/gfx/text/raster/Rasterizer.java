@@ -60,35 +60,6 @@ public final class Rasterizer {
   /** Maximum number of visible lines; text beyond this is clipped. */
   public int maxLines = Integer.MAX_VALUE;
 
-  private static final class GlyphBound {
-    private static final ConcurrentLinkedQueue<GlyphBound> GB_POOL = new ConcurrentLinkedQueue<>();
-
-    public float gx;
-    public float gy;
-    public float gw;
-    public float gh;
-
-    public void set(float gx, float gy, float gw, float gh) {
-      this.gx = gx;
-      this.gy = gy;
-      this.gw = gw;
-      this.gh = gh;
-    }
-
-    public static GlyphBound of(float gx, float gy, float gw, float gh) {
-      GlyphBound bound = GB_POOL.poll();
-      if (bound == null) {
-        bound = new GlyphBound();
-      }
-      bound.set(gx, gy, gw, gh);
-      return bound;
-    }
-
-    public void recycle() {
-      GB_POOL.offer(this);
-    }
-  }
-
   private static void computeEnds(ShapeGlyph[] glyphs, int litEnd) {
     for (int i = glyphs.length - 1; i >= 1; i--) {
       ShapeGlyph cur = glyphs[i];
@@ -591,6 +562,35 @@ public final class Rasterizer {
 
   private Raster empty() {
     return new Raster(new Raster.Entry[0], new Raster.Stroke[0], Rectangle.ZERO, 0, flipY, new LayoutRun[0], "");
+  }
+
+  private static final class GlyphBound {
+    private static final ConcurrentLinkedQueue<GlyphBound> GB_POOL = new ConcurrentLinkedQueue<>();
+
+    public float gx;
+    public float gy;
+    public float gw;
+    public float gh;
+
+    public static GlyphBound of(float gx, float gy, float gw, float gh) {
+      GlyphBound bound = GB_POOL.poll();
+      if (bound == null) {
+        bound = new GlyphBound();
+      }
+      bound.set(gx, gy, gw, gh);
+      return bound;
+    }
+
+    public void set(float gx, float gy, float gw, float gh) {
+      this.gx = gx;
+      this.gy = gy;
+      this.gw = gw;
+      this.gh = gh;
+    }
+
+    public void recycle() {
+      GB_POOL.offer(this);
+    }
   }
 
   private record BreakPoint(int charOffset, float lineWidth, boolean hard) {

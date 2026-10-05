@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.util;
 
 import io.viki.momentum.codec.streaming.BinaryBuffer;
 import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.MatrixStack;
 
 /**

@@ -152,7 +152,7 @@ public interface Texture extends FragileTexture, AutoCloseable {
    * @param y texel Y coordinate
    * @param z texel Z coordinate, or {@code 0} for a 1D or 2D texture
    * @return packed RGBA8 texel
-   * @throws IndexOutOfBoundsException if a coordinate is outside the texture
+   * @throws IndexOutOfBoundsException     if a coordinate is outside the texture
    * @throws UnsupportedOperationException if the texture cannot provide CPU-readable pixels
    */
   int pixel(int x, int y, int z);

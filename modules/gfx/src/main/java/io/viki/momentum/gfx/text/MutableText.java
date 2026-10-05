@@ -47,6 +47,16 @@ public final class MutableText implements Text {
   private String text = "";
   private long version;
 
+  private static void flatten(Text c, List<Literal> out) {
+    if (c instanceof Literal lit) {
+      out.add(lit);
+    } else if (c instanceof MutableText seq) {
+      for (Text child : seq.children) {
+        flatten(child, out);
+      }
+    }
+  }
+
   /**
    * Returns the content revision used to detect in-place changes.
    *
@@ -83,16 +93,6 @@ public final class MutableText implements Text {
     result.rasterizer.lineSpacing = rasterizer.lineSpacing;
     result.rasterizer.maxLines = rasterizer.maxLines;
     return result;
-  }
-
-  private static void flatten(Text c, List<Literal> out) {
-    if (c instanceof Literal lit) {
-      out.add(lit);
-    } else if (c instanceof MutableText seq) {
-      for (Text child : seq.children) {
-        flatten(child, out);
-      }
-    }
   }
 
   /**
@@ -180,6 +180,45 @@ public final class MutableText implements Text {
   @Override
   public String text() {
     return text;
+  }
+
+  @Override
+  public MutableText cut(int begin, int length) {
+    Objects.checkFromIndexSize(begin, length, text.length());
+    MutableText result = copy();
+    result.children.clear();
+    result.text = "";
+    int remaining = length;
+    for (Text child : children) {
+      if (remaining == 0) {
+        break;
+      }
+      int childLength = child.text().length();
+      if (begin >= childLength) {
+        begin -= childLength;
+        continue;
+      }
+      int take = Math.min(remaining, childLength - begin);
+      result.append(child.cut(begin, take));
+      remaining -= take;
+      begin = 0;
+    }
+    return result;
+  }
+
+  @Override
+  public Meta @Nullable [] getMeta(int index) {
+    if (index < 0) {
+      return null;
+    }
+    for (Text child : children) {
+      int length = child.text().length();
+      if (index < length) {
+        return child.getMeta(index);
+      }
+      index -= length;
+    }
+    return null;
   }
 
   @Override

@@ -82,5 +82,4 @@ public interface TransformHandler {
    * @return perspective projection matrix
    */
   Matrix4x4 createPerspective(float fovY, float aspect, float near, float far);
-
 }

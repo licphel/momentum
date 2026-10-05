@@ -32,7 +32,6 @@ import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.cmd.EncoderDesc;
 import io.viki.momentum.gfx.mesh.Mesh;
-import io.viki.momentum.gfx.mesh.Section;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.*;
@@ -40,8 +39,8 @@ import io.viki.momentum.gfx.shader.*;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.util.VertexStore;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Matrix4x4;
+import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.resource.Resource;
 
 /**
@@ -198,11 +197,6 @@ public class BatchedGraphics extends StatefulGraphics {
     begun = false;
   }
 
-  @Override
-  protected void onCameraChanged() {
-    MatrixUtil.store(camera == null ? Matrix4x4.IDENTITY : camera.viewProjectionMatrix(), ubo);
-  }
-
   /**
    * Releases all GPU resources: the encoder, vertex buffer, index buffer, uniform buffer,
    * pipelines, and default sampler.
@@ -216,6 +210,11 @@ public class BatchedGraphics extends StatefulGraphics {
     pipeColor.close();
     pipeTexture.close();
     defSampler.close();
+  }
+
+  @Override
+  protected void onCameraChanged() {
+    MatrixUtil.store(camera == null ? Matrix4x4.IDENTITY : camera.viewProjectionMatrix(), ubo);
   }
 
   /**

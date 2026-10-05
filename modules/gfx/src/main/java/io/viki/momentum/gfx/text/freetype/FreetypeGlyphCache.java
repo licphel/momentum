@@ -24,10 +24,10 @@
 
 package io.viki.momentum.gfx.text.freetype;
 
-import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.raster.Glyph;
+import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.texture.TextureAtlas;
 import io.viki.momentum.gfx.texture.TexturePart;
 import io.viki.momentum.util.InternalApi;
@@ -224,6 +224,14 @@ public final class FreetypeGlyphCache implements AutoCloseable {
     }
 
     @Override
+    public int hashCode() {
+      int result = font.hashCode();
+      result = 31 * result + resolution;
+      result = 31 * result + glyphIndex;
+      return 31 * result + fontStyle;
+    }
+
+    @Override
     public boolean equals(Object object) {
       if (this == object) {
         return true;
@@ -235,14 +243,6 @@ public final class FreetypeGlyphCache implements AutoCloseable {
           && glyphIndex == other.glyphIndex
           && fontStyle == other.fontStyle
           && font.equals(other.font);
-    }
-
-    @Override
-    public int hashCode() {
-      int result = font.hashCode();
-      result = 31 * result + resolution;
-      result = 31 * result + glyphIndex;
-      return 31 * result + fontStyle;
     }
   }
 }

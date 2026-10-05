@@ -24,10 +24,10 @@
 
 package io.viki.momentum.gfx.math;
 
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.Vector3;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
  * 2D orthographic camera with a center-based view and configurable Y-axis direction.

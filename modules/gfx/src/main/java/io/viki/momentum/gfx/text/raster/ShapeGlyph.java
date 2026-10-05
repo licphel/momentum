@@ -38,5 +38,6 @@ package io.viki.momentum.gfx.text.raster;
  * @param yOffset    the vertical offset, in em units
  * @param ownerIndex the index of the owning literal in the source list
  */
-public record ShapeGlyph(int start, int end, int glyphId, float xAdvance, float xOffset, float yOffset, int ownerIndex) {
+public record ShapeGlyph(int start, int end, int glyphId, float xAdvance, float xOffset, float yOffset,
+                         int ownerIndex) {
 }

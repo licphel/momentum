@@ -43,6 +43,12 @@ public interface RegistryEntry extends PaletteCandidate {
   RegistryContext getRegistryContext();
 
   /**
+   * Callback when the entry is actually registered.
+   */
+  default void onRegistered() {
+  }
+
+  /**
    * Returns the identifier this object is registered under.
    *
    * @return the identifier

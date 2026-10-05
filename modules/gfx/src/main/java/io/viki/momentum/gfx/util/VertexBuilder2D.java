@@ -65,10 +65,10 @@ public class VertexBuilder2D extends VertexBuilder {
 
   protected @Nullable Primitive2D currentPrimitive;
   protected @Nullable Texture currentTexture;
-  private float pointSize = SYSTEM_WIDTH;
-  private float strokeWidth = SYSTEM_WIDTH;
   /** Whether subsequent texture vertices use the active camera's vertically flipped convention. */
   protected boolean uvYFlipped;
+  private float pointSize = SYSTEM_WIDTH;
+  private float strokeWidth = SYSTEM_WIDTH;
 
   /**
    * Creates a new {@code VertexBuilder2D} writing into the given staging area.
@@ -78,6 +78,20 @@ public class VertexBuilder2D extends VertexBuilder {
    */
   public VertexBuilder2D(VertexStore data, TransformHandler transformHandler) {
     super(data, transformHandler);
+  }
+
+  private static void validateWidth(float value, String name) {
+    if (value < SYSTEM_WIDTH) {
+      throw new IllegalArgumentException(name + " must be finite and non-negative: " + value);
+    }
+  }
+
+  private static float clampRoundRadius(float width, float height, float radius) {
+    return Math.min(radius, Math.min(width, height) * 0.5F);
+  }
+
+  private static int computeRoundSegments(float radius) {
+    return Math.clamp((int) Math.ceil(radius / ROUND_SEGMENT_LENGTH), MIN_ROUND_SEGMENTS, MAX_ROUND_SEGMENTS);
   }
 
   /**
@@ -120,12 +134,6 @@ public class VertexBuilder2D extends VertexBuilder {
   public void setStrokeWidth(float value) {
     validateWidth(value, "Stroke width");
     strokeWidth = value;
-  }
-
-  private static void validateWidth(float value, String name) {
-    if (value < SYSTEM_WIDTH) {
-      throw new IllegalArgumentException(name + " must be finite and non-negative: " + value);
-    }
   }
 
   /**
@@ -1012,13 +1020,5 @@ public class VertexBuilder2D extends VertexBuilder {
       previousX = currentX;
       previousY = currentY;
     }
-  }
-
-  private static float clampRoundRadius(float width, float height, float radius) {
-    return Math.min(radius, Math.min(width, height) * 0.5F);
-  }
-
-  private static int computeRoundSegments(float radius) {
-    return Math.clamp((int) Math.ceil(radius / ROUND_SEGMENT_LENGTH), MIN_ROUND_SEGMENTS, MAX_ROUND_SEGMENTS);
   }
 }

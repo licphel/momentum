@@ -32,8 +32,8 @@ import java.net.URI;
  * <p>Format: {@code namespace:path}. The namespace is a {@link Namespace} namespace;
  * the path is a forward-slash-separated resource path string (not a filesystem path).
  *
- * <p>If the string form contains no colon, the namespace defaults to
- * {@link Namespace#UNKNOWN}.
+ * <p>An omitted namespace ({@code path} or {@code :path}) uses
+ * {@link Namespace#fallback()}. The stored identifier always has a concrete namespace.
  *
  * <p>Instances are immutable and safe to use as map keys.
  *
@@ -46,7 +46,8 @@ public record Identifier(Namespace namespace, String path) {
    * Parses an identifier from the string form {@code namespace:path} or {@code path}.
    *
    * <p>If {@code full} contains no colon, the entire string is treated as
-   * the path and the namespace defaults to {@link Namespace#UNKNOWN}.
+   * the path and the namespace defaults to {@link Namespace#fallback()}.
+   * A leading colon also selects this fallback.
    *
    * @param full the string to parse, e.g. {@code "mymod:textures/stone.png"}
    * @return the parsed identifier
@@ -59,17 +60,14 @@ public record Identifier(Namespace namespace, String path) {
 
     int colon = full.indexOf(':');
     if (colon < 0) {
-      return new Identifier(Namespace.UNKNOWN, full);
+      return new Identifier(Namespace.fallback(), full);
     }
-    if (colon == 0 || colon == full.length() - 1) {
-      throw new IllegalArgumentException("Identifier has empty namespace or path: '" + full + "'");
+    if (colon == full.length() - 1) {
+      throw new IllegalArgumentException("Identifier has empty path: '" + full + "'");
     }
 
     String namespacePart = full.substring(0, colon);
     String pathPart = full.substring(colon + 1);
-    if (full.indexOf(':', colon + 1) >= 0) {
-      throw new IllegalArgumentException("Identifier must not contain more than one colon: '" + full + "'");
-    }
     return new Identifier(Namespace.of(namespacePart), pathPart);
   }
 

@@ -166,6 +166,15 @@ public abstract class View implements AutoCloseable {
   }
 
   /**
+   * Returns whether the OpenGL context requests debug output.
+   *
+   * @return {@code true} when debug output was requested
+   */
+  public boolean isDebug() {
+    return debug;
+  }
+
+  /**
    * Sets whether the OpenGL context requests debug output.
    *
    * @param debug {@code true} to request a debug context
@@ -176,15 +185,6 @@ public abstract class View implements AutoCloseable {
       throw new IllegalStateException("GLFW debug context must be configured before display initialization");
     }
     this.debug = debug;
-  }
-
-  /**
-   * Returns whether the OpenGL context requests debug output.
-   *
-   * @return {@code true} when debug output was requested
-   */
-  public boolean isDebug() {
-    return debug;
   }
 
   /**

@@ -30,6 +30,7 @@ import java.util.stream.Stream;
 public final class ClasspathResource implements Resource {
   private final ClassLoader classLoader;
   private final @Nullable Path codeSource;
+  private final String root;
 
   /** Creates a provider using the current thread context class loader. */
   public ClasspathResource() {
@@ -55,13 +56,29 @@ public final class ClasspathResource implements Resource {
   }
 
   private ClasspathResource(ClassLoader classLoader, @Nullable Path codeSource) {
+    this(classLoader, codeSource, "");
+  }
+
+  private ClasspathResource(ClassLoader classLoader, @Nullable Path codeSource, String root) {
     this.classLoader = classLoader;
     this.codeSource = codeSource;
+    this.root = root;
+  }
+
+  @Override
+  public ClasspathResource resolve(String directory) {
+    String child = Resource.normalizePath(directory);
+    return child.isEmpty() ? this : new ClasspathResource(classLoader, codeSource, rootedPath(child));
+  }
+
+  private String rootedPath(String path) {
+    String child = Resource.normalizePath(path);
+    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
   }
 
   @Override
   public @Nullable InputStream open(String path) throws IOException {
-    String normalized = Resource.normalizePath(path);
+    String normalized = rootedPath(path);
     if (codeSource != null) {
       Resource source = Files.isRegularFile(codeSource)
           ? Resource.jar(codeSource) : Resource.directory(codeSource);
@@ -74,17 +91,22 @@ public final class ClasspathResource implements Resource {
 
   @Override
   public Stream<String> walk(String relativeDir) throws IOException {
-    String directory = Resource.normalizePath(relativeDir);
+    String directory = rootedPath(relativeDir);
     List<String> paths = new ArrayList<>();
     if (codeSource != null && Files.isRegularFile(codeSource)) {
       collectJar(codeSource, directory, paths);
-      return paths.stream().distinct().sorted();
+      return relativePaths(paths);
     }
     Enumeration<URL> roots = classLoader.getResources(directory);
     while (roots.hasMoreElements()) {
       collect(roots.nextElement(), directory, paths);
     }
-    return paths.stream().distinct().sorted();
+    return relativePaths(paths);
+  }
+
+  private Stream<String> relativePaths(List<String> paths) {
+    int rootLength = root.isEmpty() ? 0 : root.length() + 1;
+    return paths.stream().map(path -> path.substring(rootLength)).distinct().sorted();
   }
 
   private static void collect(URL root, String directory, List<String> paths) throws IOException {

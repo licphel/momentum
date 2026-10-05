@@ -32,8 +32,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Namespaces are interned — {@link #of(String)} returns the same instance for
  * equal names. Valid namespace names consist of alphanumeric characters plus {@code :_/$.-}
  *
- * <p>The {@link #UNKNOWN} constant serves as a fallback when no specific namespace
- * is known.
+ * <p>The process-wide fallback initially uses {@link #UNKNOWN}. Applications may
+ * replace it during startup with {@link #setFallback(Namespace)}. Changing it
+ * affects future parsing only, not existing identifiers.
  *
  * <p>Instances are safe to use as map keys and compare by identity after interning.
  *
@@ -41,16 +42,37 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class Namespace {
   private static final ConcurrentHashMap<String, Namespace> CACHE = new ConcurrentHashMap<>();
-
-  /**
-   * Fallback namespace used when no specific namespace is known.
-   */
+  private static volatile Namespace fallback;
+  /** Fallback namespace used when no specific namespace is known. */
   public static final Namespace UNKNOWN = of("unknown");
+
+  static {
+    fallback = UNKNOWN;
+  }
 
   private final String name;
 
   private Namespace(String name) {
     this.name = name;
+  }
+
+  /**
+   * Returns the current process-wide default namespace; safe across threads.
+   *
+   * @return the default fallback namespace
+   */
+  public static Namespace fallback() {
+    return fallback;
+  }
+
+  /**
+   * Sets the default for future unqualified identifier parsing. Set this during
+   * application startup, before loading configuration; existing keys are unchanged.
+   *
+   * @param namespace fallback namespace to set
+   */
+  public static void setFallback(Namespace namespace) {
+    fallback = namespace;
   }
 
   /**
@@ -84,11 +106,14 @@ public final class Namespace {
   /**
    * Returns an interned namespace with the given name.
    *
-   * @param name the namespace name; must pass {@link #validate(String)}
+   * @param name the namespace name; empty selects {@link #fallback()}
    * @return the namespace
    * @throws IllegalArgumentException if the name is blank or invalid
    */
   public static Namespace of(String name) {
+    if (name.isEmpty()) {
+      return fallback;
+    }
     if (name.isBlank()) {
       throw new IllegalArgumentException("Namespace name must not be blank");
     }

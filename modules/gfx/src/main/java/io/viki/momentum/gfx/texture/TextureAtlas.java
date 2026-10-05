@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.texture;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.io.ImageInfo;
-import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.Cube;
+import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;

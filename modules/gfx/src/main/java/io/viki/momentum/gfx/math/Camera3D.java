@@ -25,9 +25,6 @@
 package io.viki.momentum.gfx.math;
 
 import io.viki.momentum.math.*;
-import io.viki.momentum.math.Frustum;
-import io.viki.momentum.math.Quaternion;
-import io.viki.momentum.math.Ray;
 import io.viki.momentum.math.shape.Rectangle;
 
 /**

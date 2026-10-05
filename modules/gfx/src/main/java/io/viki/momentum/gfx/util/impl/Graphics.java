@@ -33,8 +33,8 @@ import io.viki.momentum.gfx.pipe.Pipeline;
 import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.texture.Sampler;
-import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.gfx.util.VertexBuilder2D;
+import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 

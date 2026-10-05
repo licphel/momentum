@@ -45,7 +45,7 @@ import java.util.Objects;
  */
 public final class Mesh implements AutoCloseable {
   private final List<Section> sections;
-  private boolean isEmpty;
+  private final boolean isEmpty;
 
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
@@ -129,6 +129,11 @@ public final class Mesh implements AutoCloseable {
   }
 
   @Override
+  public int hashCode() {
+    return Objects.hash(sections);
+  }
+
+  @Override
   public boolean equals(Object obj) {
     if (obj == this) {
       return true;
@@ -138,11 +143,6 @@ public final class Mesh implements AutoCloseable {
     }
     var that = (Mesh) obj;
     return Objects.equals(this.sections, that.sections);
-  }
-
-  @Override
-  public int hashCode() {
-    return Objects.hash(sections);
   }
 
   @Override

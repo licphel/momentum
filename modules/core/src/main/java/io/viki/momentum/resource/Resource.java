@@ -119,6 +119,20 @@ public interface Resource extends AutoCloseable {
   }
 
   /**
+   * Returns a provider rooted at a descendant directory.
+   *
+   * <p>Opening and walking use paths relative to the new root. Resolving an
+   * empty path returns this resource. A non-empty path creates a provider of
+   * the same kind; closing it does not close this provider. Its thread-safety
+   * and resource lifetime follow the implementation's normal contract.
+   *
+   * @param directory the provider-local directory
+   * @return a resource rooted at that directory
+   * @throws IllegalArgumentException if the directory escapes this resource's root
+   */
+  Resource resolve(String directory);
+
+  /**
    * Opens an input stream for a provider-local resource path.
    *
    * @param path the resource path

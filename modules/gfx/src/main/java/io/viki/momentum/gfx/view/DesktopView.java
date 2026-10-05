@@ -112,15 +112,6 @@ public abstract class DesktopView extends View {
   }
 
   /**
-   * Returns the current cursor position in window coordinates.
-   *
-   * @return cursor position
-   */
-  public final Vector2 getCursorPosition() {
-    return new Vector2((float) cursorX, (float) cursorY);
-  }
-
-  /**
    * Sets the window position in screen coordinates.
    *
    * @param position new window position
@@ -130,6 +121,28 @@ public abstract class DesktopView extends View {
     y = (int) position.y();
     if (initialized) {
       applyPlatformPosition(x, y);
+    }
+  }
+
+  /**
+   * Returns the current cursor position in window coordinates.
+   *
+   * @return cursor position
+   */
+  public final Vector2 getCursorPosition() {
+    return new Vector2((float) cursorX, (float) cursorY);
+  }
+
+  /**
+   * Sets the cursor position in window coordinates.
+   *
+   * @param position new cursor position
+   */
+  public final void setCursorPosition(Vector2 position) {
+    cursorX = position.x();
+    cursorY = position.y();
+    if (initialized) {
+      applyPlatformCursorPosition(cursorX, cursorY);
     }
   }
 
@@ -319,19 +332,6 @@ public abstract class DesktopView extends View {
     this.icon = icon;
     if (initialized) {
       applyPlatformIcon(icon);
-    }
-  }
-
-  /**
-   * Sets the cursor position in window coordinates.
-   *
-   * @param position new cursor position
-   */
-  public final void setCursorPosition(Vector2 position) {
-    cursorX = position.x();
-    cursorY = position.y();
-    if (initialized) {
-      applyPlatformCursorPosition(cursorX, cursorY);
     }
   }
 

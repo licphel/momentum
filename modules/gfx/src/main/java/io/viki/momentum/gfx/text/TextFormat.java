@@ -24,8 +24,8 @@
 
 package io.viki.momentum.gfx.text;
 
-import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.tint.Gradient;
 
 /**
  * Immutable text styling attributes for a span of text.

@@ -58,7 +58,7 @@ public final class MatrixUtil {
   /**
    * Writes a 4x4 view-projection matrix into a Uniform Buffer Object (UBO).
    *
-   * @param vpm    the view-projection matrix to be uploaded
+   * @param vpm the view-projection matrix to be uploaded
    * @param out the cpu-side cursor buffer
    */
   public static void store(Matrix4x4 vpm, ByteBuffer out) {

@@ -102,7 +102,7 @@ public final class AnimatedTexture implements Drawable2D {
    * <p>The color is the marker color found in the source image, not the replacement color written
    * into the GPU texture.
    *
-   * @param color source anchor color
+   * @param color    source anchor color
    * @param callback callback receiving the selected anchor position
    * @return this animated texture
    */
@@ -195,13 +195,13 @@ public final class AnimatedTexture implements Drawable2D {
   /**
    * Draws the current frame through a relative source region and reports its anchors.
    *
-   * @param g vertex builder receiving the draw command
-   * @param x lower-left world X coordinate
-   * @param y lower-left world Y coordinate
-   * @param w destination width in world units
-   * @param h destination height in world units
-   * @param u source X offset relative to the current frame
-   * @param v source Y offset relative to the current frame
+   * @param g  vertex builder receiving the draw command
+   * @param x  lower-left world X coordinate
+   * @param y  lower-left world Y coordinate
+   * @param w  destination width in world units
+   * @param h  destination height in world units
+   * @param u  source X offset relative to the current frame
+   * @param v  source Y offset relative to the current frame
    * @param uw source width in pixels
    * @param vh source height in pixels
    */

@@ -14,7 +14,7 @@ void main() {
     vec4 position = vec4(in_pos, 1.0);
     vertex_color = in_color;
     gl_Position = u_vp[0] * position.x
-        + u_vp[1] * position.y
-        + u_vp[2] * position.z
-        + u_vp[3] * position.w;
+    + u_vp[1] * position.y
+    + u_vp[2] * position.z
+    + u_vp[3] * position.w;
 }
