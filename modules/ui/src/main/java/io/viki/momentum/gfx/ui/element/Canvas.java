@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.ui.Resolution;
-import io.viki.momentum.gfx.ui.look.auto.UiRenderDispatcher;
+import io.viki.momentum.gfx.ui.present.ElementTreeRenderer;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.input.InputSnapshot;
@@ -44,9 +44,9 @@ import java.util.List;
  * <p>Resolution mapping is supplied by {@link DpiContext}; input routing is owned by this
  * canvas. This class is mutable and not thread-safe.
  */
-public final class Canvas extends Element implements AutoCloseable {
+public class Canvas extends Element implements AutoCloseable {
   private final DpiContext context;
-  private final UiRenderDispatcher renderer;
+  private final ElementTreeRenderer renderer;
   private final InputRouter inputRouter;
   private @Nullable Element focusedElement;
   private boolean closed;
@@ -60,7 +60,7 @@ public final class Canvas extends Element implements AutoCloseable {
    * @param context logical coordinate and input mapping for this canvas
    */
   public Canvas(DpiContext context) {
-    this(context, UiRenderDispatcher.INSTANCE);
+    this(context, ElementTreeRenderer.INSTANCE);
   }
 
   /**
@@ -69,7 +69,8 @@ public final class Canvas extends Element implements AutoCloseable {
    * @param context  logical coordinate and input mapping for this canvas
    * @param renderer dispatcher used to render the element tree
    */
-  public Canvas(DpiContext context, UiRenderDispatcher renderer) {
+  @SuppressWarnings("this-escape") // Registers callbacks only; view-thread events run after construction.
+  public Canvas(DpiContext context, ElementTreeRenderer renderer) {
     super(Rectangle.of(Vector2.ZERO, context.getLogicalSize()));
     this.context = context;
     this.renderer = renderer;
@@ -104,7 +105,7 @@ public final class Canvas extends Element implements AutoCloseable {
    * @param renderer dispatcher used to render the element tree
    * @return a newly opened canvas
    */
-  public static Canvas open(DpiContext context, UiRenderDispatcher renderer) {
+  public static Canvas open(DpiContext context, ElementTreeRenderer renderer) {
     return new Canvas(context, renderer);
   }
 
@@ -136,7 +137,7 @@ public final class Canvas extends Element implements AutoCloseable {
    */
   public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
                             float logicalHeight, boolean onlyIntegerScale,
-                            UiRenderDispatcher renderer) {
+                            ElementTreeRenderer renderer) {
     return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale, transformHandler), renderer);
   }
 

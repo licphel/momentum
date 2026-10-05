@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.ElementRenderer;
-import io.viki.momentum.gfx.ui.look.auto.SliderRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoSliderRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -397,7 +397,7 @@ public final class Slider extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return SliderRenderer.INSTANCE;
+    return AutoSliderRenderer.INSTANCE;
   }
 
   @Override

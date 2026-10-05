@@ -24,9 +24,9 @@
 
 package io.viki.momentum.gfx.ui.look;
 
-import io.viki.momentum.gfx.ui.Look;
 import io.viki.momentum.gfx.ui.element.*;
 import io.viki.momentum.gfx.ui.look.auto.*;
+import io.viki.momentum.gfx.ui.present.EmptyRenderer;
 
 /**
  * Provides the shared default visual policy for standard UI elements.
@@ -54,17 +54,17 @@ public final class AutoLook {
         .register(Panel.class, EmptyRenderer.INSTANCE)
         .register(Group.class, EmptyRenderer.INSTANCE)
         .register(Canvas.class, EmptyRenderer.INSTANCE)
-        .register(Button.class, ButtonRenderer.INSTANCE)
-        .register(CheckBox.class, CheckBoxRenderer.INSTANCE)
-        .register(Slider.class, SliderRenderer.INSTANCE)
-        .register(ScrollBar.class, ScrollBarRenderer.INSTANCE)
-        .register(ScrollPane.class, ScrollPaneRenderer.INSTANCE)
-        .register(Window.class, WindowRenderer.INSTANCE)
-        .register(DropDown.class, DropDownRenderer.INSTANCE)
-        .register(DropDown.Popup.class, DropDownPopupRenderer.INSTANCE)
-        .register(DropDown.OptionPart.class, DropDownOptionRenderer.INSTANCE)
-        .register(TextBox.class, TextBoxRenderer.INSTANCE)
-        .register(TextView.class, TextViewRenderer.INSTANCE)
-        .register(ImageView.class, ImageViewRenderer.INSTANCE);
+        .register(Button.class, AutoButtonRenderer.INSTANCE)
+        .register(CheckBox.class, AutoCheckBoxRenderer.INSTANCE)
+        .register(Slider.class, AutoSliderRenderer.INSTANCE)
+        .register(ScrollBar.class, AutoScrollBarRenderer.INSTANCE)
+        .register(ScrollPane.class, AutoScrollPaneRenderer.INSTANCE)
+        .register(Window.class, AutoWindowRenderer.INSTANCE)
+        .register(DropDown.class, AutoDropDownRenderer.INSTANCE)
+        .register(DropDown.Popup.class, AutoDropDownPopupRenderer.INSTANCE)
+        .register(DropDown.OptionPart.class, AutoDropDownOptionRenderer.INSTANCE)
+        .register(TextBox.class, AutoTextBoxRenderer.INSTANCE)
+        .register(TextView.class, AutoTextViewRenderer.INSTANCE)
+        .register(ImageView.class, AutoImageViewRenderer.INSTANCE);
   }
 }

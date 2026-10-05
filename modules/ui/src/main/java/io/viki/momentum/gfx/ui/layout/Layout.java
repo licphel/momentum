@@ -22,42 +22,28 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.look.auto;
+package io.viki.momentum.gfx.ui.layout;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.ui.element.ImageView;
-import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
+import java.util.List;
+
 /**
- * Renders an {@link ImageView} within its destination bounds.
+ * Defines how a container positions its child elements inside a local area.
  *
- * <p>The renderer has no per-view state and is safe to share among views used by the same UI
- * thread.
+ * <p>Layouts mutate child bounds during a container's layout pass and do not own the child list.
+ * Implementations should preserve the supplied gap where space permits and may clamp geometry
+ * when the available area is smaller than the requested content.
  */
-public final class ImageViewRenderer implements ElementRenderer {
-  /** Shared renderer for image views. */
-  public static final ImageViewRenderer INSTANCE = new ImageViewRenderer();
-
-  private ImageViewRenderer() {
-  }
-
+@FunctionalInterface
+public interface Layout {
   /**
-   * Draws the image and clips it to the element's visible area.
+   * Arranges the supplied children within the given area.
    *
-   * @param graphics graphics context receiving the image
-   * @param element  element expected to be an {@link ImageView}
-   * @param area     absolute destination bounds
+   * @param area     the local region available to the children
+   * @param children the children whose bounds may be updated
+   * @param gap      the spacing to preserve between adjacent children
    */
-  @Override
-  public void render(Graphics graphics, Element element, Rectangle area) {
-    graphics.pushScissor(area);
-    try {
-      ((ImageView) element).image().draw(graphics, area.minX(), area.minY(),
-          area.width(), area.height());
-    } finally {
-      graphics.popScissor();
-    }
-  }
+  void arrange(Rectangle area, List<Element> children, float gap);
 }

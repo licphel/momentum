@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -36,26 +36,26 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>Rows derive their selected and hovered state from their owning drop-down. The renderer is
  * stateless and therefore safe to share across all option parts on the UI thread.
  */
-public final class DropDownOptionRenderer implements ElementRenderer {
+public final class AutoDropDownOptionRenderer implements ElementRenderer {
   /** Shared stateless renderer used by option parts. */
-  public static final DropDownOptionRenderer INSTANCE = new DropDownOptionRenderer();
+  public static final AutoDropDownOptionRenderer INSTANCE = new AutoDropDownOptionRenderer();
 
-  private DropDownOptionRenderer() {
+  private AutoDropDownOptionRenderer() {
   }
 
   private static void drawStateSurface(Graphics graphics, DropDown.OptionPart option,
                                        DropDown owner, Rectangle area) {
     if (option.index() == owner.selectedIndex()) {
-      RendererSupport.fill(graphics, area, RendererSupport.STATE_PRESSED);
+      AutoRendererSupport.fill(graphics, area, AutoRendererSupport.STATE_PRESSED);
     } else if (option.optionHovered()) {
-      RendererSupport.fill(graphics, area, RendererSupport.STATE_HOVER);
+      AutoRendererSupport.fill(graphics, area, AutoRendererSupport.STATE_HOVER);
     }
   }
 
   private static void drawOptionLabel(Graphics graphics, DropDown owner,
                                       DropDown.OptionPart option, Rectangle area) {
-    RendererSupport.drawText(graphics, owner.options().get(option.index()),
-        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER);
+    AutoRendererSupport.drawText(graphics, owner.options().get(option.index()),
+        area.minX() + AutoRendererSupport.PADDING, area.centralY(), AutoRendererSupport.LEFT_CENTER);
   }
 
   /**

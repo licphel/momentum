@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -37,27 +37,27 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>The popup is a separate element part so its border and background remain above sibling
  * content while option rows are rendered in their own pass.
  */
-public final class DropDownPopupRenderer implements ElementRenderer {
+public final class AutoDropDownPopupRenderer implements ElementRenderer {
   /** Shared stateless renderer used by drop-down popup parts. */
-  public static final DropDownPopupRenderer INSTANCE = new DropDownPopupRenderer();
+  public static final AutoDropDownPopupRenderer INSTANCE = new AutoDropDownPopupRenderer();
 
-  private DropDownPopupRenderer() {
+  private AutoDropDownPopupRenderer() {
   }
 
   private static void drawPopupSurface(Graphics graphics, Rectangle area) {
-    RendererSupport.fill(graphics, area, RendererSupport.POPUP_SURFACE);
+    AutoRendererSupport.fill(graphics, area, AutoRendererSupport.POPUP_SURFACE);
   }
 
   private static void drawPopupBorder(Graphics graphics, Rectangle area) {
-    RendererSupport.drawBoundary(graphics, area, RendererSupport.OUTLINE);
+    AutoRendererSupport.drawBoundary(graphics, area, AutoRendererSupport.OUTLINE);
   }
 
   private static void drawTopHighlight(Graphics graphics, Rectangle area) {
-    graphics.setTint(RendererSupport.HIGHLIGHT);
-    graphics.drawRectangle(area.minX() + RendererSupport.BORDER_WIDTH,
-        area.minY() + RendererSupport.BORDER_WIDTH,
-        Math.max(0.0F, area.width() - RendererSupport.BORDER_WIDTH * 2.0F),
-        RendererSupport.BORDER_WIDTH);
+    graphics.setTint(AutoRendererSupport.HIGHLIGHT);
+    graphics.drawRectangle(area.minX() + AutoRendererSupport.BORDER_WIDTH,
+        area.minY() + AutoRendererSupport.BORDER_WIDTH,
+        Math.max(0.0F, area.width() - AutoRendererSupport.BORDER_WIDTH * 2.0F),
+        AutoRendererSupport.BORDER_WIDTH);
     graphics.setTint(Color.WHITE);
   }
 

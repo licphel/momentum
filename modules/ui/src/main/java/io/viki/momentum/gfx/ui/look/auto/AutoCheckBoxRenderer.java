@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.CheckBox;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -37,28 +37,28 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>The renderer is stateless and uses the checkbox's current enabled, focus, hover, and
  * checked state to select the corresponding monochrome visual treatment.
  */
-public final class CheckBoxRenderer implements ElementRenderer {
+public final class AutoCheckBoxRenderer implements ElementRenderer {
   /** Shared stateless renderer used by default checkbox instances. */
-  public static final CheckBoxRenderer INSTANCE = new CheckBoxRenderer();
+  public static final AutoCheckBoxRenderer INSTANCE = new AutoCheckBoxRenderer();
 
-  private CheckBoxRenderer() {
+  private AutoCheckBoxRenderer() {
   }
 
   private static void drawSurface(Graphics graphics, CheckBox checkBox, Rectangle box) {
     if (checkBox.checked()) {
-      RendererSupport.fill(graphics, box, RendererSupport.CHECKED_SURFACE);
+      AutoRendererSupport.fill(graphics, box, AutoRendererSupport.CHECKED_SURFACE);
     } else if (checkBox.pressed() || checkBox.hovered() || checkBox.focused()) {
-      RendererSupport.fill(graphics, box,
-          checkBox.pressed() ? RendererSupport.STATE_PRESSED : RendererSupport.STATE_HOVER);
+      AutoRendererSupport.fill(graphics, box,
+          checkBox.pressed() ? AutoRendererSupport.STATE_PRESSED : AutoRendererSupport.STATE_HOVER);
     }
   }
 
   private static void drawBorder(Graphics graphics, CheckBox checkBox, Rectangle box) {
-    Color outline = !checkBox.enabled() ? new Color(RendererSupport.OUTLINE, 0.40F)
-        : checkBox.focused() ? RendererSupport.OUTLINE_FOCUS
-        : checkBox.hovered() || checkBox.pressed() ? RendererSupport.OUTLINE_HOVER
-        : checkBox.checked() ? RendererSupport.THUMB : RendererSupport.OUTLINE;
-    RendererSupport.drawBoundary(graphics, box, outline);
+    Color outline = !checkBox.enabled() ? new Color(AutoRendererSupport.OUTLINE, 0.40F)
+        : checkBox.focused() ? AutoRendererSupport.OUTLINE_FOCUS
+        : checkBox.hovered() || checkBox.pressed() ? AutoRendererSupport.OUTLINE_HOVER
+        : checkBox.checked() ? AutoRendererSupport.THUMB : AutoRendererSupport.OUTLINE;
+    AutoRendererSupport.drawBoundary(graphics, box, outline);
   }
 
   private static void drawCheckStatus(Graphics graphics, CheckBox checkBox, Rectangle box,
@@ -67,14 +67,14 @@ public final class CheckBoxRenderer implements ElementRenderer {
       float inset = Math.max(1.0F, size * checkBox.checkMarkInsetForRender());
       Rectangle mark = Rectangle.of(box.minX() + inset, box.minY() + inset,
           Math.max(0.0F, size - inset * 2.0F), Math.max(0.0F, size - inset * 2.0F));
-      RendererSupport.fill(graphics, mark, RendererSupport.FOREGROUND);
+      AutoRendererSupport.fill(graphics, mark, AutoRendererSupport.FOREGROUND);
     }
   }
 
   private static void drawLabel(Graphics graphics, CheckBox checkBox, Rectangle area,
                                 Rectangle box) {
-    graphics.drawText(checkBox.label(), box.maxX() + RendererSupport.PADDING,
-        area.centralY(), RendererSupport.LEFT_CENTER);
+    graphics.drawText(checkBox.label(), box.maxX() + AutoRendererSupport.PADDING,
+        area.centralY(), AutoRendererSupport.LEFT_CENTER);
   }
 
   /**

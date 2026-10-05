@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.layout;
 
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.math.shape.Rectangle;

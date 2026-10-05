@@ -44,6 +44,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
   private final Identifier key;
   private final Map<Identifier, T> byId = new LinkedHashMap<>();
   private final Map<T, Identifier> byValue = new IdentityHashMap<>();
+  private final List<T> byIndex = new ArrayList<>();
   private final AtomicInteger nextId = new AtomicInteger();
   private boolean frozen;
 
@@ -78,6 +79,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
     ctx.putId(id);
     ctx.putIndex(nextId.getAndIncrement());
     ctx.putRegistry(this);
+    byIndex.add(value);
     return value;
   }
 
@@ -89,6 +91,21 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
   @Override
   public @Nullable T get(Identifier id) {
     return byId.get(id);
+  }
+
+  @Override
+  public T get(int index) {
+    return byIndex.get(index);
+  }
+
+  @Override
+  public int searchIndex(T value) {
+    return value.getRegistryContext().registry() == this ? value.registryIndex() : -1;
+  }
+
+  @Override
+  public List<T> values() {
+    return List.copyOf(byIndex);
   }
 
   @Override

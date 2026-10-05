@@ -24,21 +24,21 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.TextBox;
-import io.viki.momentum.gfx.ui.look.TextBoxContent;
-import io.viki.momentum.gfx.ui.look.TextBoxPresentation;
+import io.viki.momentum.gfx.ui.present.TextBoxContent;
+import io.viki.momentum.gfx.ui.present.TextBoxPresentation;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
 /** Shared automatic textbox skin. Use on the owning UI thread, as with its controls. */
-public final class TextBoxRenderer implements ElementRenderer, TextBoxPresentation {
+public final class AutoTextBoxRenderer implements ElementRenderer, TextBoxPresentation {
   /** Shared renderer used by the automatic look. */
-  public static final TextBoxRenderer INSTANCE = new TextBoxRenderer();
-  private final TextBoxContent content = new TextBoxContent(RendererSupport.TEXT_FORMAT);
+  public static final AutoTextBoxRenderer INSTANCE = new AutoTextBoxRenderer();
+  private final TextBoxContent content = new TextBoxContent(AutoRendererSupport.TEXT_FORMAT);
 
-  private TextBoxRenderer() {
+  private AutoTextBoxRenderer() {
   }
 
   @Override
@@ -46,7 +46,7 @@ public final class TextBoxRenderer implements ElementRenderer, TextBoxPresentati
     // Preserve the existing automatic frame policy for scroll-pane hosted editors.
     TextBox textBox = (TextBox) element;
     if (textBox.enclosingScrollPaneForRender() == null) {
-      RendererSupport.drawTextBoxBackground(graphics, area, textBox.enabled(), textBox.focused());
+      AutoRendererSupport.drawTextBoxBackground(graphics, area, textBox.enabled(), textBox.focused());
     }
     this.content.render(graphics, textBox, area);
   }

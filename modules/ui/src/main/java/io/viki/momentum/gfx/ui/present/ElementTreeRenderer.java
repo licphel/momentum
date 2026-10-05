@@ -22,11 +22,12 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.look.auto;
+package io.viki.momentum.gfx.ui.present;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Window;
+import io.viki.momentum.gfx.ui.look.auto.BackdropBlurEffect;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -42,9 +43,9 @@ import java.util.List;
  * one unit, which keeps an overlay from an older window above a newer window. A window that opts
  * into backdrop blur receives a full-surface capture before its translucent glass is painted.
  */
-public final class UiRenderDispatcher implements AutoCloseable {
+public final class ElementTreeRenderer implements AutoCloseable {
   /** Dispatcher used by elements that are drawn without an explicitly configured Canvas. */
-  public static final UiRenderDispatcher INSTANCE = new UiRenderDispatcher();
+  public static final ElementTreeRenderer INSTANCE = new ElementTreeRenderer();
 
   private final @Nullable BackdropBlurEffect backdropBlur;
   private final List<Rectangle> renderedWindows = new ArrayList<>();
@@ -56,11 +57,11 @@ public final class UiRenderDispatcher implements AutoCloseable {
    * <p>This constructor is suitable for ordinary UI rendering when backdrop blur resources are
    * not required.
    */
-  public UiRenderDispatcher() {
+  public ElementTreeRenderer() {
     this(null);
   }
 
-  private UiRenderDispatcher(@Nullable Device device) {
+  private ElementTreeRenderer(@Nullable Device device) {
     backdropBlur = device == null ? null : new BackdropBlurEffect(device);
   }
 
@@ -74,8 +75,8 @@ public final class UiRenderDispatcher implements AutoCloseable {
    * @param device graphics device that supplies the backdrop resources
    * @return a dispatcher backed by the supplied device
    */
-  public static UiRenderDispatcher create(Device device) {
-    return new UiRenderDispatcher(device);
+  public static ElementTreeRenderer create(Device device) {
+    return new ElementTreeRenderer(device);
   }
 
   private static Rectangle absoluteBounds(Element element, float parentX, float parentY) {

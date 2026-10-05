@@ -22,28 +22,26 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.gfx.ui.layout;
 
 import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.math.shape.Rectangle;
-
-import java.util.List;
+import io.viki.momentum.math.Vector2;
 
 /**
- * Defines how a container positions its child elements inside a local area.
+ * Recomputes an element's bounds when its parent layout size changes.
  *
- * <p>Layouts mutate child bounds during a container's layout pass and do not own the child list.
- * Implementations should preserve the supplied gap where space permits and may clamp geometry
- * when the available area is smaller than the requested content.
+ * <p>The callback receives logical coordinates in the parent-local space. Implementations may
+ * update the supplied element's bounds and may derive placement from the previous and current
+ * parent sizes.
  */
 @FunctionalInterface
-public interface Layout {
+public interface Locator {
   /**
-   * Arranges the supplied children within the given area.
+   * Updates an element in response to a parent-size change.
    *
-   * @param area     the local region available to the children
-   * @param children the children whose bounds may be updated
-   * @param gap      the spacing to preserve between adjacent children
+   * @param element element whose bounds should be recomputed
+   * @param oldSize previous parent size in logical coordinates
+   * @param newSize current parent size in logical coordinates
    */
-  void arrange(Rectangle area, List<Element> children, float gap);
+  void locate(Element element, Vector2 oldSize, Vector2 newSize);
 }

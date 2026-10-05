@@ -22,48 +22,33 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.util;
+package io.viki.momentum.gfx.ui.present;
 
-import java.util.List;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
- * A bidirectional mapping between canonical objects and dense integer identifiers.
+ * No-op renderer for elements that provide layout or interaction without drawing a surface.
  *
- * <p>IDs are assigned sequentially as objects are added. Lookup by object
- * returns the assigned ID; lookup by ID returns the object. The mapping is
- * append-only — entries cannot be removed once added.
- *
- * @param <K> the key type stored in this palette
+ * <p>The singleton is used by the canvas root and by base elements that intentionally leave
+ * their appearance to descendants or a custom renderer.
  */
-public interface Palette<K extends PaletteCandidate> {
-  /**
-   * Returns the ID assigned to the given object.
-   *
-   * @param map the object to look up
-   * @return the assigned ID, or {@code -1} if the object is unknown
-   */
-  int searchIndex(K map);
+public final class EmptyRenderer implements ElementRenderer {
+  /** Shared no-op renderer instance. */
+  public static final EmptyRenderer INSTANCE = new EmptyRenderer();
+
+  private EmptyRenderer() {
+  }
 
   /**
-   * Returns the object for the given ID.
+   * Intentionally performs no drawing.
    *
-   * @param index the ID to look up
-   * @return the object at that ID
-   * @throws IndexOutOfBoundsException if the index is out of range
+   * @param graphics graphics context, left unchanged
+   * @param element  element with no built-in visual content
+   * @param area     absolute element bounds
    */
-  K get(int index);
-
-  /**
-   * Returns the number of entries in this palette.
-   *
-   * @return the entry count
-   */
-  int size();
-
-  /**
-   * Returns all entries in ID order.
-   *
-   * @return an unmodifiable list of all registered objects
-   */
-  List<K> values();
+  @Override
+  public void render(Graphics graphics, Element element, Rectangle area) {
+  }
 }

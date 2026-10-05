@@ -335,7 +335,7 @@ public class VertexBuilder2D extends VertexBuilder {
     if (t == null) {
       return;
     }
-    t.draw(this, dst.minX(), dst.minY(), dst.width(), dst.height(), 0, 0, 0, 0);
+    t.draw(this, dst.minX(), dst.minY(), dst.width(), dst.height());
   }
 
   /**

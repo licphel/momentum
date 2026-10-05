@@ -24,36 +24,31 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.text.MutableText;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.ui.element.ScrollPane;
+import io.viki.momentum.gfx.ui.element.TextView;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
-/**
- * Draws the viewport surface associated with a {@link ScrollPane}.
- *
- * <p>Scrollbar parts and content are rendered by their own elements. This renderer owns only the
- * fixed viewport surface and frame, so the decoration remains stationary while content scrolls.
- */
-public final class ScrollPaneRenderer implements ElementRenderer {
-  /** Shared stateless renderer used by scroll panes. */
-  public static final ScrollPaneRenderer INSTANCE = new ScrollPaneRenderer();
+/** Stateless renderer; each TextView owns its layout cache on the UI thread. */
+public final class AutoTextViewRenderer implements ElementRenderer {
+  /** Shared renderer used by the automatic look. */
+  public static final AutoTextViewRenderer INSTANCE = new AutoTextViewRenderer();
 
-  private ScrollPaneRenderer() {
+  /** Creates an empty text-view renderer cache. */
+  public AutoTextViewRenderer() {
   }
 
-  /**
-   * Draws the scroll pane's fixed viewport surface and frame.
-   *
-   * @param graphics graphics context receiving the viewport
-   * @param raw      scroll-pane element to render
-   * @param area     absolute scroll-pane bounds
-   */
   @Override
-  public void render(Graphics graphics, Element raw, Rectangle area) {
-    ScrollPane pane = (ScrollPane) raw;
-    Rectangle viewport = Rectangle.of(area.minX(), area.minY(), pane.viewportWidth(), pane.viewportHeight());
-    RendererSupport.drawScrollPaneBackground(graphics, viewport);
+  public void render(Graphics graphics, Element element, Rectangle area) {
+    TextView view = (TextView) element;
+    MutableText component = view.layoutForRender(area.width());
+    graphics.pushScissor(area);
+    try {
+      graphics.drawText(component, area.minX(), area.minY());
+    } finally {
+      graphics.popScissor();
+    }
   }
 }

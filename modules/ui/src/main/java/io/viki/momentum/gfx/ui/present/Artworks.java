@@ -22,48 +22,39 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.util;
+package io.viki.momentum.gfx.ui.present;
 
-import java.util.List;
+import io.viki.momentum.gfx.texture.Drawable2D;
 
 /**
- * A bidirectional mapping between canonical objects and dense integer identifiers.
+ * Immutable interaction-state artwork. Resources are borrowed and used on the UI thread.
+ * State images need not have equal dimensions; matching artwork is the caller's responsibility.
  *
- * <p>IDs are assigned sequentially as objects are added. Lookup by object
- * returns the assigned ID; lookup by ID returns the object. The mapping is
- * append-only — entries cannot be removed once added.
- *
- * @param <K> the key type stored in this palette
+ * @param idle     idle artwork
+ * @param hovered  hovered artwork
+ * @param pressed  pressed artwork
+ * @param disabled disabled artwork
  */
-public interface Palette<K extends PaletteCandidate> {
+public record Artworks(Drawable2D idle, Drawable2D hovered,
+                       Drawable2D pressed, Drawable2D disabled) {
   /**
-   * Returns the ID assigned to the given object.
+   * Uses one drawable for every interaction state.
    *
-   * @param map the object to look up
-   * @return the assigned ID, or {@code -1} if the object is unknown
+   * @param drawable shared state artwork
    */
-  int searchIndex(K map);
+  public Artworks(Drawable2D drawable) {
+    this(drawable, drawable, drawable, drawable);
+  }
 
   /**
-   * Returns the object for the given ID.
+   * Returns the drawable corresponding to the current interaction state.
    *
-   * @param index the ID to look up
-   * @return the object at that ID
-   * @throws IndexOutOfBoundsException if the index is out of range
+   * @param enabled whether the control is enabled
+   * @param hovered whether it is hovered or focused
+   * @param pressed whether it is pressed
+   * @return selected state artwork
    */
-  K get(int index);
-
-  /**
-   * Returns the number of entries in this palette.
-   *
-   * @return the entry count
-   */
-  int size();
-
-  /**
-   * Returns all entries in ID order.
-   *
-   * @return an unmodifiable list of all registered objects
-   */
-  List<K> values();
+  public Drawable2D select(boolean enabled, boolean hovered, boolean pressed) {
+    return !enabled ? disabled : pressed ? this.pressed : hovered ? this.hovered : idle;
+  }
 }

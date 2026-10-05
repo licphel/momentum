@@ -35,7 +35,7 @@ import io.viki.momentum.util.InternalApi;
 
 /** Shared constants and low-level drawing helpers for the built-in element renderers. */
 @InternalApi
-final class RendererSupport {
+final class AutoRendererSupport {
   static final float BORDER_WIDTH = 1.0F;
   static final float PADDING = 4.0F;
   static final float SCROLLBAR_THUMB_THICKNESS = 3.0F;
@@ -66,7 +66,7 @@ final class RendererSupport {
   static final Color CHECKED_SURFACE = new Color(1.0F, 1.0F, 1.0F, 0.07F);
   static final Color SELECTION = new Color(0.2F, 0.45F, 0.85F, 0.55F);
 
-  private RendererSupport() {
+  private AutoRendererSupport() {
   }
 
   static void drawText(Graphics graphics, Text value, float x, float y, Alignment alignment) {

@@ -37,11 +37,11 @@ import java.util.List;
  * <p>Tooltip geometry is computed from the rasterized text at draw time, keeping the overlay
  * independent from the element layout tree and ensuring it remains above every control.
  */
-public final class TooltipRenderer {
+public final class AutoTooltipRenderer {
   private static final float PADDING = 4.0F;
   private static final float LINE_GAP = 2.0F;
 
-  private TooltipRenderer() {
+  private AutoTooltipRenderer() {
   }
 
   /**
@@ -72,9 +72,9 @@ public final class TooltipRenderer {
     Rectangle area = Rectangle.of(x, y, width + PADDING * 2.0F,
         height + PADDING * 2.0F);
     // Draw the tooltip popup surface.
-    RendererSupport.fill(graphics, area, RendererSupport.POPUP_SURFACE);
+    AutoRendererSupport.fill(graphics, area, AutoRendererSupport.POPUP_SURFACE);
     // Draw the tooltip popup border.
-    RendererSupport.drawBoundary(graphics, area, RendererSupport.OUTLINE);
+    AutoRendererSupport.drawBoundary(graphics, area, AutoRendererSupport.OUTLINE);
     // Draw each rich text entry on its own tooltip line.
     float offsetY = y + PADDING;
     for (int i = 0; i < values.size(); i++) {

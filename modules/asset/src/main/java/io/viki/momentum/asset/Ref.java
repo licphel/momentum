@@ -28,6 +28,7 @@ import io.viki.momentum.util.Identifier;
 import org.jspecify.annotations.Nullable;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.BiConsumer;
@@ -37,12 +38,12 @@ import java.util.function.Supplier;
  * A typed, mutable reference to an asset that supports hot-reloading.
  *
  * <p>When an asset is updated via {@link Assets#set(Identifier, Object)},
- * all existing {@code Ref} instances for that identifier automatically
+ * all existing {@code Ref} instances for that identifier and type automatically
  * reflect the new value. Listeners registered via
  * {@link #addChangeListener(BiConsumer)} are notified of every update.
  *
- * <p>{@code Ref} is thread-safe: reads are volatile and writes are
- * guarded by the owning {@link Assets} store.
+ * <p>{@code Ref} reads and updates a concurrent resource map. Listeners are called synchronously
+ * on the updating thread and may be invoked concurrently by concurrent updates.
  *
  * @param <T> the asset type
  * @see Assets
@@ -50,19 +51,13 @@ import java.util.function.Supplier;
 public final class Ref<T> implements Supplier<T> {
   private final Identifier id;
   private final List<BiConsumer<@Nullable T, @Nullable T>> listeners = new CopyOnWriteArrayList<>();
-  private volatile @Nullable T value;
+  private final Map<Class<?>, @Nullable Object> values;
   private final Class<T> type;
 
-  @SuppressWarnings("unchecked")
-  Ref(Identifier id, T initialValue) {
-    this.id = id;
-    this.value = initialValue;
-    this.type = (Class<T>) initialValue.getClass();
-  }
-
-  Ref(Identifier id, Class<T> type) {
+  Ref(Identifier id, Class<T> type, Map<Class<?>, Object> values) {
     this.id = id;
     this.type = type;
+    this.values = values;
   }
 
   /**
@@ -79,8 +74,9 @@ public final class Ref<T> implements Supplier<T> {
    *
    * @return the current value, or {@code null} if none
    */
+  @SuppressWarnings("all")
   public @Nullable T get() {
-    return value;
+    return type.cast(values.getOrDefault(type, null));
   }
 
   /**
@@ -88,7 +84,9 @@ public final class Ref<T> implements Supplier<T> {
    *
    * @return the current value, or {@code null} if none
    */
+  @SuppressWarnings("all")
   public @Nullable T getOrDefault() {
+    T value = get();
     return value == null ? AssetFallback.get(type) : value;
   }
 
@@ -98,7 +96,7 @@ public final class Ref<T> implements Supplier<T> {
    * @return the current optional value
    */
   public Optional<@Nullable T> optional() {
-    return Optional.ofNullable(value);
+    return Optional.ofNullable(get());
   }
 
   /**
@@ -110,11 +108,10 @@ public final class Ref<T> implements Supplier<T> {
    * @param newValue the new value
    */
   void set(@Nullable T newValue) {
-    T old = value;
+    T old = type.cast(newValue == null ? values.remove(type) : values.put(type, newValue));
     if (old == newValue) {
       return;
     }
-    value = newValue;
     for (BiConsumer<@Nullable T, @Nullable T> listener : listeners) {
       listener.accept(old, newValue);
     }

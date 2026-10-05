@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.DropDown;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -34,41 +34,41 @@ import io.viki.momentum.math.shape.Rectangle;
 /**
  * Draws the selectable header of a {@link DropDown}, including its current option and indicator.
  *
- * <p>Popup rows are rendered separately by {@link DropDownOptionRenderer}; this renderer only
+ * <p>Popup rows are rendered separately by {@link AutoDropDownOptionRenderer}; this renderer only
  * owns the header surface and its interaction-state outline.
  */
-public final class DropDownRenderer implements ElementRenderer {
+public final class AutoDropDownRenderer implements ElementRenderer {
   /** Shared stateless renderer used by default drop-down instances. */
-  public static final DropDownRenderer INSTANCE = new DropDownRenderer();
+  public static final AutoDropDownRenderer INSTANCE = new AutoDropDownRenderer();
 
-  private DropDownRenderer() {
+  private AutoDropDownRenderer() {
   }
 
   private static void drawSurface(Graphics graphics, DropDown dropDown, Rectangle area) {
     if (dropDown.expanded() || dropDown.hovered() || dropDown.focused()) {
-      RendererSupport.fill(graphics, area,
-          dropDown.expanded() ? RendererSupport.STATE_PRESSED : RendererSupport.STATE_HOVER);
+      AutoRendererSupport.fill(graphics, area,
+          dropDown.expanded() ? AutoRendererSupport.STATE_PRESSED : AutoRendererSupport.STATE_HOVER);
     }
   }
 
   private static void drawBorder(Graphics graphics, DropDown dropDown, Rectangle area) {
     var outline = !dropDown.enabled() ? new Color(
-        RendererSupport.OUTLINE, 0.35F)
-        : dropDown.focused() || dropDown.expanded() ? RendererSupport.OUTLINE_FOCUS
-        : dropDown.hovered() ? RendererSupport.OUTLINE_HOVER : RendererSupport.OUTLINE;
-    RendererSupport.drawBoundary(graphics, area, outline);
+        AutoRendererSupport.OUTLINE, 0.35F)
+        : dropDown.focused() || dropDown.expanded() ? AutoRendererSupport.OUTLINE_FOCUS
+        : dropDown.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;
+    AutoRendererSupport.drawBoundary(graphics, area, outline);
   }
 
   private static void drawSelectedOption(Graphics graphics, DropDown dropDown, Rectangle area) {
-    RendererSupport.drawText(graphics, dropDown.selectedOption(),
-        area.minX() + RendererSupport.PADDING, area.centralY(), RendererSupport.LEFT_CENTER);
+    AutoRendererSupport.drawText(graphics, dropDown.selectedOption(),
+        area.minX() + AutoRendererSupport.PADDING, area.centralY(), AutoRendererSupport.LEFT_CENTER);
   }
 
   private static void drawCollapseIndicator(Graphics graphics, DropDown dropDown, Rectangle area) {
     float halfSize = Math.min(3.0F, area.height() * 0.2F);
-    float centerX = area.maxX() - RendererSupport.PADDING - halfSize;
+    float centerX = area.maxX() - AutoRendererSupport.PADDING - halfSize;
     float centerY = area.centralY();
-    graphics.setTint(RendererSupport.FOREGROUND);
+    graphics.setTint(AutoRendererSupport.FOREGROUND);
     if (dropDown.expanded()) {
       graphics.drawTriangle(centerX - halfSize, centerY + halfSize,
           centerX + halfSize, centerY + halfSize, centerX, centerY - halfSize);

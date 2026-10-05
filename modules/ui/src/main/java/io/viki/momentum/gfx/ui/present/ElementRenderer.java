@@ -22,48 +22,27 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.util;
+package io.viki.momentum.gfx.ui.present;
 
-import java.util.List;
+import io.viki.momentum.gfx.ui.element.Element;
+import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.shape.Rectangle;
 
 /**
- * A bidirectional mapping between canonical objects and dense integer identifiers.
+ * Rendering strategy for one UI element.
  *
- * <p>IDs are assigned sequentially as objects are added. Lookup by object
- * returns the assigned ID; lookup by ID returns the object. The mapping is
- * append-only — entries cannot be removed once added.
- *
- * @param <K> the key type stored in this palette
+ * <p>An element renderer is responsible only for the element's own visual content. Input
+ * handling, layout, child traversal, and clipping remain in the widget and dispatcher layers,
+ * which makes custom renderers easy to install without changing widget behavior.
  */
-public interface Palette<K extends PaletteCandidate> {
+@FunctionalInterface
+public interface ElementRenderer {
   /**
-   * Returns the ID assigned to the given object.
+   * Renders only the element's own visual content.
    *
-   * @param map the object to look up
-   * @return the assigned ID, or {@code -1} if the object is unknown
+   * @param graphics       graphics context receiving the visual content
+   * @param element        element whose state should be represented
+   * @param absoluteBounds element bounds in the graphics coordinate system
    */
-  int searchIndex(K map);
-
-  /**
-   * Returns the object for the given ID.
-   *
-   * @param index the ID to look up
-   * @return the object at that ID
-   * @throws IndexOutOfBoundsException if the index is out of range
-   */
-  K get(int index);
-
-  /**
-   * Returns the number of entries in this palette.
-   *
-   * @return the entry count
-   */
-  int size();
-
-  /**
-   * Returns all entries in ID order.
-   *
-   * @return an unmodifiable list of all registered objects
-   */
-  List<K> values();
+  void render(Graphics graphics, Element element, Rectangle absoluteBounds);
 }

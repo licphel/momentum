@@ -24,179 +24,319 @@
 
 package io.viki.momentum.international;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.viki.momentum.util.Identifier;
+import io.viki.momentum.util.Namespace;
 import io.viki.momentum.util.QuickFmt;
 import org.jspecify.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.io.IOException;
+import java.net.URI;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 /**
- * A localization table mapping translation keys to translated text.
- *
- * <p>A {@code Language} is identified by a locale key such as {@code "en_us"}
- * or {@code "zh_cn"}. Translations are loaded from a string-string map whose
- * entries are key-value pairs of {@code translationKey → translatedText}.
- *
- * <p>Languages can be merged: when looking up a key, the primary language is
- * checked first, then the fallback chain. This enables base translations with
- * per-mod overrides.
- *
- * <p>This class is thread-safe for reads after registration.
+ * Global localization registry. Tables are immutable snapshots, safely published to readers.
+ * Change listeners run on the thread selecting the language.
  */
 public final class Language {
-  public static final String EN_US_KEY = "en_us";
-  public static final Language EN_US = new Language(EN_US_KEY);
-  private static volatile Language currentLanguage = EN_US;
+  private static final ObjectMapper JSON = new ObjectMapper();
   private static final Map<String, Language> LANGUAGES = new ConcurrentHashMap<>();
   private static final List<Consumer<Language>> CURRENT_LISTENERS = new CopyOnWriteArrayList<>();
+  private static volatile Language currentLanguage;
+
+  public static final Language EN = register("en", "English");
 
   static {
-    LANGUAGES.put(EN_US_KEY, EN_US);
+    String[][] defaults = {
+        {"ar", "العربية"},
+        {"bg", "Български"},
+        {"zh-CN", "简体中文"},
+        {"zh-TW", "繁體中文"},
+        {"cs", "Čeština"},
+        {"da", "Dansk"},
+        {"nl", "Nederlands"},
+        {"fi", "Suomi"},
+        {"fr", "Français"},
+        {"de", "Deutsch"},
+        {"el", "Ελληνικά"},
+        {"hu", "Magyar"},
+        {"id", "Bahasa Indonesia"},
+        {"it", "Italiano"},
+        {"ja", "日本語"},
+        {"ko", "한국어"},
+        {"ms", "Bahasa Melayu"},
+        {"no", "Norsk"},
+        {"pl", "Polski"},
+        {"pt", "Português"},
+        {"pt-BR", "Português (Brasil)"},
+        {"ro", "Română"},
+        {"ru", "Русский"},
+        {"es", "Español (España)"},
+        {"es-419", "Español (Latinoamérica)"},
+        {"sv", "Svenska"}, {"th", "ไทย"},
+        {"tr", "Türkçe"},
+        {"uk", "Українська"},
+        {"vi", "Tiếng Việt"}
+    };
+    for (String[] entry : defaults) {
+      register(entry[0], entry[1]);
+    }
+    currentLanguage = EN;
   }
 
   private final String key;
-  private final Map<String, String> translations;
-  private final @Nullable Language fallback;
+  private volatile String name;
+  private volatile Map<Identifier, String> translations = Map.of();
 
-  private Language(String key, Map<String, String> translations, Language fallback) {
+  private Language(String key, String name) {
     this.key = key;
-    this.translations = Map.copyOf(translations);
-    this.fallback = fallback;
-  }
-
-  private Language(String key) {
-    this.key = key;
-    this.translations = new HashMap<>();
-    this.fallback = EN_US;
+    this.name = name;
   }
 
   /**
-   * Returns the currently active language.
+   * Registers a language independently of whether translations are available.
+   * Re-registering a case-insensitively equal key updates its display name, preserving its table.
    *
-   * @return current language
+   * @param key  locale code; the first registered spelling is retained
+   * @param name display name for language selection
+   * @return the stable registered language instance
+   */
+  public static Language register(String key, String name) {
+    Language language = LANGUAGES.computeIfAbsent(key.toLowerCase(Locale.ROOT), k -> new Language(key, name));
+    language.name = name;
+    return language;
+  }
+
+  /**
+   * Resolves a locale code, registering an empty language if it is not yet known.
+   *
+   * @param key case-insensitive locale code
+   * @return the stable language instance; newly discovered languages use their code as their name
+   */
+  public static Language get(String key) {
+    return LANGUAGES.computeIfAbsent(key.toLowerCase(Locale.ROOT), k -> new Language(key, key));
+  }
+
+  /**
+   * Provides registered languages for selection, including those without translation files.
+   *
+   * @return an immutable snapshot sorted by locale code
+   */
+  public static Collection<Language> languages() {
+    return LANGUAGES.values().stream().sorted(java.util.Comparator.comparing(Language::key)).toList();
+  }
+
+  /**
+   * Returns the globally selected language.
+   *
+   * @return the active language
    */
   public static Language current() {
     return currentLanguage;
   }
 
   /**
-   * Sets the global current language.
+   * Selects the global language and synchronously notifies change listeners on the calling thread.
+   * Listener exceptions propagate to the caller after the language has been selected.
    *
-   * <p>Listeners registered via {@link #addChangeListener(Consumer)} are
-   * notified with the newly selected language.
-   *
-   * @param lang the language to set
+   * @param language language to select
    */
-  public static void setCurrent(Language lang) {
-    currentLanguage = lang;
+  public static void setCurrent(Language language) {
+    currentLanguage = language;
     for (Consumer<Language> listener : CURRENT_LISTENERS) {
-      listener.accept(lang);
+      listener.accept(language);
     }
   }
 
   /**
-   * Sets the global current language.
+   * Resolves and selects a language, notifying listeners as in {@link #setCurrent(Language)}.
    *
-   * <p>Listeners registered via {@link #addChangeListener(Consumer)} are
-   * notified with the newly selected language.
-   *
-   * @param langKey the language key to set
+   * @param key case-insensitive locale code, registered if previously unknown
    */
-  public static void setCurrent(String langKey) {
-    setCurrent(get(langKey));
+  public static void setCurrent(String key) {
+    setCurrent(get(key));
   }
 
   /**
-   * Registers a listener invoked whenever the current language changes.
+   * Subscribes to subsequent language selections, not translation insertions or downloads.
    *
-   * <p>UI systems can use this to refresh all displayed text.
-   *
-   * @param listener the listener, receiving the newly current language
+   * @param listener callback receiving the selected language on the selecting thread
    */
   public static void addChangeListener(Consumer<Language> listener) {
     CURRENT_LISTENERS.add(listener);
   }
 
   /**
-   * Removes a change listener.
-
-   * @param listener the listener, receiving the newly current language
+   * Removes one registration of a language-selection listener.
+   *
+   * @param listener callback to unsubscribe
    */
   public static void removeChangeListener(Consumer<Language> listener) {
     CURRENT_LISTENERS.remove(listener);
   }
 
   /**
-   * Looks up a registered language by its locale key.
+   * Adds or replaces a translation in the language.
+   * Other translations and languages are preserved.
    *
-   * @param key the locale key, e.g. {@code "en_us"}
-   * @return the language, or {@code null} if not registered
+   * @param key   namespace-qualified translation key
+   * @param value translated text, optionally containing {@link QuickFmt} placeholders
    */
-  public static Language get(String key) {
-    return LANGUAGES.computeIfAbsent(key.toLowerCase(), Language::new);
+  public void insert(Identifier key, String value) {
+    putAll(Map.of(key, value));
   }
 
   /**
-   * Loads a language from a string-string map.
+   * Imports a flat JSON object of translation paths and text into the language.
+   * All entries belong to the supplied namespace; malformed input leaves the table unchanged.
    *
-   * <p>Each entry in the tag is treated as a translation key-value pair.
-   * Only entries with {@link String} values are kept; others are silently
-   * skipped.
-   *
-   * @param tag the tag containing translation entries
+   * @param namespace namespace assigned to every JSON property
+   * @param json      complete JSON object whose values must be strings
+   * @throws IllegalArgumentException if the input is malformed, contains trailing content,
+   *                                  is not an object, or contains non-string values
    */
-  public void merge(Iterable<Map.Entry<String, @Nullable String>> tag) {
-    for (Map.Entry<String, String> entry : tag) {
-      translations.put(entry.getKey(), entry.getValue());
+  public void load(Namespace namespace, String json) {
+    putAll(parse(namespace, json));
+  }
+
+  /**
+   * Translates using the active language, its registered base locales, and finally English.
+   * Formatting arguments are preserved across fallbacks; a missing translation returns the key.
+   *
+   * @param key  namespace-qualified translation key
+   * @param args arguments for {@link QuickFmt} placeholders
+   * @return formatted translation, or the identifier string if no translation exists
+   */
+  public static String translate(Identifier key, Object... args) {
+    Language language = currentLanguage;
+    String value = language.find(key);
+    return value == null ? key.toString() : QuickFmt.format(value, args);
+  }
+
+  /**
+   * Parses an import without changing a language, preventing partially applied invalid content.
+   *
+   * @param namespace namespace assigned to the parsed keys
+   * @param json      flat JSON translation object
+   * @return parsed translation entries
+   * @throws IllegalArgumentException if the JSON is not a complete object of string values
+   */
+  private static Map<Identifier, String> parse(Namespace namespace, String json) {
+    try {
+      JsonNode root = JSON.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .readTree(json);
+      if (root == null || !root.isObject()) {
+        throw new IllegalArgumentException("Language JSON must be an object");
+      }
+      Map<Identifier, String> entries = new HashMap<>();
+      for (Map.Entry<String, JsonNode> entry : root.properties()) {
+        if (!entry.getValue().isTextual()) {
+          throw new IllegalArgumentException("Language value must be text: " + entry.getKey());
+        }
+        entries.put(new Identifier(namespace, entry.getKey()), entry.getValue().textValue());
+      }
+      return entries;
+    } catch (IOException e) {
+      throw new IllegalArgumentException("Invalid language JSON for " + namespace, e);
     }
   }
 
   /**
-   * Returns the locale key.
+   * Asynchronously imports the latest file content at a GitHub branch, tag, or commit.
+   * The language selected at invocation remains the target even if the selection later changes.
+   * Transfer limits and failure behavior are defined by {@link #update(Namespace, URI)}.
    *
-   * @return the locale key
+   * @param namespace  namespace assigned to the downloaded translation keys
+   * @param repository GitHub repository in owner/name form
+   * @param ref        branch, tag, or commit expressed as a URL path component
+   * @param path       repository-relative JSON path expressed as a URL path
+   * @return future containing {@code true} after successful import, otherwise {@code false}
+   * @throws IllegalArgumentException if the arguments form an invalid URI
+   */
+  public static CompletableFuture<Boolean> updateFromGitHub(Namespace namespace, String repository, String ref, String path) {
+    return update(namespace, URI.create("https://raw.githubusercontent.com/" + repository + "/" + ref + "/" + path));
+  }
+
+  /**
+   * Asynchronously downloads and imports a raw UTF-8 JSON resource into the language active now.
+   * A transfer is abandoned if its first body byte takes more than 1500 milliseconds or a
+   * subsequent 500-millisecond measurement window averages less than 128 KiB/s.
+   * Small responses completed before the first speed measurement are accepted.
+   * Network, HTTP, URI, and JSON failures produce {@code false} without changing local content.
+   * Successful imports replace matching keys but preserve unrelated translations.
+   *
+   * @param namespace namespace assigned to every downloaded translation key
+   * @param content   HTTP or HTTPS URI serving raw JSON, not an HTML repository page
+   * @return future containing {@code true} after publication, otherwise {@code false}
+   */
+  public static CompletableFuture<Boolean> update(Namespace namespace, URI content) {
+    Language target = currentLanguage;
+    return CompletableFuture.supplyAsync(() -> {
+      try {
+        target.putAll(parse(namespace, LanguageDownload.fetch(content)));
+        return true;
+      } catch (IOException | IllegalArgumentException e) {
+        return false;
+      }
+    });
+  }
+
+  /**
+   * Returns the locale code in its originally registered spelling.
+   *
+   * @return locale code
    */
   public String key() {
     return key;
   }
 
   /**
-   * Creates a merged language where {@code other} overrides this one.
+   * Returns the language-selection display name.
    *
-   * <p>When translating, {@code other} is checked first; if the key is
-   * not found, this language (and its fallback chain) is checked.
-   *
-   * @param other the overriding language
-   * @return a new merged language
+   * @return current display name
    */
-  public Language merge(Language other) {
-    return new Language(key, other.translations, this);
+  public String name() {
+    return name;
   }
 
   /**
-   * Returns the translated text for the given key.
+   * Resolves text through regional and English fallbacks without formatting it.
    *
-   * <p>If the key is not found in this language, the fallback chain is
-   * searched. If no translation is found anywhere in the chain, the key
-   * itself is returned.
-   *
-   * @param translationKey the translation key
-   * @param args           the formatting args
-   * @return the translated text
+   * @param id translation identifier
+   * @return translated template, or {@code null} if all eligible languages lack it
    */
-  public String translate(String translationKey, Object... args) {
-    String value = translations.get(translationKey);
+  private @Nullable String find(Identifier id) {
+    String value = translations.get(id);
     if (value != null) {
-      return QuickFmt.format(value, args);
+      return value;
     }
-    if (fallback != null) {
-      return fallback.translate(translationKey);
+    int separator = key.lastIndexOf('-');
+    if (separator > 0) {
+      Language base = LANGUAGES.get(key.substring(0, separator).toLowerCase(Locale.ROOT));
+      if (base != null) {
+        value = base.find(id);
+        if (value != null) {
+          return value;
+        }
+      }
     }
-    return translationKey;
+    return this == EN ? null : EN.translations.get(id);
+  }
+
+  /**
+   * Publishes a complete import while preserving concurrent updates to unrelated entries.
+   *
+   * @param entries translations to add or replace
+   */
+  private synchronized void putAll(Map<Identifier, String> entries) {
+    Map<Identifier, String> updated = new HashMap<>(translations);
+    updated.putAll(entries);
+    translations = Map.copyOf(updated);
   }
 
   @Override

@@ -22,34 +22,29 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui.look;
+package io.viki.momentum.gfx.ui.present;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
-import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.math.shape.Rectangle;
+import io.viki.momentum.gfx.ui.element.TextBox;
 
 /**
- * No-op renderer for elements that provide layout or interaction without drawing a surface.
- *
- * <p>The singleton is used by the canvas root and by base elements that intentionally leave
- * their appearance to descendants or a custom renderer.
+ * Geometry supplied by a textbox renderer. Input uses the same font and padding as rendering.
+ * Implementations are used on the control's owning UI thread.
  */
-public final class EmptyRenderer implements ElementRenderer {
-  /** Shared no-op renderer instance. */
-  public static final EmptyRenderer INSTANCE = new EmptyRenderer();
-
-  private EmptyRenderer() {
-  }
+public interface TextBoxPresentation {
+  /**
+   * Maps a pointer position to the nearest insertion point in the editor.
+   *
+   * @param textBox editor whose layout is queried
+   * @param x       pointer X coordinate in textbox-local space
+   * @param y       pointer Y coordinate in textbox-local space
+   * @return UTF-16 insertion index
+   */
+  int hitIndex(TextBox textBox, float x, float y);
 
   /**
-   * Intentionally performs no drawing.
+   * Keeps the current insertion point visible in the containing scroll pane.
    *
-   * @param graphics graphics context, left unchanged
-   * @param element  element with no built-in visual content
-   * @param area     absolute element bounds
+   * @param textBox editor whose insertion point should be revealed
    */
-  @Override
-  public void render(Graphics graphics, Element element, Rectangle area) {
-  }
+  void scrollCursorIntoView(TextBox textBox);
 }

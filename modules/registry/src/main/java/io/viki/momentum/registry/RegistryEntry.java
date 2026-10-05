@@ -26,6 +26,7 @@ package io.viki.momentum.registry;
 
 import io.viki.momentum.tag.Tag;
 import io.viki.momentum.util.Identifier;
+import io.viki.momentum.util.PaletteCandidate;
 
 import java.util.Objects;
 
@@ -33,7 +34,7 @@ import java.util.Objects;
  * An object that carries its own registry metadata, so it can know its
  * identifier and registration index without consulting the registry.
  */
-public interface RegistryEntry {
+public interface RegistryEntry extends PaletteCandidate {
   /**
    * Returns the metadata holding this object's assigned identifier and index.
    *
@@ -79,5 +80,10 @@ public interface RegistryEntry {
    */
   default boolean is(Object t) {
     return this == t;
+  }
+
+  @Override
+  default int identity() {
+    return registryIndex();
   }
 }

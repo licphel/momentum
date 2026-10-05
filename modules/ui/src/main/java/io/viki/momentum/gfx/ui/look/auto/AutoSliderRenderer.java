@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Slider;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -37,24 +37,24 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>The slider widget owns value conversion and step handling; this renderer only maps the
  * normalized value to a visual track and reads the widget's interaction state.
  */
-public final class SliderRenderer implements ElementRenderer {
+public final class AutoSliderRenderer implements ElementRenderer {
   /** Shared stateless renderer used by sliders. */
-  public static final SliderRenderer INSTANCE = new SliderRenderer();
+  public static final AutoSliderRenderer INSTANCE = new AutoSliderRenderer();
 
-  private SliderRenderer() {
+  private AutoSliderRenderer() {
   }
 
   private static void drawInteractionSurface(Graphics graphics, Slider slider, Rectangle track) {
     if (slider.hovered() || slider.dragging() || slider.focused()) {
-      RendererSupport.fill(graphics, track,
-          slider.dragging() ? RendererSupport.STATE_PRESSED : RendererSupport.STATE_HOVER);
+      AutoRendererSupport.fill(graphics, track,
+          slider.dragging() ? AutoRendererSupport.STATE_PRESSED : AutoRendererSupport.STATE_HOVER);
     }
   }
 
   private static void drawTrack(Graphics graphics, Slider slider, Rectangle track,
                                 float trackHeight) {
-    Color trackColor = slider.enabled() ? RendererSupport.TRACK
-        : new Color(RendererSupport.TRACK, 0.45F);
+    Color trackColor = slider.enabled() ? AutoRendererSupport.TRACK
+        : new Color(AutoRendererSupport.TRACK, 0.45F);
     float y = track.centralY() - Math.max(1.0F, trackHeight) * 0.5F;
     float h = Math.max(1.0F, trackHeight);
     graphics.setTint(trackColor);
@@ -64,8 +64,8 @@ public final class SliderRenderer implements ElementRenderer {
 
   private static void drawTrackFill(Graphics graphics, Slider slider, Rectangle track,
                                     float trackHeight, float value) {
-    Color fillColor = slider.enabled() ? RendererSupport.TRACK_FILL
-        : new Color(RendererSupport.TRACK_FILL, 0.40F);
+    Color fillColor = slider.enabled() ? AutoRendererSupport.TRACK_FILL
+        : new Color(AutoRendererSupport.TRACK_FILL, 0.40F);
     float y = track.centralY() - Math.max(1.0F, trackHeight) * 0.5F;
     float h = Math.max(1.0F, trackHeight);
     graphics.setTint(fillColor);
@@ -75,24 +75,24 @@ public final class SliderRenderer implements ElementRenderer {
 
   private static void drawThumb(Graphics graphics, Slider slider, Rectangle track,
                                 float thumbWidth, float value) {
-    Color thumbColor = slider.enabled() ? RendererSupport.THUMB
-        : new Color(RendererSupport.THUMB, 0.38F);
+    Color thumbColor = slider.enabled() ? AutoRendererSupport.THUMB
+        : new Color(AutoRendererSupport.THUMB, 0.38F);
     float width = Math.min(track.width(), Math.max(1.0F, thumbWidth));
     float thumbHeight = Math.min(track.height(),
-        Math.max(RendererSupport.SLIDER_THUMB_MIN_HEIGHT,
-            track.height() - RendererSupport.SLIDER_THUMB_VERTICAL_INSET * 2.0F));
+        Math.max(AutoRendererSupport.SLIDER_THUMB_MIN_HEIGHT,
+            track.height() - AutoRendererSupport.SLIDER_THUMB_VERTICAL_INSET * 2.0F));
     float thumbX = track.minX() + (track.width() - width) * value;
     float thumbY = track.centralY() - thumbHeight * 0.5F;
     graphics.setTint(thumbColor);
     graphics.drawRoundRect(thumbX, thumbY, width, thumbHeight,
-        Math.min(RendererSupport.SLIDER_THUMB_RADIUS, thumbHeight * 0.5F));
+        Math.min(AutoRendererSupport.SLIDER_THUMB_RADIUS, thumbHeight * 0.5F));
     graphics.setTint(Color.WHITE);
   }
 
   private static void drawValue(Graphics graphics, Slider slider, Rectangle area) {
-    RendererSupport.drawText(graphics, slider.displayValue(),
+    AutoRendererSupport.drawText(graphics, slider.displayValue(),
         area.maxX() + slider.valueGapForRender(), area.centralY(),
-        RendererSupport.LEFT_CENTER);
+        AutoRendererSupport.LEFT_CENTER);
   }
 
   /**

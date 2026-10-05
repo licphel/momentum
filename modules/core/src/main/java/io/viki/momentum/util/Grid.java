@@ -33,7 +33,7 @@ import java.util.function.BiConsumer;
  * A fixed-size two-dimensional grid that stores palette-encoded values with
  * optional per-cell metadata.
  *
- * <p>Values are stored indirectly through a {@link Palette}, reducing memory
+ * <p>Values are stored indirectly through a {@link AssignedPalette}, reducing memory
  * overhead when many cells share the same value. Each cell may also carry
  * user-defined metadata bytes for auxiliary data like flags or timestamps.
  *

@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.ui.Layout;
+import io.viki.momentum.gfx.ui.layout.Layout;
 import io.viki.momentum.math.shape.Rectangle;
 
 /**

@@ -22,27 +22,51 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.ui;
+package io.viki.momentum.util;
 
-import io.viki.momentum.gfx.ui.element.Element;
-import io.viki.momentum.gfx.util.impl.Graphics;
-import io.viki.momentum.math.shape.Rectangle;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
- * Rendering strategy for one UI element.
+ * A default assignable implementation of {@link Palette}.
  *
- * <p>An element renderer is responsible only for the element's own visual content. Input
- * handling, layout, child traversal, and clipping remain in the widget and dispatcher layers,
- * which makes custom renderers easy to install without changing widget behavior.
+ * @param <K> the key type stored in this palette
  */
-@FunctionalInterface
-public interface ElementRenderer {
+public class AssignedPalette<K extends PaletteCandidate> implements Palette<K> {
+  private final Map<K, Integer> forward = new HashMap<>();
+  private final List<K> backward = new ArrayList<>();
+
   /**
-   * Renders only the element's own visual content.
+   * Assigns the next sequential ID to the given object.
    *
-   * @param graphics       graphics context receiving the visual content
-   * @param element        element whose state should be represented
-   * @param absoluteBounds element bounds in the graphics coordinate system
+   * @param map the object to register
    */
-  void render(Graphics graphics, Element element, Rectangle absoluteBounds);
+  public void assign(K map) {
+    int id = backward.size();
+    forward.put(map, id);
+    backward.add(map);
+  }
+
+  @Override
+  public int searchIndex(K map) {
+    Integer id = forward.get(map);
+    return id != null ? id : -1;
+  }
+
+  @Override
+  public K get(int index) {
+    return backward.get(index);
+  }
+
+  @Override
+  public int size() {
+    return backward.size();
+  }
+
+  @Override
+  public List<K> values() {
+    return List.copyOf(backward);
+  }
 }

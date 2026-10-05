@@ -25,13 +25,13 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.InputListener;
-import io.viki.momentum.gfx.ui.Locator;
-import io.viki.momentum.gfx.ui.Look;
+import io.viki.momentum.gfx.ui.layout.Locator;
+import io.viki.momentum.gfx.ui.look.Look;
 import io.viki.momentum.gfx.ui.look.AutoLook;
-import io.viki.momentum.gfx.ui.look.EmptyRenderer;
-import io.viki.momentum.gfx.ui.look.auto.UiRenderDispatcher;
+import io.viki.momentum.gfx.ui.present.EmptyRenderer;
+import io.viki.momentum.gfx.ui.present.ElementTreeRenderer;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
@@ -119,11 +119,11 @@ public abstract class Element implements InputListener {
    */
   public void draw(Graphics graphics) {
     relayout();
-    UiRenderDispatcher.INSTANCE.render(graphics, this);
+    ElementTreeRenderer.INSTANCE.render(graphics, this);
   }
 
   /**
-   * Returns the rendering strategy used by {@link UiRenderDispatcher}.
+   * Returns the rendering strategy used by {@link ElementTreeRenderer}.
    *
    * <p>An explicitly installed override takes precedence over the subclass-provided default.
    *

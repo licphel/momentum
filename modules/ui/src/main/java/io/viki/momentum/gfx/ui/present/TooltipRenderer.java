@@ -22,48 +22,26 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.util;
+package io.viki.momentum.gfx.ui.present;
+
+import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.util.impl.Graphics;
 
 import java.util.List;
 
 /**
- * A bidirectional mapping between canonical objects and dense integer identifiers.
- *
- * <p>IDs are assigned sequentially as objects are added. Lookup by object
- * returns the assigned ID; lookup by ID returns the object. The mapping is
- * append-only — entries cannot be removed once added.
- *
- * @param <K> the key type stored in this palette
+ * Presentation of transient rich-text tooltips. Invoked after the element tree on the UI thread.
+ * Input routing retains responsibility for hover detection and display delay.
  */
-public interface Palette<K extends PaletteCandidate> {
+@FunctionalInterface
+public interface TooltipRenderer {
   /**
-   * Returns the ID assigned to the given object.
+   * Renders the rich-text entries at the requested tooltip origin.
    *
-   * @param map the object to look up
-   * @return the assigned ID, or {@code -1} if the object is unknown
+   * @param graphics graphics context receiving the tooltip
+   * @param values   rich-text lines in display order
+   * @param x        tooltip origin in logical coordinates
+   * @param y        tooltip origin in logical coordinates
    */
-  int searchIndex(K map);
-
-  /**
-   * Returns the object for the given ID.
-   *
-   * @param index the ID to look up
-   * @return the object at that ID
-   * @throws IndexOutOfBoundsException if the index is out of range
-   */
-  K get(int index);
-
-  /**
-   * Returns the number of entries in this palette.
-   *
-   * @return the entry count
-   */
-  int size();
-
-  /**
-   * Returns all entries in ID order.
-   *
-   * @return an unmodifiable list of all registered objects
-   */
-  List<K> values();
+  void render(Graphics graphics, List<Text> values, float x, float y);
 }

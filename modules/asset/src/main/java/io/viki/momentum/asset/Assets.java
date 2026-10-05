@@ -24,177 +24,176 @@
 
 package io.viki.momentum.asset;
 
-import io.viki.momentum.util.Identifier;
-import io.viki.momentum.util.Namespace;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
+import io.viki.momentum.util.Identifier;
+import io.viki.momentum.util.Namespace;
 import org.jspecify.annotations.Nullable;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Global, thread-safe asset store keyed by {@link Identifier}.
+ * Global, thread-safe asset store indexed by identifier and resource type.
  *
- * <p>Assets are stored in {@link Ref} containers that support hot-reloading.
- * When {@link #set(Identifier, Object)} is called with a new value for an
- * existing identifier, all {@code Ref} instances for that identifier
- * automatically reflect the update. Code that needs to observe asset
- * changes should call {@link #ref(Identifier, Class)} and hold the
- * returned {@code Ref}, reading from it each time the value is needed.
- *
- * <p>Values that implement {@link AutoCloseable} are closed when removed
- * via {@link #remove(Identifier)} or when the store is cleared.
- *
- * <p>Assets are loaded by {@link Loader} instances and consumed
- * anywhere in the engine.
+ * <p>Each identifier can hold several independently reloadable resources. Resource values use
+ * exact class keys; register interface types explicitly with {@link #set(Identifier, Class, Object)}.
+ * References read the shared per-identifier resource map and listeners run on the updating thread.
+ * Removal closes every stored resource that implements {@link AutoCloseable}.
  */
 public final class Assets {
   private static final Logger LOGGER = Log.getLogger();
-
-  private static final ConcurrentHashMap<Identifier, Ref<?>> STORE = new ConcurrentHashMap<>();
+  private static final ConcurrentHashMap<Identifier, Entry> STORE = new ConcurrentHashMap<>();
 
   private Assets() {
   }
 
   /**
-   * Stores an asset under the given identifier.
+   * Stores an asset under its runtime class.
    *
-   * <p>If a {@link Ref} already exists for the identifier, its value is
-   * updated in place and all registered listeners are notified — this is
-   * the mechanism that enables hot-reloading. The value is verified against
-   * the type of the previous value; a mismatch throws
-   * {@link IllegalArgumentException} and leaves the store unchanged.
-   *
-   * @param id    the asset identifier
-   * @param value the asset value
+   * @param id asset identifier
+   * @param value asset value
    */
   @SuppressWarnings("unchecked")
   public static void set(Identifier id, Object value) {
-    @Nullable Ref<?>[] existing = new Ref<?>[1];
-    STORE.compute(id, (k, ref) -> {
-      if (ref == null) {
-        return new Ref<>(id, value);
-      }
-      existing[0] = ref;
-      return ref;
-    });
-    if (existing[0] != null) {
-      ((Ref<Object>) existing[0]).set(value);
-    }
+    set(id, (Class<Object>) value.getClass(), value);
   }
 
   /**
-   * Retrieves the {@link Ref} for the given identifier.
+   * Stores an asset under an explicit class key, updating only references for that type.
    *
-   * <p>The returned {@code Ref} is a live view — if the asset is later
-   * updated via {@link #set(Identifier, Object)}, the ref's value changes
-   * accordingly.
+   * @param id asset identifier
+   * @param type resource type used for storage and lookup
+   * @param value asset value
+   * @param <T> resource type
+   */
+  public static <T> void set(Identifier id, Class<T> type, T value) {
+    ref(id, type).set(value);
+  }
+
+  /**
+   * Returns the live reference for an identifier and exact type.
    *
-   * @param id   the asset identifier
-   * @param type the expected asset type
-   * @param <T>  the expected asset type
-   * @return the ref
+   * @param id asset identifier
+   * @param type resource type
+   * @param <T> resource type
+   * @return shared reference updated when this identifier and type are set
    */
   @SuppressWarnings("unchecked")
   public static <T> Ref<T> ref(Identifier id, Class<T> type) {
-    return (Ref<T>) STORE.computeIfAbsent(id, _ -> new Ref<>(id, type));
+    Entry entry = STORE.computeIfAbsent(id, k -> new Entry());
+    return (Ref<T>) entry.references.computeIfAbsent(type, k -> new Ref<>(id, type, entry.values));
   }
 
   /**
-   * Retrieves a typed asset by identifier.
+   * Returns a resource, its registered type fallback, or null when neither exists.
    *
-   * <p>This is a convenience method that extracts the current value from
-   * the underlying {@link Ref}. For hot-reload support, prefer
-   * {@link #ref(Identifier, Class)} and hold the returned {@code Ref}.
-   *
-   * <p>If no compatible asset is registered, a fallback registered via
-   * {@link AssetFallback#register(Class, Object)} for the requested type is
-   * returned, or {@code null} if none exists.
-   *
-   * @param id   the asset identifier
-   * @param type the expected type
-   * @param <T>  the expected type
-   * @return the asset, or a type fallback, or {@code null}
+   * @param id asset identifier
+   * @param type resource type
+   * @param <T> resource type
+   * @return stored asset, fallback, or null
    */
-  @SuppressWarnings("unchecked")
+  @SuppressWarnings("all")
   public static <T> @Nullable T getOrDefault(Identifier id, Class<T> type) {
-    Ref<?> ref = STORE.get(id);
-    if (ref != null) {
-      Object value = ref.get();
-      if (type.isInstance(value)) {
-        return (T) value;
+    Entry entry = STORE.get(id);
+    if (entry != null) {
+      T value = type.cast(entry.values.getOrDefault(type, null));
+      if (value != null) {
+        return value;
       }
     }
-    T fallback = AssetFallback.get(type);
-    return type.isInstance(fallback) ? fallback : null;
+    return AssetFallback.contains(type) ? AssetFallback.get(type) : null;
   }
 
   /**
-   * Returns whether an asset is registered under the identifier.
+   * Reports whether the identifier has a resource entry or a requested reference.
    *
-   * @param id the asset identifier
-   * @return {@code true} if an asset is registered
+   * @param id asset identifier
+   * @return whether the identifier exists in the store
    */
   public static boolean contains(Identifier id) {
     return STORE.containsKey(id);
   }
 
   /**
-   * Returns the identifiers of all registered assets.
+   * Reports whether a value is stored for the exact type.
    *
-   * <p>The returned set is a live view backed by the store.
+   * @param id asset identifier
+   * @param type resource type
+   * @return whether a value is registered for this identifier and type
+   */
+  public static boolean contains(Identifier id, Class<?> type) {
+    Entry entry = STORE.get(id);
+    return entry != null && entry.values.containsKey(type);
+  }
+
+  /**
+   * Returns the live view of registered identifiers.
    *
-   * @return the registered identifiers
+   * @return identifiers backed by the store
    */
   public static Set<Identifier> keys() {
     return STORE.keySet();
   }
 
   /**
-   * Returns a snapshot of all current asset values keyed by identifier.
+   * Returns snapshots of the resource values grouped by identifier and exact class.
    *
-   * @return a snapshot map of the store
+   * @return resource maps independent of subsequent store changes
    */
-  public static Map<Identifier, Object> entries() {
-    ConcurrentHashMap<Identifier, Object> snapshot = new ConcurrentHashMap<>();
-    STORE.forEach((id, ref) -> {
-      Object value = ref.get();
-      if (value != null) {
-        snapshot.put(id, value);
+  public static Map<Identifier, Map<Class<?>, Object>> entries() {
+    Map<Identifier, Map<Class<?>, Object>> snapshot = new HashMap<>();
+    STORE.forEach((id, entry) -> {
+      Map<Class<?>, Object> values = new HashMap<>(entry.values);
+      if (!values.isEmpty()) {
+        snapshot.put(id, values);
       }
     });
     return snapshot;
   }
 
   /**
-   * Returns the number of registered assets.
+   * Returns the number of registered identifiers.
    *
-   * @return the asset count
+   * @return identifier count
    */
   public static int size() {
     return STORE.size();
   }
 
   /**
-   * Removes an asset from the store, closing it if it implements
-   * {@link AutoCloseable}.
+   * Removes and closes one resource type while preserving the identifier's other types.
    *
-   * @param id the asset identifier
+   * @param id asset identifier
+   * @param type resource type to remove
    */
-  public static void remove(Identifier id) {
-    Ref<?> ref = STORE.remove(id);
-    if (ref != null) {
-      dispose(ref.get());
+  public static void remove(Identifier id, Class<?> type) {
+    Entry entry = STORE.get(id);
+    if (entry != null) {
+      dispose(entry.values.remove(type));
     }
   }
 
   /**
-   * Clears all assets for the given namespace, closing each one if it
-   * implements {@link AutoCloseable}.
+   * Removes the identifier and closes all resource types registered under it.
    *
-   * @param namespace the namespace to clear
+   * @param id asset identifier
+   */
+  public static void remove(Identifier id) {
+    Entry entry = STORE.remove(id);
+    if (entry != null) {
+      Map<Class<?>, Object> values = new HashMap<>(entry.values);
+      entry.values.clear();
+      values.values().forEach(Assets::dispose);
+    }
+  }
+
+  /**
+   * Removes and closes every resource belonging to a namespace.
+   *
+   * @param namespace namespace to clear
    */
   public static void clearNamespace(Namespace namespace) {
     for (Identifier id : STORE.keySet().toArray(new Identifier[0])) {
@@ -205,12 +204,12 @@ public final class Assets {
   }
 
   /**
-   * Clears all assets from every namespace, closing each one if it
-   * implements {@link AutoCloseable}.
+   * Removes every identifier and closes all stored resources.
    */
   public static void clear() {
-    STORE.forEach((id, ref) -> dispose(ref.get()));
-    STORE.clear();
+    for (Identifier id : STORE.keySet().toArray(new Identifier[0])) {
+      remove(id);
+    }
   }
 
   private static void dispose(@Nullable Object value) {
@@ -221,5 +220,10 @@ public final class Assets {
         LOGGER.warn("Failed to dispose asset", e);
       }
     }
+  }
+
+  private static final class Entry {
+    private final Map<Class<?>, @Nullable Object> values = new ConcurrentHashMap<>();
+    private final Map<Class<?>, Ref<?>> references = new ConcurrentHashMap<>();
   }
 }

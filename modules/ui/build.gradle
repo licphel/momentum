@@ -2,16 +2,6 @@ plugins {
   id 'java-library'
 }
 
-sourceSets {
-  main {
-    resources {
-      srcDir 'src/main/java'
-      include 'shaders/**'
-      include 'io/viki/momentum/gfx/ui/sample.jpg'
-    }
-  }
-}
-
 dependencies {
   api project(':momentum-gfx')
   api project(':momentum-asset')

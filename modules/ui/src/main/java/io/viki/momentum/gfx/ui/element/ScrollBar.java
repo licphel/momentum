@@ -24,8 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
-import io.viki.momentum.gfx.ui.look.auto.ScrollBarRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoScrollBarRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -235,7 +235,7 @@ public final class ScrollBar extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return ScrollBarRenderer.INSTANCE;
+    return AutoScrollBarRenderer.INSTANCE;
   }
 
   @Override

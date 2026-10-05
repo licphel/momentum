@@ -25,10 +25,10 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.ElementRenderer;
-import io.viki.momentum.gfx.ui.look.auto.DropDownOptionRenderer;
-import io.viki.momentum.gfx.ui.look.auto.DropDownPopupRenderer;
-import io.viki.momentum.gfx.ui.look.auto.DropDownRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoDropDownOptionRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoDropDownPopupRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoDropDownRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
 import io.viki.momentum.math.shape.Rectangle;
@@ -283,7 +283,7 @@ public final class DropDown extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return DropDownRenderer.INSTANCE;
+    return AutoDropDownRenderer.INSTANCE;
   }
 
   @Override
@@ -410,7 +410,7 @@ public final class DropDown extends Element {
 
     @Override
     protected ElementRenderer defaultRenderer() {
-      return DropDownPopupRenderer.INSTANCE;
+      return AutoDropDownPopupRenderer.INSTANCE;
     }
 
     @Override
@@ -503,7 +503,7 @@ public final class DropDown extends Element {
 
     @Override
     protected ElementRenderer defaultRenderer() {
-      return DropDownOptionRenderer.INSTANCE;
+      return AutoDropDownOptionRenderer.INSTANCE;
     }
 
     /**

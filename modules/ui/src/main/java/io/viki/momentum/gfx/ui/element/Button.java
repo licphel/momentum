@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
-import io.viki.momentum.gfx.ui.ElementRenderer;
-import io.viki.momentum.gfx.ui.look.auto.ButtonRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
+import io.viki.momentum.gfx.ui.look.auto.AutoButtonRenderer;
 import io.viki.momentum.input.*;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -141,7 +141,7 @@ public final class Button extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return ButtonRenderer.INSTANCE;
+    return AutoButtonRenderer.INSTANCE;
   }
 
   /**

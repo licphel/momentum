@@ -25,6 +25,7 @@
 package io.viki.momentum.registry;
 
 import io.viki.momentum.util.Identifier;
+import io.viki.momentum.util.Palette;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Set;
@@ -41,7 +42,7 @@ import java.util.stream.Stream;
  *
  * @param <T> the type of entries stored in this registry
  */
-public interface Registry<T extends RegistryEntry> extends Iterable<T> {
+public interface Registry<T extends RegistryEntry> extends Palette<T>, Iterable<T> {
   /**
    * Returns the identifier under which this registry itself is registered.
    *

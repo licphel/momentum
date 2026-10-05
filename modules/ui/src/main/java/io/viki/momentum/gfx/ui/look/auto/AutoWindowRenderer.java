@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx.ui.look.auto;
 
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Window;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -37,30 +37,30 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>The renderer deliberately leaves child clipping and backdrop capture to the dispatcher;
  * it only paints the window's own visual layers and control affordances.
  */
-public final class WindowRenderer implements ElementRenderer {
+public final class AutoWindowRenderer implements ElementRenderer {
   /** Shared stateless renderer used by windows. */
-  public static final WindowRenderer INSTANCE = new WindowRenderer();
+  public static final AutoWindowRenderer INSTANCE = new AutoWindowRenderer();
 
-  private WindowRenderer() {
+  private AutoWindowRenderer() {
   }
 
   private static void drawTitleBar(Graphics graphics, Window window, Rectangle titleArea) {
     if (titleArea.width() <= 0.0F || titleArea.height() <= 0.0F) {
       return;
     }
-    RendererSupport.fill(graphics, titleArea, RendererSupport.GLASS_TITLE_SURFACE);
-    RendererSupport.drawBoundary(graphics, titleArea, RendererSupport.OUTLINE);
-    graphics.drawText(window.title(), titleArea.minX() + RendererSupport.PADDING,
-        titleArea.centralY(), RendererSupport.LEFT_CENTER);
+    AutoRendererSupport.fill(graphics, titleArea, AutoRendererSupport.GLASS_TITLE_SURFACE);
+    AutoRendererSupport.drawBoundary(graphics, titleArea, AutoRendererSupport.OUTLINE);
+    graphics.drawText(window.title(), titleArea.minX() + AutoRendererSupport.PADDING,
+        titleArea.centralY(), AutoRendererSupport.LEFT_CENTER);
   }
 
   private static void drawCloseButton(Graphics graphics, Window window, Rectangle closeArea,
                                       float titleHeight) {
     if (window.closePressed() || window.closeHovered()) {
-      RendererSupport.fill(graphics, closeArea,
-          window.closePressed() ? RendererSupport.STATE_PRESSED : RendererSupport.CLOSE_HOVER);
+      AutoRendererSupport.fill(graphics, closeArea,
+          window.closePressed() ? AutoRendererSupport.STATE_PRESSED : AutoRendererSupport.CLOSE_HOVER);
     }
-    graphics.setTint(RendererSupport.CLOSE_FOREGROUND);
+    graphics.setTint(AutoRendererSupport.CLOSE_FOREGROUND);
     float inset = titleHeight * 0.32F;
     Rectangle iconArea = Rectangle.of(closeArea.minX() + inset, closeArea.minY() + inset,
         closeArea.width() - inset * 2.0F, closeArea.height() - inset * 2.0F);
@@ -72,10 +72,10 @@ public final class WindowRenderer implements ElementRenderer {
   private static void drawMinimizeButton(Graphics graphics, Window window, Rectangle minimizeArea,
                                          float titleHeight) {
     if (window.minimizePressed() || window.minimizeHovered()) {
-      RendererSupport.fill(graphics, minimizeArea,
-          window.minimizePressed() ? RendererSupport.STATE_PRESSED : RendererSupport.CLOSE_HOVER);
+      AutoRendererSupport.fill(graphics, minimizeArea,
+          window.minimizePressed() ? AutoRendererSupport.STATE_PRESSED : AutoRendererSupport.CLOSE_HOVER);
     }
-    graphics.setTint(RendererSupport.CLOSE_FOREGROUND);
+    graphics.setTint(AutoRendererSupport.CLOSE_FOREGROUND);
     float inset = titleHeight * 0.32F;
     float y = minimizeArea.maxY() - inset;
     graphics.drawLine(minimizeArea.minX() + inset, y, minimizeArea.maxX() - inset, y);
@@ -102,7 +102,7 @@ public final class WindowRenderer implements ElementRenderer {
   private void renderWindow(Graphics graphics, Element raw, Rectangle area) {
     Window window = (Window) raw;
     // Draw the glass surface and outer frame after the dispatcher backdrop pass.
-    RendererSupport.drawWindowBackground(graphics, area, window.shadowEnabled());
+    AutoRendererSupport.drawWindowBackground(graphics, area, window.shadowEnabled());
     // Draw the title-bar surface and separator frame.
     float titleHeight = Math.min(area.height(), window.titleHeightForRender());
     Rectangle titleArea = Rectangle.of(area.minX(), area.minY(), area.width(), titleHeight);

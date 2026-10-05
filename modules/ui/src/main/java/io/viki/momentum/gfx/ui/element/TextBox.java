@@ -28,10 +28,10 @@ import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.MutableText;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.text.raster.Raster;
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.HeadlessTextEditor;
-import io.viki.momentum.gfx.ui.look.TextBoxPresentation;
-import io.viki.momentum.gfx.ui.look.auto.TextBoxRenderer;
+import io.viki.momentum.gfx.ui.present.TextBoxPresentation;
+import io.viki.momentum.gfx.ui.look.auto.AutoTextBoxRenderer;
 import io.viki.momentum.input.InputModifiers;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
@@ -484,7 +484,7 @@ public final class TextBox extends Element {
 
   @Override
   protected ElementRenderer defaultRenderer() {
-    return TextBoxRenderer.INSTANCE;
+    return AutoTextBoxRenderer.INSTANCE;
   }
 
   @Override
@@ -615,7 +615,7 @@ public final class TextBox extends Element {
     // Resolve dynamically: changing an override or inherited look also changes editor metrics.
     ElementRenderer renderer = renderer();
     return renderer instanceof TextBoxPresentation presentation
-        ? presentation : TextBoxRenderer.INSTANCE;
+        ? presentation : AutoTextBoxRenderer.INSTANCE;
   }
 
   private void copySelection() {

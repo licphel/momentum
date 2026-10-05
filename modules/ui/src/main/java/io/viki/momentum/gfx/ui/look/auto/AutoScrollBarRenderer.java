@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
-import io.viki.momentum.gfx.ui.ElementRenderer;
+import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.ScrollBar;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -36,35 +36,35 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>The track frame is intentionally separate from the hosting scroll pane so the scrollbar
  * remains visually distinct even when the two controls touch.
  */
-public final class ScrollBarRenderer implements ElementRenderer {
+public final class AutoScrollBarRenderer implements ElementRenderer {
   /** Shared stateless renderer used by scrollbars. */
-  public static final ScrollBarRenderer INSTANCE = new ScrollBarRenderer();
+  public static final AutoScrollBarRenderer INSTANCE = new AutoScrollBarRenderer();
 
-  private ScrollBarRenderer() {
+  private AutoScrollBarRenderer() {
   }
 
   private static void drawFrame(Graphics graphics, ScrollBar scrollBar, Rectangle area) {
-    var border = scrollBar.focused() ? RendererSupport.OUTLINE_FOCUS
-        : scrollBar.hovered() ? RendererSupport.OUTLINE_HOVER : RendererSupport.OUTLINE;
-    RendererSupport.drawBoundary(graphics, area, border);
+    var border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
+        : scrollBar.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;
+    AutoRendererSupport.drawBoundary(graphics, area, border);
   }
 
   private static Rectangle visualThumb(Rectangle area, Rectangle thumb) {
     return area.width() >= area.height()
-        ? Rectangle.of(thumb.minX(), area.centralY() - RendererSupport.SCROLLBAR_THUMB_THICKNESS
-        * 0.5F, thumb.width(), RendererSupport.SCROLLBAR_THUMB_THICKNESS)
-        : Rectangle.of(area.centralX() - RendererSupport.SCROLLBAR_THUMB_THICKNESS * 0.5F,
-        thumb.minY(), RendererSupport.SCROLLBAR_THUMB_THICKNESS, thumb.height());
+        ? Rectangle.of(thumb.minX(), area.centralY() - AutoRendererSupport.SCROLLBAR_THUMB_THICKNESS
+        * 0.5F, thumb.width(), AutoRendererSupport.SCROLLBAR_THUMB_THICKNESS)
+        : Rectangle.of(area.centralX() - AutoRendererSupport.SCROLLBAR_THUMB_THICKNESS * 0.5F,
+        thumb.minY(), AutoRendererSupport.SCROLLBAR_THUMB_THICKNESS, thumb.height());
   }
 
   private static void drawThumbSurface(Graphics graphics, Rectangle visual) {
-    RendererSupport.fill(graphics, visual, RendererSupport.TRACK_FILL);
+    AutoRendererSupport.fill(graphics, visual, AutoRendererSupport.TRACK_FILL);
   }
 
   private static void drawThumbFrame(Graphics graphics, ScrollBar scrollBar, Rectangle visual) {
-    var border = scrollBar.focused() ? RendererSupport.OUTLINE_FOCUS
-        : scrollBar.hovered() ? RendererSupport.OUTLINE_HOVER : RendererSupport.OUTLINE;
-    RendererSupport.drawBoundary(graphics, visual, border);
+    var border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
+        : scrollBar.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;
+    AutoRendererSupport.drawBoundary(graphics, visual, border);
   }
 
   /**
