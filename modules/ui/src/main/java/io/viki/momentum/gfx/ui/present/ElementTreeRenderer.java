@@ -27,7 +27,6 @@ package io.viki.momentum.gfx.ui.present;
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.Window;
-import io.viki.momentum.gfx.ui.look.auto.BackdropBlurEffect;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -40,8 +39,8 @@ import java.util.List;
  *
  * <p>Children are rendered in their insertion order, while parts are rendered in a second local
  * pass so popups and other overlays remain above sibling content. A layer boundary is rendered as
- * one unit, which keeps an overlay from an older window above a newer window. A window that opts
- * into backdrop blur receives a full-surface capture before its translucent glass is painted.
+ * one unit, which keeps an overlay from an older window above a newer window. Backdrop blur is
+ * applied only where a window overlaps previously rendered windows.
  */
 public final class ElementTreeRenderer implements AutoCloseable {
   /** Dispatcher used by elements that are drawn without an explicitly configured Canvas. */
@@ -171,8 +170,8 @@ public final class ElementTreeRenderer implements AutoCloseable {
       return;
     }
     Rectangle absolute = absoluteBounds(element, parentX, parentY);
-    if (element instanceof Window window) {
-      drawWindowBackdrop(graphics, window, absolute);
+    if (element instanceof Window) {
+      drawOccludedBackdrop(graphics, absolute);
       renderedWindows.add(absolute);
     }
     element.renderer().render(graphics, element, absolute);
@@ -228,13 +227,5 @@ public final class ElementTreeRenderer implements AutoCloseable {
     for (Rectangle region : blurRegions) {
       backdropBlur.draw(graphics, region);
     }
-  }
-
-  private void drawWindowBackdrop(Graphics graphics, Window window, Rectangle windowBounds) {
-    if (backdropBlur != null && window.backdropBlurEnabled()) {
-      backdropBlur.draw(graphics, windowBounds);
-      return;
-    }
-    drawOccludedBackdrop(graphics, windowBounds);
   }
 }

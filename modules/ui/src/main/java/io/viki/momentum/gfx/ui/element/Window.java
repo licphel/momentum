@@ -45,7 +45,6 @@ public final class Window extends Element {
   private boolean movable = true;
   private boolean closable = true;
   private boolean minimizable = true;
-  private boolean backdropBlurEnabled;
   private boolean shadowEnabled = true;
   private boolean closed;
   private boolean minimized;
@@ -87,24 +86,6 @@ public final class Window extends Element {
    */
   public void setTitle(Text value) {
     title = value;
-  }
-
-  /**
-   * Reports whether this window asks the UI dispatcher to blur the content behind its surface.
-   *
-   * @return {@code true} when backdrop blur is enabled
-   */
-  public boolean backdropBlurEnabled() {
-    return backdropBlurEnabled;
-  }
-
-  /**
-   * Enables or disables the device-backed frosted backdrop pass for this window.
-   *
-   * @param value {@code true} to blur the framebuffer behind the window before painting its glass
-   */
-  public void setBackdropBlurEnabled(boolean value) {
-    backdropBlurEnabled = value;
   }
 
   /**
