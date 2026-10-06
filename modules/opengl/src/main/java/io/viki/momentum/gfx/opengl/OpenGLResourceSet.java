@@ -53,15 +53,12 @@ public final class OpenGLResourceSet implements ResourceSet {
   private static final byte UNIFORM = 2;
 
   private final ResourceSetLayout layout;
-  /**
-   * Sparse list of bound slots, grown on demand. A set typically carries a handful
-   * of bindings, so a linear scan on bind and a compact array beat dense
-   * fixed-size arrays with mostly-empty entries (a set is created per draw batch).
-   */
+  /** Entries for slots with recorded resource bindings. */
   private ResourceSlot[] slots = new ResourceSlot[2];
   private int slotCount = 0;
+  private @Nullable OpenGLResourceSet recordedSnapshot;
 
-  OpenGLResourceSet(OpenGLDevice ctx, ResourceSetLayout layout) {
+  OpenGLResourceSet(ResourceSetLayout layout) {
     this.layout = layout;
   }
 
@@ -70,8 +67,34 @@ public final class OpenGLResourceSet implements ResourceSet {
     return layout;
   }
 
+  /**
+   * Captures the current bindings for commands recorded before the next binding change.
+   *
+   * @return a resource set containing the current bindings
+   */
+  OpenGLResourceSet snapshot() {
+    if (recordedSnapshot != null) return recordedSnapshot;
+    OpenGLResourceSet copy = new OpenGLResourceSet(layout);
+    copy.slots = new ResourceSlot[slotCount];
+    copy.slotCount = slotCount;
+    for (int i = 0; i < slotCount; i++) {
+      ResourceSlot source = slots[i];
+      ResourceSlot target = new ResourceSlot(source.index);
+      target.type = source.type;
+      target.texture = source.texture;
+      target.sampler = source.sampler;
+      target.ubo = source.ubo;
+      target.uboSize = source.uboSize;
+      target.uboOffset = source.uboOffset;
+      copy.slots[i] = target;
+    }
+    recordedSnapshot = copy;
+    return copy;
+  }
+
   @Override
   public void bindTexture(int slot, Texture texture, Sampler sampler) {
+    recordedSnapshot = null;
     ResourceSlot s = findOrCreate(slot);
     s.type = TEXTURE;
     s.texture = (Handle) texture;
@@ -80,6 +103,7 @@ public final class OpenGLResourceSet implements ResourceSet {
 
   @Override
   public void bindUniform(int slot, BufferObject buffer, int size, int offset) {
+    recordedSnapshot = null;
     ResourceSlot s = findOrCreate(slot);
     s.type = UNIFORM;
     s.ubo = (OpenGLBufferObject) buffer;
@@ -91,7 +115,12 @@ public final class OpenGLResourceSet implements ResourceSet {
   public void close() {
   }
 
-  /** Returns the slot entry, updating an existing one or appending a new one. */
+  /**
+   * Returns the binding entry for a descriptor slot.
+   *
+   * @param slot the descriptor slot to find or create
+   * @return the existing entry, or a new entry when the slot has not been bound
+   */
   private ResourceSlot findOrCreate(int slot) {
     for (int i = 0; i < slotCount; i++) {
       if (slots[i].index == slot) {
@@ -109,7 +138,7 @@ public final class OpenGLResourceSet implements ResourceSet {
   /**
    * Applies all recorded bindings to the GL state cache.
    *
-   * @param cache the global cache
+   * @param cache the state cache that receives these bindings
    */
   public void apply(OpenGLCache cache) {
     for (int i = 0; i < slotCount; i++) {
@@ -131,9 +160,10 @@ public final class OpenGLResourceSet implements ResourceSet {
   }
 
   /**
-   * Validates this set's layout against the pipeline's layout at the given slot.
+   * Checks whether this set's layout matches the pipeline's required layout.
    *
-   * @throws GraphicsException if the layouts are incompatible
+   * @param pipelineLayout the required layout, or null when no layout is available
+   * @throws GraphicsException if the layouts are incompatible, including when {@code pipelineLayout} is null
    */
   void validate(@Nullable ResourceSetLayout pipelineLayout) {
     if (!layout.matches(pipelineLayout)) {
@@ -141,7 +171,7 @@ public final class OpenGLResourceSet implements ResourceSet {
     }
   }
 
-  /** One bound slot: the set keeps a sparse list of these instead of dense arrays. */
+  /** Holds the resources bound to one shader-visible slot. */
   private static final class ResourceSlot {
     final int index;
     byte type;

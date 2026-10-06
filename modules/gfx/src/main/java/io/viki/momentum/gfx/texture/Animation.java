@@ -24,6 +24,7 @@
 
 package io.viki.momentum.gfx.texture;
 
+import io.viki.momentum.gfx.io.ImageInfo;
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
@@ -61,6 +62,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * Creates a looping animation definition.
    *
    * @param frames ordered frame list, which must contain at least one frame
+   * @throws IllegalArgumentException if {@code frames} is empty
    */
   public Animation(List<Frame> frames) {
     this(frames, true);
@@ -75,6 +77,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param duration    duration of each frame in seconds
    * @param loop        whether playback restarts after the last frame
    * @return animation containing the even rows
+   * @throws IllegalArgumentException if the sheet contains no complete selected frame
    */
   public static Animation fromEvenRows(Texture sheet, int frameWidth, int frameHeight,
                                        float duration, boolean loop) {
@@ -92,6 +95,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param offsetX     X coordinate of the first frame
    * @param offsetY     Y coordinate of the first frame
    * @return animation containing the even rows
+   * @throws IllegalArgumentException if the sheet contains no complete selected frame
    */
   public static Animation fromEvenRows(Texture sheet, int frameWidth, int frameHeight,
                                        float duration, boolean loop, int offsetX, int offsetY) {
@@ -116,6 +120,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param duration    duration of each frame in seconds
    * @param loop        whether playback restarts after the last frame
    * @return animation containing the even columns
+   * @throws IllegalArgumentException if the sheet contains no complete selected frame
    */
   public static Animation fromEvenCols(Texture sheet, int frameWidth, int frameHeight,
                                        float duration, boolean loop) {
@@ -133,6 +138,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param offsetX     X coordinate of the first frame
    * @param offsetY     Y coordinate of the first frame
    * @return animation containing the even columns
+   * @throws IllegalArgumentException if the sheet contains no complete selected frame
    */
   public static Animation fromEvenCols(Texture sheet, int frameWidth, int frameHeight,
                                        float duration, boolean loop, int offsetX, int offsetY) {
@@ -159,6 +165,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param duration    duration of each frame in seconds
    * @param loop        whether playback restarts after the last frame
    * @return animation containing the horizontal frames
+   * @throws IllegalArgumentException if {@code frameCount} is not positive
    */
   public static Animation fromHorizontalRow(Texture sheet, Color anchorColor,
                                             int frameWidth, int frameHeight, int frameCount,
@@ -180,6 +187,7 @@ public record Animation(List<Frame> frames, boolean loop) {
    * @param offsetX     X coordinate of the first frame
    * @param offsetY     Y coordinate of the first frame
    * @return animation containing the horizontal frames
+   * @throws IllegalArgumentException if {@code frameCount} is not positive
    */
   public static Animation fromHorizontalRow(Texture sheet, Color anchorColor,
                                             int frameWidth, int frameHeight, int frameCount,
@@ -197,10 +205,56 @@ public record Animation(List<Frame> frames, boolean loop) {
     return new Animation(frames, loop);
   }
 
+  /**
+   * Creates a horizontal animation from an atlas-backed sheet.
+   *
+   * <p>The decoded image is used only for anchor discovery; the returned frames retain the
+   * supplied atlas region and therefore do not create a standalone texture.
+   *
+   * @param sheet       atlas-backed sheet region
+   * @param image       decoded source image corresponding to {@code sheet}
+   * @param anchorColor color identifying the attachment pixel
+   * @param frameWidth  frame width in pixels
+   * @param frameHeight frame height in pixels
+   * @param frameCount  number of consecutive frames
+   * @param duration    duration of each frame in seconds
+   * @param loop        whether playback restarts after the last frame
+   * @param offsetX     X coordinate of the first frame in the source image
+   * @param offsetY     Y coordinate of the first frame in the source image
+   * @return animation containing atlas-backed horizontal frames
+   * @throws IllegalArgumentException if {@code frameCount} is not positive
+   */
+  public static Animation fromHorizontalRow(TexturePart sheet, ImageInfo image,
+                                            Color anchorColor, int frameWidth, int frameHeight,
+                                            int frameCount, float duration, boolean loop,
+                                            int offsetX, int offsetY) {
+    List<Frame> frames = new ArrayList<>(frameCount);
+    for (int index = 0; index < frameCount; index++) {
+      int frameX = offsetX + index * frameWidth;
+      Map<Color, Vector2> anchors = getAnchors(
+          image, anchorColor, frameX, offsetY, frameWidth, frameHeight);
+      TexturePart region = new TexturePart(
+          sheet, Rectangle.of(frameX, offsetY, frameWidth, frameHeight));
+      frames.add(new Frame(region, duration, anchors));
+    }
+    return new Animation(frames, loop);
+  }
+
   private static Frame frame(Texture sheet, int x, int y, int width, int height, float duration) {
     return new Frame(new TexturePart(sheet, Rectangle.of(x, y, width, height)), duration);
   }
 
+  /**
+   * Finds the first occurrence of an anchor color within a texture frame.
+   *
+   * @param sheet the texture containing the frame
+   * @param anchorColor the color that identifies the anchor
+   * @param frameX the frame's left coordinate in the texture
+   * @param frameY the frame's top coordinate in the texture
+   * @param frameWidth the frame width in pixels
+   * @param frameHeight the frame height in pixels
+   * @return anchor metadata, empty when the color does not occur in the frame
+   */
   private static Map<Color, Vector2> getAnchors(Texture sheet, Color anchorColor,
                                                 int frameX, int frameY,
                                                 int frameWidth, int frameHeight) {
@@ -210,6 +264,39 @@ public record Animation(List<Frame> frames, boolean loop) {
       for (int x = 0; x < frameWidth; x++) {
         int pixel = sheet.pixel(frameX + x, frameY + y, 0);
         if (pixel == anchorRgba) {
+          anchors.putIfAbsent(anchorColor, new Vector2(x, y));
+        }
+      }
+    }
+    return Map.copyOf(anchors);
+  }
+
+  /**
+   * Finds the first occurrence of an anchor color within a decoded image frame.
+   *
+   * @param sheet the image containing the frame
+   * @param anchorColor the color that identifies the anchor
+   * @param frameX the frame's left coordinate in the image
+   * @param frameY the frame's top coordinate in the image
+   * @param frameWidth the frame width in pixels
+   * @param frameHeight the frame height in pixels
+   * @return anchor metadata, empty when the color does not occur in the frame
+   */
+  private static Map<Color, Vector2> getAnchors(ImageInfo sheet, Color anchorColor,
+                                                int frameX, int frameY,
+                                                int frameWidth, int frameHeight) {
+    Map<Color, Vector2> anchors = new LinkedHashMap<>();
+    int anchorRgba = anchorColor.packRgba8();
+    int channels = sheet.channels();
+    byte[] pixels = sheet.pixels();
+    for (int y = 0; y < frameHeight; y++) {
+      for (int x = 0; x < frameWidth; x++) {
+        int offset = ((frameY + y) * sheet.width() + frameX + x) * channels;
+        int red = Byte.toUnsignedInt(pixels[offset]);
+        int green = channels > 1 ? Byte.toUnsignedInt(pixels[offset + 1]) : red;
+        int blue = channels > 2 ? Byte.toUnsignedInt(pixels[offset + 2]) : green;
+        int alpha = channels > 3 ? Byte.toUnsignedInt(pixels[offset + 3]) : 255;
+        if (Color.packRgba8(red, green, blue, alpha) == anchorRgba) {
           anchors.putIfAbsent(anchorColor, new Vector2(x, y));
         }
       }

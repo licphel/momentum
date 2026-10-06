@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.util.impl;
 
+import io.viki.momentum.util.Analysis;
+
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
@@ -55,6 +57,8 @@ import java.util.List;
  *
  * <p>{@link #begin(RenderPass)} and {@link #end()} have no effect in this implementation;
  * render pass management is the caller's responsibility when drawing the baked mesh.
+ *
+ * <p>This builder is not thread-safe and should be used by one thread at a time.
  *
  * @see BatchedGraphics
  * @see Mesh
@@ -116,39 +120,81 @@ public final class MeshGraphics extends BatchedGraphics {
    * and topology. Every baked mesh owns its own uniform buffer, so meshes cached from one
    * context can be created and closed independently — a shared ubo would be released by the
    * first {@link Mesh#close()}. The result can be drawn with
-   * {@link Graphics#drawMesh(Mesh)}.
+   * {@link Graphics#drawMesh(Mesh)}. Baking clears the builder so it can record a new mesh.
    *
    * @param device the GPU device to allocate buffers from
    * @return a new mesh containing all recorded geometry
    */
   public Mesh bake(Device device) {
+    return finish().bake(device);
+  }
+
+  /**
+   * Freezes the recorded CPU geometry without creating or uploading GPU resources.
+   *
+   * <p>The builder is cleared and can record more geometry after this call.
+   *
+   * @return an immutable draft that can later be baked into a mesh
+   */
+  public Draft finish() {
     flush(true);
-    List<Section> sections = new ArrayList<>();
+    Draft draft = new Draft(List.copyOf(drafts));
+    drafts.clear();
+    return draft;
+  }
 
-    for (SectionDraft d : drafts) {
-      if (d.primitive() == null) {
-        continue;
-      }
-      ResourceSet rs = device.getResourceSet(d.rsl);
-      boolean tex = d.primitive().isTextured();
-      if (tex && d.texture() != null && d.sampler() != null) {
-        rs.bindTexture(1, d.texture(), d.sampler());
-      }
+  /**
+   * Holds a frozen geometry snapshot independently of the builder that created it.
+   *
+   * <p>A draft can be produced on a worker thread and baked into GPU resources on the context
+   * thread.
+   */
+  public static final class Draft {
+    private final List<SectionDraft> drafts;
 
-      BufferObject vbo = device.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STATIC));
-      vbo.submit(d.vertices(), 0, d.vertices().length);
-      BufferObject ibo = d.primitive().isIndexed() ? device.getBuffer(BufferObjectDesc.index(BufferFrequency.STATIC)) : null;
-      if (ibo != null) {
-        ibo.submit(d.indices(), 0, d.indices().length);
-      }
-
-      Topology top = d.primitive().topology();
-      int idxCount = d.indices().length / Integer.BYTES;
-      int vertCount = d.vertices().length / d.primitive().vertexSize();
-      sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount, top));
+    private Draft(List<SectionDraft> drafts) {
+      this.drafts = drafts;
     }
 
-    return new Mesh(List.copyOf(sections));
+    /**
+     * Creates the GPU resources for this draft and returns the resulting mesh.
+     *
+     * @param device the GPU device that receives the mesh resources
+     * @return the mesh containing this draft's geometry
+     */
+    public Mesh bake(Device device) {
+      Analysis.start("mesh.allocateBuffersAndQueueUploads");
+      try {
+        List<Section> sections = new ArrayList<>();
+
+        for (SectionDraft d : drafts) {
+          if (d.primitive() == null) {
+            continue;
+          }
+          ResourceSet rs = device.getResourceSet(d.rsl);
+          boolean tex = d.primitive().isTextured();
+          if (tex && d.texture() != null && d.sampler() != null) {
+            rs.bindTexture(1, d.texture(), d.sampler());
+          }
+
+          BufferObject vbo = device.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STATIC));
+          vbo.submit(d.vertices(), 0, d.vertices().length);
+          BufferObject ibo = d.primitive().isIndexed() ? device.getBuffer(BufferObjectDesc.index(BufferFrequency.STATIC)) : null;
+          if (ibo != null) {
+            ibo.submit(d.indices(), 0, d.indices().length);
+          }
+
+          Topology top = d.primitive().topology();
+          int idxCount = d.indices().length / Integer.BYTES;
+          int vertCount = d.vertices().length / d.primitive().vertexSize();
+          sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount, top));
+        }
+
+        return new Mesh(List.copyOf(sections));
+      } finally {
+        Analysis.end("mesh.allocateBuffersAndQueueUploads");
+      }
+    }
   }
 
   private record SectionDraft(byte[] vertices,

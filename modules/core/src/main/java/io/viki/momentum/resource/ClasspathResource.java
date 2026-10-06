@@ -65,50 +65,6 @@ public final class ClasspathResource implements Resource {
     this.root = root;
   }
 
-  @Override
-  public ClasspathResource resolve(String directory) {
-    String child = Resource.normalizePath(directory);
-    return child.isEmpty() ? this : new ClasspathResource(classLoader, codeSource, rootedPath(child));
-  }
-
-  private String rootedPath(String path) {
-    String child = Resource.normalizePath(path);
-    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
-  }
-
-  @Override
-  public @Nullable InputStream open(String path) throws IOException {
-    String normalized = rootedPath(path);
-    if (codeSource != null) {
-      Resource source = Files.isRegularFile(codeSource)
-          ? Resource.jar(codeSource) : Resource.directory(codeSource);
-      if (source.exists(normalized)) {
-        return source.open(normalized);
-      }
-    }
-    return classLoader.getResourceAsStream(normalized);
-  }
-
-  @Override
-  public Stream<String> walk(String relativeDir) throws IOException {
-    String directory = rootedPath(relativeDir);
-    List<String> paths = new ArrayList<>();
-    if (codeSource != null && Files.isRegularFile(codeSource)) {
-      collectJar(codeSource, directory, paths);
-      return relativePaths(paths);
-    }
-    Enumeration<URL> roots = classLoader.getResources(directory);
-    while (roots.hasMoreElements()) {
-      collect(roots.nextElement(), directory, paths);
-    }
-    return relativePaths(paths);
-  }
-
-  private Stream<String> relativePaths(List<String> paths) {
-    int rootLength = root.isEmpty() ? 0 : root.length() + 1;
-    return paths.stream().map(path -> path.substring(rootLength)).distinct().sorted();
-  }
-
   private static void collect(URL root, String directory, List<String> paths) throws IOException {
     switch (root.getProtocol()) {
       case "file" -> collectDirectory(root, directory, paths);
@@ -162,5 +118,49 @@ public final class ClasspathResource implements Resource {
     } catch (RuntimeException | URISyntaxException exception) {
       return null;
     }
+  }
+
+  @Override
+  public ClasspathResource resolve(String directory) {
+    String child = Resource.normalizePath(directory);
+    return child.isEmpty() ? this : new ClasspathResource(classLoader, codeSource, rootedPath(child));
+  }
+
+  @Override
+  public @Nullable InputStream open(String path) throws IOException {
+    String normalized = rootedPath(path);
+    if (codeSource != null) {
+      Resource source = Files.isRegularFile(codeSource)
+          ? Resource.jar(codeSource) : Resource.directory(codeSource);
+      if (source.exists(normalized)) {
+        return source.open(normalized);
+      }
+    }
+    return classLoader.getResourceAsStream(normalized);
+  }
+
+  @Override
+  public Stream<String> walk(String relativeDir) throws IOException {
+    String directory = rootedPath(relativeDir);
+    List<String> paths = new ArrayList<>();
+    if (codeSource != null && Files.isRegularFile(codeSource)) {
+      collectJar(codeSource, directory, paths);
+      return relativePaths(paths);
+    }
+    Enumeration<URL> roots = classLoader.getResources(directory);
+    while (roots.hasMoreElements()) {
+      collect(roots.nextElement(), directory, paths);
+    }
+    return relativePaths(paths);
+  }
+
+  private String rootedPath(String path) {
+    String child = Resource.normalizePath(path);
+    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
+  }
+
+  private Stream<String> relativePaths(List<String> paths) {
+    int rootLength = root.isEmpty() ? 0 : root.length() + 1;
+    return paths.stream().map(path -> path.substring(rootLength)).distinct().sorted();
   }
 }

@@ -24,13 +24,17 @@
 
 package io.viki.momentum.gfx.opengl;
 
+import io.viki.momentum.util.Analysis;
+
 import io.viki.momentum.gfx.DirectBufferPool;
+import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.buffer.BufferUsage;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -44,7 +48,7 @@ import static org.lwjgl.opengl.GL33.*;
  * or {@code GL_UNIFORM_BUFFER}) and a usage hint derived from its {@link BufferFrequency}. All GL calls are enqueued
  * via {@link OpenGLDevice#submit(Runnable)} for execution on the render thread.
  *
- * <p><b>Buf orphaning:</b> for {@link BufferFrequency#STREAM} buffers,
+ * <p><b>Buffer orphaning:</b> for {@link BufferFrequency#STREAM} buffers,
  * a {@link #submit(byte[], int, int)} call at offset 0 discards the previous allocation (via an extra
  * {@code glBufferData}) before writing. This technique avoids GPU pipeline stalls by letting the driver rotate through
  * fresh backing storage each frame. The trade-off is an extra allocation per frame.
@@ -59,10 +63,12 @@ import static org.lwjgl.opengl.GL33.*;
  */
 @InternalApi
 public final class OpenGLBufferObject implements BufferObject, Handle {
+  private static final ByteBuffer EMPTY_UPLOAD = ByteBuffer.allocate(0);
   private final OpenGLDevice ctx;
   private final BufferObjectDesc desc;
   private final int target;
   private final int hint;
+  private final Pool<UploadCommand> uploads = new Pool<>();
 
   /**
    * The GL buffer handle (0 until the render thread creates it).
@@ -113,6 +119,7 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
         try {
           bb.put(data).flip();
           glBufferData(target, bb, hint);
+          GraphicsMetrics.recordBufferUpload(cap);
         } finally {
           DirectBufferPool.release(bb);
         }
@@ -125,39 +132,32 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
 
   @Override
   public void submit(ByteBuffer memory, int offset) {
-    /*
-     * Copy first since the memory is volatile.
-     * Users may pollute the memory after submission.
-     *
-     * P.S. This might influence the performance.
-     * However, this is essential, if we want a pure asynchronous submission.
-     */
-    int size = memory.remaining();
-    if (size == 0) {
-      return;
+    Analysis.start("buffer.copyUploadDataAndQueue");
+    try {
+      /*
+       * Copy first since the memory is volatile.
+       * Users may pollute the memory after submission.
+       *
+       * P.S. This might influence the performance.
+       * However, this is essential, if we want a pure asynchronous submission.
+       */
+      int size = memory.remaining();
+      if (size == 0) {
+        return;
+      }
+      ByteBuffer bb = DirectBufferPool.acquire(size);
+      bb.put(memory).flip();
+
+      UploadCommand command = uploads.poll();
+      if (command == null) {
+        command = new UploadCommand(this);
+      }
+      command.bytes = bb;
+      command.offset = offset;
+      ctx.submit(command);
+    } finally {
+      Analysis.end("buffer.copyUploadDataAndQueue");
     }
-    ByteBuffer bb = DirectBufferPool.acquire(size);
-    bb.put(memory).flip();
-
-    ctx.submit(() -> {
-      OpenGLCache cache = ctx.cache;
-      int needed = offset + size;
-      cache.bindBuffer(target, handle);
-
-      if (needed > capacity) {
-        int newCap = Math.max(needed, capacity * 2);
-        glBufferData(target, newCap, hint);
-        capacity = newCap;
-      }
-
-      if (desc.frequency() == BufferFrequency.STREAM && offset == 0) {
-        // Buf orphaning: discard the old allocation before writing.
-        glBufferData(target, capacity, hint);
-      }
-
-      glBufferSubData(target, offset, bb);
-      DirectBufferPool.release(bb);
-    });
   }
 
   @Override
@@ -168,6 +168,7 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
         // otherwise the handle could be recycled under a dangling VAO
         ctx.vaos.invalidateBuffer(handle);
         glDeleteBuffers(handle);
+        ctx.cache.invalidateBuffer(handle);
         handle = 0;
       }
     });
@@ -176,5 +177,53 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
   @Override
   public int handle(int slot) {
     return slot == 0 ? handle : target;
+  }
+
+  private static final class UploadCommand implements Runnable {
+    private final OpenGLBufferObject buffer;
+    private ByteBuffer bytes = EMPTY_UPLOAD;
+    private int offset;
+
+    private UploadCommand(OpenGLBufferObject buffer) {
+      this.buffer = buffer;
+    }
+
+    @Override
+    public void run() {
+      try {
+        buffer.ctx.cache.bindBuffer(buffer.target, buffer.handle);
+        int needed = offset + bytes.remaining();
+        if (needed > buffer.capacity) {
+          buffer.capacity = Math.max(needed, buffer.capacity * 2);
+          Analysis.start("gl.growBufferStorage");
+          try {
+            glBufferData(buffer.target, buffer.capacity, buffer.hint);
+          } finally {
+            Analysis.end("gl.growBufferStorage");
+          }
+        } else if (buffer.desc.frequency() == BufferFrequency.STREAM && offset == 0) {
+          // Growth already orphans storage; do not allocate twice.
+          Analysis.start("gl.orphanStreamBufferStorage");
+          try {
+            glBufferData(buffer.target, buffer.capacity, buffer.hint);
+          } finally {
+            Analysis.end("gl.orphanStreamBufferStorage");
+          }
+        }
+        int uploadedBytes = bytes.remaining();
+        Analysis.start("gl.bufferSubData");
+        try {
+          glBufferSubData(buffer.target, offset, bytes);
+        } finally {
+          Analysis.end("gl.bufferSubData");
+        }
+        GraphicsMetrics.recordBufferUpload(uploadedBytes);
+      } finally {
+        DirectBufferPool.release(bytes);
+        bytes = EMPTY_UPLOAD;
+        offset = 0;
+        buffer.uploads.release(this);
+      }
+    }
   }
 }

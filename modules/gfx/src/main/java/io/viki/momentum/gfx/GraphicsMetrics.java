@@ -27,50 +27,75 @@ package io.viki.momentum.gfx;
 import java.util.concurrent.atomic.LongAdder;
 
 /**
- * High-performance, lock-free statistics tracker for graphics pipeline metrics.
+ * Collects aggregate rendering statistics for monitoring graphics workloads.
  *
- * <p>This class uses {@link LongAdder} to accumulate counters with near-zero
- * overhead, making it safe for high-frequency calls within the rendering loop
- * without causing garbage collection or thread contention.
- *
- * <p>Call {@link #next()} once per frame to advance the frame counter.
- * Call {@link #dump()} to print accumulated statistics and per-frame averages
- * to {@code System.out}, then reset all counters.
- *
- * <p><b>Thread safety:</b> All counters are thread-safe and can be updated
- * concurrently from multiple producer threads.
- *
- * @see LongAdder
+ * <p>Call {@link #next()} once at each frame boundary to snapshot frame metrics. Call
+ * {@link #dump()} to print interval totals and averages, then reset interval counters. Concurrent
+ * counter increments are supported; frame advancement and reporting should be coordinated with
+ * counter updates to keep snapshots consistent.
  */
 public final class GraphicsMetrics {
-  /**
-   * Total number of draw calls (including draw, drawIndexed, drawInstanced,
-   * drawIndexedInstanced, and compute dispatches) submitted to the GPU.
-   * <p>This is the most critical metric for assessing GPU workload.
-   */
+  /** Number of draw and compute dispatch calls issued during the reporting interval. */
   public static final LongAdder Drawcalls = new LongAdder();
-
-  /**
-   * Total number of commands (opcodes) <b>recorded</b> by the Encoder.
-   * <p>This includes state-setting commands (setPipeline, setViewport, etc.)
-   * as well as draw commands. It reflects the workload of the <b>producer thread</b>
-   * (CPU-side command generation).
-   */
+  /** Number of graphics commands recorded by encoders during the reporting interval. */
   public static final LongAdder EncoderSum = new LongAdder();
-
-  /**
-   * Total number of commands <b>actually queued and executed</b> by the Device
-   * (render thread).
-   * <p>This represents the actual workload dispatched to the OpenGL driver
-   * from the render thread's command queue. It can be used to compare against
-   * {@link #EncoderSum} to detect queue overflows, drops, or synchronization stalls
-   * between the producer and the consumer threads.
-   */
+  /** Sum of pending device commands observed at execution start during the reporting interval. */
   public static final LongAdder DeviceQueueSize = new LongAdder();
+  /** Actual buffer payload bytes uploaded during the reporting interval; excludes storage allocation. */
+  public static final LongAdder BufferUploadBytes = new LongAdder();
+  /** Number of executed payload upload batches, including allocations with initial data. */
+  public static final LongAdder BufferUploadBatches = new LongAdder();
+
+  private static final LongAdder pendingBufferUploadBatches = new LongAdder();
+  private static volatile long lastFrameBufferUploadBatches;
+  private static final LongAdder pendingBufferUploadBytes = new LongAdder();
+  private static volatile long lastFrameBufferUploadBytes;
+  private static long peakFrameBufferUploadBytes;
+  private static long previousDrawcalls;
+  private static volatile long lastFrameDrawcalls;
 
   private static long frameCount = 0L;
 
   private GraphicsMetrics() {
+  }
+
+  /**
+   * Records payload bytes after an upload executes.
+   *
+   * @param bytes the number of payload bytes uploaded
+   */
+  public static void recordBufferUpload(long bytes) {
+    BufferUploadBytes.add(bytes);
+    pendingBufferUploadBytes.add(bytes);
+    BufferUploadBatches.increment();
+    pendingBufferUploadBatches.increment();
+  }
+
+  /**
+   * Returns the number of payload upload batches in the last completed frame.
+   *
+   * @return the completed frame's payload upload batch count
+   */
+  public static long lastFrameBufferUploadBatches() {
+    return lastFrameBufferUploadBatches;
+  }
+
+  /**
+   * Returns the number of payload bytes uploaded in the last completed frame.
+   *
+   * @return the completed frame's payload upload byte count
+   */
+  public static long lastFrameBufferUploadBytes() {
+    return lastFrameBufferUploadBytes;
+  }
+
+  /**
+   * Returns the draw and compute dispatch calls issued in the last completed frame.
+   *
+   * @return the completed frame's draw and compute dispatch call count
+   */
+  public static long lastFrameDrawcalls() {
+    return lastFrameDrawcalls;
   }
 
   /**
@@ -79,22 +104,26 @@ public final class GraphicsMetrics {
    * of the rendering loop), regardless of whether statistics are due to be printed.
    */
   public static void next() {
+    long drawcalls = Drawcalls.sum();
+    lastFrameDrawcalls = drawcalls - previousDrawcalls;
+    previousDrawcalls = drawcalls;
+    lastFrameBufferUploadBytes = pendingBufferUploadBytes.sumThenReset();
+    lastFrameBufferUploadBatches = pendingBufferUploadBatches.sumThenReset();
+    peakFrameBufferUploadBytes = Math.max(peakFrameBufferUploadBytes, lastFrameBufferUploadBytes);
     frameCount++;
   }
 
   /**
-   * Prints the accumulated statistics if at least one second has elapsed since
-   * the last output. It shows the total values over the interval and the average
-   * per-frame values, then resets all counters and the frame counter.
+   * Prints interval totals and per-frame averages, then resets interval counters.
    *
-   * <p><b>Performance note:</b> This method uses {@link System#nanoTime()}
-   * instead of {@code System.currentTimeMillis()} to ensure high precision
-   * and minimize system call overhead in a tight rendering loop.
+   * <p>Averages are zero when no frame boundaries have been recorded since the previous report.
    */
   public static void dump() {
     long dCptTotal = Drawcalls.sum();
     long eCmpDtTotal = EncoderSum.sum();
     long dCmpDtTotal = DeviceQueueSize.sum();
+    long bufferBytes = BufferUploadBytes.sum();
+    long bufferBatches = BufferUploadBatches.sum();
     long currentFrameCount = frameCount;
 
     // Prevent division by zero if no frames were recorded
@@ -108,12 +137,22 @@ public final class GraphicsMetrics {
     System.out.printf("  %-40s %10d %12d%n", "DCPT (Draw Calls)", dCptTotal, avgDcpt);
     System.out.printf("  %-40s %10d %12d%n", "ECMDPT (Encoder Cmds)", eCmpDtTotal, avgEcmpdt);
     System.out.printf("  %-40s %10d %12d%n", "DCMDPT (Device Cmds)", dCmpDtTotal, avgDcmpdt);
+    System.out.printf("  %-40s %10d %12d%n", "Buffer Upload (bytes)", bufferBytes,
+        currentFrameCount > 0 ? bufferBytes / currentFrameCount : 0);
+    System.out.printf("  Buffer Upload last/peak frame: %d / %d bytes%n",
+        lastFrameBufferUploadBytes, peakFrameBufferUploadBytes);
+    System.out.printf("  %-40s %10d %12d%n", "BTPT (Buffer Upload Batches)", bufferBatches,
+        currentFrameCount > 0 ? bufferBatches / currentFrameCount : 0);
     System.out.println();
 
     // Reset counters and frame count for the next interval
     Drawcalls.reset();
+    previousDrawcalls = 0L;
     EncoderSum.reset();
     DeviceQueueSize.reset();
+    BufferUploadBytes.reset();
+    BufferUploadBatches.reset();
+    peakFrameBufferUploadBytes = 0L;
     frameCount = 0L;
   }
 }

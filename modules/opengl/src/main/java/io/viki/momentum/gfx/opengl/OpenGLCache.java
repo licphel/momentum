@@ -133,12 +133,17 @@ public final class OpenGLCache {
   /**
    * Binds a vertex array object.
    *
+   * <p>Changing the VAO invalidates cached element-buffer state because that binding belongs to
+   * the VAO.
+   *
    * @param id the GL VAO handle
    */
   public void bindVao(int id) {
     if (vao != id) {
       glBindVertexArray(id);
       vao = id;
+      // Element-buffer binding belongs to the VAO, not to the context.
+      buffers[bufferIndex(GL_ELEMENT_ARRAY_BUFFER)] = -1;
     }
   }
 
@@ -153,6 +158,22 @@ public final class OpenGLCache {
     if (buffers[idx] != id) {
       glBindBuffer(target, id);
       buffers[idx] = id;
+    }
+  }
+
+  /**
+   * Removes a deleted buffer name from cached bindings before OpenGL can reuse it.
+   *
+   * <p>Must be called on the context thread.
+   *
+   * @param id the deleted GL buffer name
+   */
+  void invalidateBuffer(int id) {
+    for (int i = 0; i < buffers.length; i++) {
+      if (buffers[i] == id) buffers[i] = -1;
+    }
+    for (int i = 0; i < uniformBuffers.length; i++) {
+      if (uniformBuffers[i] == id) uniformBuffers[i] = -1;
     }
   }
 

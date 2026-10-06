@@ -79,7 +79,6 @@ public final class OpenALMixer implements Mixer {
    * happens asynchronously on the audio thread. If device or context creation fails, the audio thread throws
    * {@link IllegalStateException}.
    */
-  @InternalApi
   public OpenALMixer() {
     audioThread = new Thread(this::run, "OpenAL-Mixer");
     audioThread.setDaemon(true);

@@ -52,7 +52,6 @@ public final class MonoInt2ObjectMap<T> {
     this.elements = new Object[Math.max(initialCapacity, 1)];
   }
 
-
   /**
    * Creates an empty map with default capacity.
    */
@@ -89,7 +88,7 @@ public final class MonoInt2ObjectMap<T> {
   /**
    * Stores the value at the given id, growing the backing array if needed.
    *
-   * @param id the id, must be non-negative
+   * @param id    the id, must be non-negative
    * @param value the value to store
    * @throws IndexOutOfBoundsException if {@code id < 0}
    */

@@ -78,7 +78,7 @@ public final class TagManager<T extends RegistryEntry> {
     if (resolved) {
       throw new IllegalStateException("Cannot load tags after resolution");
     }
-    ListNBT values = tag.getList("values");
+    ListNBT values = tag.getList("values").orElse(null);
     if (values == null) {
       tags.put(key, new SimpleTag<>(key, Set.of(), Set.of()));
       return;
@@ -120,7 +120,7 @@ public final class TagManager<T extends RegistryEntry> {
     if (resolved) {
       throw new IllegalStateException("Cannot load tags after resolution");
     }
-    CompoundNBT mappingsTag = tag.getCompound("mappings");
+    CompoundNBT mappingsTag = tag.getCompound("mappings").orElse(null);
     if (mappingsTag == null) {
       tags.put(key, new SimpleTagMap<>(key, Map.of(), Map.of()));
       return;

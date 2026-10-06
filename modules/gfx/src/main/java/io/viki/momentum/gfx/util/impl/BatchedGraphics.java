@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.util.impl;
 
+import io.viki.momentum.util.Analysis;
+
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
@@ -126,16 +128,21 @@ public class BatchedGraphics extends StatefulGraphics {
    */
   @Override
   public void drawMesh(Mesh mesh) {
-    if (mesh.isEmpty()) {
-      return;
+    Analysis.start("graphics.flushAndRecordMeshDraws");
+    try {
+      if (mesh.isEmpty()) {
+        return;
+      }
+
+      flush();
+
+      encoder.setViewport((int) viewport.minX(), (int) viewport.minY(), (int) viewport.width(), (int) viewport.height());
+      encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
+
+      mesh.submit(encoder, 0, ubo);
+    } finally {
+      Analysis.end("graphics.flushAndRecordMeshDraws");
     }
-
-    flush();
-
-    encoder.setViewport((int) viewport.minX(), (int) viewport.minY(), (int) viewport.width(), (int) viewport.height());
-    encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
-
-    mesh.submit(encoder, 0, ubo);
   }
 
   /**
@@ -224,67 +231,72 @@ public class BatchedGraphics extends StatefulGraphics {
    * <p>Does nothing if no primitive has been selected or no camera is set.
    */
   private void submitBatch() {
-    if (currentPrimitive == null) {
-      return;
-    }
-
-    int vc = data.vertexCount();
-    int ic = data.indexCount();
-    int vr = data.vertices().readerIndex();
-    int vw = data.vertices().writerIndex();
-    int ir = data.indices().readerIndex();
-    int iw = data.indices().writerIndex();
-    byte[] rawV = data.recordVertices();
-    byte[] rawI = data.recordIndices();
-
-    // This won't actually clear array data
-    // we've set volatile = true.
-    data.clear();
-
-    vbo.submit(rawV, vr, vw - vr);
-    if (ic > 0 && currentPrimitive.isIndexed()) {
-      ibo.submit(rawI, ir, iw - ir);
-    }
-
-    encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),
-        (int) viewport.width(), (int) viewport.height());
-    encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
-
-    Pipeline pipe = currentPipeline;
-    ResourceSet rs = currentResourceSet;
-    if (pipe == null) {
-      boolean useTexture = currentPrimitive.isTextured();
-
-      pipe = useTexture ? pipeTexture : pipeColor;
-      ResourceSetLayout rsl = useTexture ? rslTexture : rslColor;
-      rs = device.getResourceSet(rsl);
-      rs.bindUniform(0, ubo, 64);
-
-      if (currentTexture != null && useTexture) {
-        Sampler usedSamp = sampler == null ? defSampler : sampler;
-        rs.bindTexture(1, currentTexture, usedSamp);
+    Analysis.start("graphics.copyVerticesAndQueueBatch");
+    try {
+      if (currentPrimitive == null) {
+        return;
       }
-    }
-    encoder.setRenderPipe(pipe);
-    if (rs == null) {
-      throw new GraphicsException("There's a custom pipeline, however, no custom resource set bound");
-    }
-    encoder.setResource(0, rs);
 
-    Topology top = currentPrimitive.topology();
-    encoder.setTopology(top);
-    encoder.setVertexBuffer(vbo);
-    if (currentPrimitive.isIndexed()) {
-      encoder.setIndexBuffer(ibo);
-      encoder.drawIndexed(ic, 0);
-    } else {
-      encoder.draw(vc, 0);
-    }
+      int vc = data.vertexCount();
+      int ic = data.indexCount();
+      int vr = data.vertices().readerIndex();
+      int vw = data.vertices().writerIndex();
+      int ir = data.indices().readerIndex();
+      int iw = data.indices().writerIndex();
+      byte[] rawV = data.recordVertices();
+      byte[] rawI = data.recordIndices();
 
-    encoder.endPass();
-    encoder.queuedExecute();
-    encoder.reset();
-    encoder.beginPass(new RenderPass.Builder().target(renderTarget).clearMask(0).build());
+      // This won't actually clear array data
+      // we've set volatile = true.
+      data.clear();
+
+      vbo.submit(rawV, vr, vw - vr);
+      if (ic > 0 && currentPrimitive.isIndexed()) {
+        ibo.submit(rawI, ir, iw - ir);
+      }
+
+      encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),
+          (int) viewport.width(), (int) viewport.height());
+      encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
+
+      Pipeline pipe = currentPipeline;
+      ResourceSet rs = currentResourceSet;
+      if (pipe == null) {
+        boolean useTexture = currentPrimitive.isTextured();
+
+        pipe = useTexture ? pipeTexture : pipeColor;
+        ResourceSetLayout rsl = useTexture ? rslTexture : rslColor;
+        rs = device.getResourceSet(rsl);
+        rs.bindUniform(0, ubo, 64);
+
+        if (currentTexture != null && useTexture) {
+          Sampler usedSamp = sampler == null ? defSampler : sampler;
+          rs.bindTexture(1, currentTexture, usedSamp);
+        }
+      }
+      encoder.setRenderPipe(pipe);
+      if (rs == null) {
+        throw new GraphicsException("There's a custom pipeline, however, no custom resource set bound");
+      }
+      encoder.setResource(0, rs);
+
+      Topology top = currentPrimitive.topology();
+      encoder.setTopology(top);
+      encoder.setVertexBuffer(vbo);
+      if (currentPrimitive.isIndexed()) {
+        encoder.setIndexBuffer(ibo);
+        encoder.drawIndexed(ic, 0);
+      } else {
+        encoder.draw(vc, 0);
+      }
+
+      encoder.endPass();
+      encoder.queuedExecute();
+      encoder.reset();
+      encoder.beginPass(new RenderPass.Builder().target(renderTarget).clearMask(0).build());
+    } finally {
+      Analysis.end("graphics.copyVerticesAndQueueBatch");
+    }
   }
 
   /**

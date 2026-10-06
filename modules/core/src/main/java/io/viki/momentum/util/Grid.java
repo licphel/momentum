@@ -33,8 +33,8 @@ import java.util.function.BiConsumer;
  * A fixed-size two-dimensional grid that stores palette-encoded values with
  * optional per-cell metadata.
  *
- * <p>Values are stored indirectly through a {@link AssignedPalette}, reducing memory
- * overhead when many cells share the same value. Each cell may also carry
+ * <p>Mutable and owner-thread confined. Each cell stores its source palette's integer ID.
+ * Reads and writes are O(1) for registry-backed palettes. Each cell may also carry
  * user-defined metadata bytes for auxiliary data like flags or timestamps.
  *
  * <p>Coordinates are automatically wrapped using a power-of-two mask,
@@ -43,8 +43,10 @@ import java.util.function.BiConsumer;
  * @param <T> the value type, which must provide integer identities via {@link PaletteCandidate}
  */
 public final class Grid<T extends PaletteCandidate> {
+  private static final VarHandle LONG_HANDLE = MethodHandles.byteArrayViewVarHandle(long[].class, ByteOrder.LITTLE_ENDIAN);
   private static final VarHandle INT_HANDLE = MethodHandles.byteArrayViewVarHandle(int[].class, ByteOrder.LITTLE_ENDIAN);
   private static final VarHandle SHORT_HANDLE = MethodHandles.byteArrayViewVarHandle(short[].class, ByteOrder.LITTLE_ENDIAN);
+
   private final int size;
   private final int mask;
   private final int metaBytes;
@@ -83,7 +85,7 @@ public final class Grid<T extends PaletteCandidate> {
     this.size = size;
     this.mask = size - 1;
     this.metaBytes = metaBytes;
-    this.stride = 4 + metaBytes;
+    this.stride = Integer.BYTES + metaBytes;
     this.storage = new byte[size * size * stride];
     this.palette = palette;
   }
@@ -112,8 +114,7 @@ public final class Grid<T extends PaletteCandidate> {
    */
   public T get(int x, int y) {
     int off = offset(x, y);
-    int id = (int) INT_HANDLE.get(storage, off);
-    return palette.get(id);
+    return palette.get((int) INT_HANDLE.get(storage, off));
   }
 
   /**
@@ -144,7 +145,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaBytes == 0) {
       return;
     }
-    int off = offset(x, y) + 4;
+    int off = offset(x, y) + Integer.BYTES;
     System.arraycopy(storage, off, dst, dstOffset, metaBytes);
   }
 
@@ -161,7 +162,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaIndex < 0 || metaIndex >= metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    return storage[offset(x, y) + 4 + metaIndex];
+    return storage[offset(x, y) + Integer.BYTES + metaIndex];
   }
 
   /**
@@ -175,10 +176,10 @@ public final class Grid<T extends PaletteCandidate> {
    * @throws IndexOutOfBoundsException if the range exceeds available metadata
    */
   public short getMetaShort(int x, int y, int metaIndex) {
-    if (metaIndex < 0 || metaIndex + 2 > metaBytes) {
+    if (metaIndex < 0 || metaIndex + Short.BYTES > metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    int off = offset(x, y) + 4 + metaIndex;
+    int off = offset(x, y) + Integer.BYTES + metaIndex;
     return (short) SHORT_HANDLE.get(storage, off);
   }
 
@@ -193,11 +194,29 @@ public final class Grid<T extends PaletteCandidate> {
    * @throws IndexOutOfBoundsException if the range exceeds available metadata
    */
   public int getMetaInt(int x, int y, int metaIndex) {
-    if (metaIndex < 0 || metaIndex + 4 > metaBytes) {
+    if (metaIndex < 0 || metaIndex + Integer.BYTES > metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    int off = offset(x, y) + 4 + metaIndex;
+    int off = offset(x, y) + Integer.BYTES + metaIndex;
     return (int) INT_HANDLE.get(storage, off);
+  }
+
+  /**
+   * Reads four metadata bytes as a little-endian {@code long} for the cell at
+   * the given coordinates.
+   *
+   * @param x         the x-coordinate
+   * @param y         the y-coordinate
+   * @param metaIndex the starting byte index within the metadata block
+   * @return the metadata value as an long
+   * @throws IndexOutOfBoundsException if the range exceeds available metadata
+   */
+  public long getMetaLong(int x, int y, int metaIndex) {
+    if (metaIndex < 0 || metaIndex + Long.BYTES > metaBytes) {
+      throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
+    }
+    int off = offset(x, y) + Integer.BYTES + metaIndex;
+    return (long) LONG_HANDLE.get(storage, off);
   }
 
   /**
@@ -210,9 +229,11 @@ public final class Grid<T extends PaletteCandidate> {
    * @param value the value to store
    */
   public void set(int x, int y, T value) {
-    int id = value.identity();
-    int off = offset(x, y);
-    INT_HANDLE.set(storage, off, id);
+    int id = palette.searchIndex(value);
+    if (id < 0) {
+      throw new IllegalArgumentException("Value does not belong to the grid's palette");
+    }
+    setId(x, y, id);
   }
 
   /**
@@ -224,8 +245,7 @@ public final class Grid<T extends PaletteCandidate> {
    * @param id the palette identifier
    */
   public void setId(int x, int y, int id) {
-    int off = offset(x, y);
-    INT_HANDLE.set(storage, off, id);
+    INT_HANDLE.set(storage, offset(x, y), id);
   }
 
   /**
@@ -243,7 +263,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaBytes == 0) {
       return;
     }
-    int off = offset(x, y) + 4;
+    int off = offset(x, y) + Integer.BYTES;
     System.arraycopy(src, srcOffset, storage, off, metaBytes);
   }
 
@@ -260,7 +280,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaIndex < 0 || metaIndex >= metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    storage[offset(x, y) + 4 + metaIndex] = value;
+    storage[offset(x, y) + Integer.BYTES + metaIndex] = value;
   }
 
   /**
@@ -277,7 +297,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaIndex < 0 || metaIndex + 2 > metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    int off = offset(x, y) + 4 + metaIndex;
+    int off = offset(x, y) + Integer.BYTES + metaIndex;
     SHORT_HANDLE.set(storage, off, value);
   }
 
@@ -295,7 +315,7 @@ public final class Grid<T extends PaletteCandidate> {
     if (metaIndex < 0 || metaIndex + 4 > metaBytes) {
       throw new IndexOutOfBoundsException("metaIndex: " + metaIndex);
     }
-    int off = offset(x, y) + 4 + metaIndex;
+    int off = offset(x, y) + Integer.BYTES + metaIndex;
     INT_HANDLE.set(storage, off, value);
   }
 
@@ -319,7 +339,6 @@ public final class Grid<T extends PaletteCandidate> {
    * @param action the action to invoke for each cell
    */
   public void forEachValue(BiConsumer<T, BiConsumer<Integer, Integer>> action) {
-    // 简化版，实际使用可以传递更多信息
     for (int x = 0; x < size; x++) {
       for (int y = 0; y < size; y++) {
         action.accept(get(x, y), (dx, dy) -> {
@@ -329,34 +348,32 @@ public final class Grid<T extends PaletteCandidate> {
   }
 
   /**
-   * Copies all cells with non-default values from this grid into the
+   * Copies all cells and metadata into the
    * destination grid.
    *
    * <p>The destination must have the same dimensions and metadata layout.
-   * Palette entries are not transferred; the destination retains its own
-   * palette.
+   * Both grids must use the same source palette.
    *
    * @param dest the destination grid
    * @throws IllegalArgumentException if the dimensions or metadata layout differ
    */
-  public void copyTo(Grid<T> dest) {
-    if (dest.size != this.size || dest.stride != this.stride) {
-      throw new IllegalArgumentException("Size or stride mismatch");
+  public void copyTo(Grid<?> dest) {
+    if (dest.size != size || dest.stride != stride || dest.palette != palette) {
+      throw new IllegalArgumentException("Grid dimensions, metadata or source palette differ");
     }
+    System.arraycopy(storage, 0, dest.storage, 0, storage.length);
+  }
 
-    for (int x = 0; x < size; x++) {
-      for (int y = 0; y < size; y++) {
-        int id = getId(x, y);
-        if (id != 0) {
-          dest.setId(x, y, id);
-          if (metaBytes > 0) {
-            int off = offset(x, y) + 4;
-            int destOff = dest.offset(x, y) + 4;
-            System.arraycopy(storage, off, dest.storage, destOff, metaBytes);
-          }
-        }
-      }
+  /**
+   * Copies a decoded runtime buffer. The caller owns ID validation.
+   *
+   * @param data source data
+   */
+  public void restore(byte[] data) {
+    if (data.length != storage.length) {
+      throw new IllegalArgumentException("Grid storage size differs");
     }
+    System.arraycopy(data, 0, storage, 0, storage.length);
   }
 
   /**

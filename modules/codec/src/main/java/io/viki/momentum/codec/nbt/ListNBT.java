@@ -33,6 +33,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Optional;
+import java.util.function.Supplier;
 
 /**
  * An ordered, heterogeneous list of NBT values.
@@ -121,14 +123,14 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
-   * Returns the element at the given index with an unchecked cast.
+   * Returns the tag at the index without checking its subtype.
    *
-   * <p>Returns {@code null} if the index is out of bounds, or if the element
-   * itself is {@code null}.
+   * <p>The caller must ensure that the stored tag matches the expected subtype.
+   * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
    *
-   * @param index the element index
-   * @param <T>   the expected Tag subtype
-   * @return the tag, or {@code null} if absent
+   * @param index the zero-based element index
+   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @return the stored tag, or {@code null} for a out-of-bounds index
    */
   @SuppressWarnings("unchecked")
   public <T extends NBT> @Nullable T get(int index) {
@@ -139,12 +141,28 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
-   * Returns the element at the given index, or {@code fallback} if out of bounds.
+   * Returns the numeric value at the index, preserving its numeric type.
    *
-   * @param index    the element index
-   * @param fallback the value to return if the index is invalid
-   * @param <T>      the expected Tag subtype
-   * @return the tag, or {@code fallback} if absent
+   * <p>Boolean tags are not numeric values.
+   *
+   * @param index the zero-based element index
+   * @return the numeric value, or {@code null} for a out-of-bounds index or nonnumeric tag
+   */
+  public @Nullable Number getNumber(int index) {
+    NBT value = get(index);
+    return value instanceof NumericNBT ? (Number) value.asObject() : null;
+  }
+
+  /**
+   * Returns the tag at the index without checking its subtype.
+   *
+   * <p>The caller must ensure that the stored tag matches the expected subtype.
+   * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
+   *
+   * @param index the zero-based element index
+   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the stored tag, or {@code fallback} for a out-of-bounds index
    */
   public <T extends NBT> T get(int index, T fallback) {
     T value = get(index);
@@ -152,116 +170,215 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
-   * Returns the element as a {@code byte} via {@link NumericNBT},
-   * converting across numeric types. {@link BooleanNBT} maps {@code true} → 1, {@code false} → 0.
+   * Returns the value at the index as a {@code byte}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the byte value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Byte> getByte(int index) {
+    Number value = getNumber(index);
+    if (value == null && get(index) instanceof BooleanNBT bool) {
+      return Optional.of((byte) (bool.get() ? 1 : 0));
+    }
+    return value == null ? Optional.empty() : Optional.of(value.byteValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code short}.
+   *
+   * <p>Numeric tags use {@link Number#shortValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Short> getShort(int index) {
+    Number value = getNumber(index);
+    return value == null ? Optional.empty() : Optional.of(value.shortValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code int}.
+   *
+   * <p>Numeric tags use {@link Number#intValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Integer> getInt(int index) {
+    Number value = getNumber(index);
+    return value == null ? Optional.empty() : Optional.of(value.intValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code long}.
+   *
+   * <p>Numeric tags use {@link Number#longValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Long> getLong(int index) {
+    Number value = getNumber(index);
+    return value == null ? Optional.empty() : Optional.of(value.longValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code float}.
+   *
+   * <p>Numeric tags use {@link Number#floatValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Float> getFloat(int index) {
+    Number value = getNumber(index);
+    return value == null ? Optional.empty() : Optional.of(value.floatValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code double}.
+   *
+   * <p>Numeric tags use {@link Number#doubleValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Double> getDouble(int index) {
+    Number value = getNumber(index);
+    return value == null ? Optional.empty() : Optional.of(value.doubleValue());
+  }
+
+  /**
+   * Returns the value at the index as a {@code boolean}.
+   *
+   * <p>Boolean tags are returned directly; numeric tags are true when their {@link Number#longValue()} is nonzero.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<Boolean> getBoolean(int index) {
+    NBT value = get(index);
+    if (value instanceof BooleanNBT bool) return Optional.of(bool.get());
+    Number number = getNumber(index);
+    return number == null ? Optional.empty() : Optional.of(number.longValue() != 0);
+  }
+
+  /**
+   * Returns the value at the index as a string.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the stored value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<String> getString(int index) {
+    NBT value = get(index);
+    return value instanceof StringNBT string ? Optional.of(string.get()) : Optional.empty();
+  }
+
+  /**
+   * Returns the value at the index as a {@code byte}.
+   *
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public byte getByte(int index, byte fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asByte();
+    Number value = getNumber(index);
+    if (value == null && get(index) instanceof BooleanNBT bool) {
+      return (byte) (bool.get() ? 1 : 0);
     }
-    if (v instanceof BooleanNBT b) {
-      return (byte) (b.get() ? 1 : 0);
-    }
-    return fallback;
+    return value == null ? fallback : value.byteValue();
   }
 
   /**
-   * Returns the element as a {@code short} via {@link NumericNBT}.
+   * Returns the value at the index as a {@code short}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the short value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#shortValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public short getShort(int index, short fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asShort();
-    }
-    return fallback;
+    Number value = getNumber(index);
+    return value == null ? fallback : value.shortValue();
   }
 
   /**
-   * Returns the element as an {@code int} via {@link NumericNBT}.
+   * Returns the value at the index as a {@code int}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the int value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#intValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public int getInt(int index, int fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asInt();
-    }
-    return fallback;
+    Number value = getNumber(index);
+    return value == null ? fallback : value.intValue();
   }
 
   /**
-   * Returns the element as a {@code long} via {@link NumericNBT}.
+   * Returns the value at the index as a {@code long}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the long value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#longValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public long getLong(int index, long fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asLong();
-    }
-    return fallback;
+    Number value = getNumber(index);
+    return value == null ? fallback : value.longValue();
   }
 
   /**
-   * Returns the element as a {@code float} via {@link NumericNBT}.
+   * Returns the value at the index as a {@code float}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the float value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#floatValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public float getFloat(int index, float fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asFloat();
-    }
-    return fallback;
+    Number value = getNumber(index);
+    return value == null ? fallback : value.floatValue();
   }
 
   /**
-   * Returns the element as a {@code double} via {@link NumericNBT}.
+   * Returns the value at the index as a {@code double}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or not numeric
-   * @return the double value, or {@code fallback}
+   * <p>Numeric tags use {@link Number#doubleValue()} conversion, which may lose precision or narrow the value.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public double getDouble(int index, double fallback) {
-    NBT v = get(index);
-    if (v instanceof NumericNBT n) {
-      return n.asDouble();
-    }
-    return fallback;
+    Number value = getNumber(index);
+    return value == null ? fallback : value.doubleValue();
   }
 
   /**
-   * Returns the element as a {@code boolean}. {@link BooleanNBT} is returned
-   * directly; numeric tags map non-zero to {@code true}.
+   * Returns the value at the index as a {@code boolean}.
    *
-   * @param index    the element index
-   * @param fallback the value to return if out of bounds or type mismatch
-   * @return the boolean value, or {@code fallback}
+   * <p>Boolean tags are returned directly; numeric tags are true when their {@link Number#longValue()} is nonzero.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
   public boolean getBoolean(int index, boolean fallback) {
     NBT v = get(index);
     if (v instanceof BooleanNBT b) {
       return b.get();
     }
-    if (v instanceof NumericNBT n) {
-      return n.asLong() != 0;
-    }
-    return fallback;
+    Number number = getNumber(index);
+    return number == null ? fallback : number.longValue() != 0;
   }
 
   /**
@@ -277,36 +394,276 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
-   * Returns the element as a byte array.
+   * Returns the value at the index as a byte array.
    *
-   * @param index the element index
-   * @return the byte array, or {@code null} if out of bounds or type mismatch
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the stored value, or empty for a out-of-bounds index or incompatible tag
    */
-  public byte @Nullable [] getBytes(int index) {
-    NBT v = get(index);
-    return v instanceof ByteArrayNBT b ? b.get() : null;
+  public Optional<byte[]> getBytes(int index) {
+    NBT value = get(index);
+    return value instanceof ByteArrayNBT tag ? Optional.of(tag.get()) : Optional.empty();
   }
 
   /**
-   * Returns the element as an {@link CompoundNBT}.
+   * Returns the value at the index as a byte array.
    *
-   * @param index the element index
-   * @return the nested compound, or {@code null} if out of bounds or type mismatch
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
-  public @Nullable CompoundNBT getCompound(int index) {
-    NBT v = get(index);
-    return v instanceof CompoundNBT c ? c : null;
+  public byte[] getBytes(int index, byte[] fallback) {
+    return getBytes(index).orElse(fallback);
   }
 
   /**
-   * Returns the element as a {@link ListNBT}.
+   * Returns the value at the index as a byte array.
    *
-   * @param index the element index
-   * @return the nested list, or {@code null} if out of bounds or type mismatch
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
-  public @Nullable ListNBT getList(int index) {
-    NBT v = get(index);
-    return v instanceof ListNBT l ? l : null;
+  public byte[] getBytes(int index, Supplier<? extends byte[]> fallback) {
+    return getBytes(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a nested compound.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the stored value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<CompoundNBT> getCompound(int index) {
+    NBT value = get(index);
+    return value instanceof CompoundNBT tag ? Optional.of(tag) : Optional.empty();
+  }
+
+  /**
+   * Returns the value at the index as a nested compound.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
+   */
+  public CompoundNBT getCompound(int index, CompoundNBT fallback) {
+    return getCompound(index).orElse(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a nested compound.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public CompoundNBT getCompound(int index, Supplier<? extends CompoundNBT> fallback) {
+    return getCompound(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a nested list.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @return an optional containing the stored value, or empty for a out-of-bounds index or incompatible tag
+   */
+  public Optional<ListNBT> getList(int index) {
+    NBT value = get(index);
+    return value instanceof ListNBT tag ? Optional.of(tag) : Optional.empty();
+  }
+
+  /**
+   * Returns the value at the index as a nested list.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * @param index the zero-based element index
+   * @param fallback the fallback value to return as-is when no compatible value is available
+   * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
+   */
+  public ListNBT getList(int index, ListNBT fallback) {
+    return getList(index).orElse(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a nested list.
+   *
+   * <p>The stored value is returned by reference; changes to it affect this container.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public ListNBT getList(int index, Supplier<? extends ListNBT> fallback) {
+    return getList(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the tag at the index without checking its subtype.
+   *
+   * <p>The caller must ensure that the stored tag matches the expected subtype.
+   * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
+   *
+   * @param index the zero-based element index
+   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @return an optional containing the stored tag, or empty for a out-of-bounds index
+   */
+  public <T extends NBT> Optional<T> tryGet(int index) {
+    return Optional.ofNullable(get(index));
+  }
+
+  /**
+   * Returns the tag at the index without checking its subtype.
+   *
+   * <p>The caller must ensure that the stored tag matches the expected subtype.
+   * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index.
+   *
+   * @param index the zero-based element index
+   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the stored tag, or the supplied fallback value for a out-of-bounds index
+   */
+  public <T extends NBT> T get(int index, Supplier<? extends T> fallback) {
+    T value = get(index);
+    return value != null ? value : fallback.get();
+  }
+
+  /**
+   * Returns the value at the index as a {@code byte}.
+   *
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public byte getByte(int index, Supplier<? extends Byte> fallback) {
+    return getByte(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code short}.
+   *
+   * <p>Numeric tags use {@link Number#shortValue()} conversion, which may lose precision or narrow the value.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public short getShort(int index, Supplier<? extends Short> fallback) {
+    return getShort(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code int}.
+   *
+   * <p>Numeric tags use {@link Number#intValue()} conversion, which may lose precision or narrow the value.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public int getInt(int index, Supplier<? extends Integer> fallback) {
+    return getInt(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code long}.
+   *
+   * <p>Numeric tags use {@link Number#longValue()} conversion, which may lose precision or narrow the value.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public long getLong(int index, Supplier<? extends Long> fallback) {
+    return getLong(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code float}.
+   *
+   * <p>Numeric tags use {@link Number#floatValue()} conversion, which may lose precision or narrow the value.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public float getFloat(int index, Supplier<? extends Float> fallback) {
+    return getFloat(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code double}.
+   *
+   * <p>Numeric tags use {@link Number#doubleValue()} conversion, which may lose precision or narrow the value.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public double getDouble(int index, Supplier<? extends Double> fallback) {
+    return getDouble(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a {@code boolean}.
+   *
+   * <p>Boolean tags are returned directly; numeric tags are true when their {@link Number#longValue()} is nonzero.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public boolean getBoolean(int index, Supplier<? extends Boolean> fallback) {
+    return getBoolean(index).orElseGet(fallback);
+  }
+
+  /**
+   * Returns the value at the index as a string.
+   *
+   * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
+   *
+   * @param index the zero-based element index
+   * @param fallback supplies a non-null fallback value only when no compatible value is available
+   * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
+   */
+  public String getString(int index, Supplier<? extends String> fallback) {
+    return getString(index).orElseGet(fallback);
   }
 
   /**

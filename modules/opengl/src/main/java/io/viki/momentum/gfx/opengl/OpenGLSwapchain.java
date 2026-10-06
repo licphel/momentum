@@ -28,15 +28,15 @@ import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
-import io.viki.momentum.math.Cube;
-import org.lwjgl.system.MemoryUtil;
 import io.viki.momentum.gfx.texture.TextureFilter;
+import io.viki.momentum.math.Cube;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
+import org.lwjgl.system.MemoryUtil;
 
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.nio.ByteBuffer;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.lwjgl.opengl.GL33.*;
 
@@ -148,6 +148,11 @@ public final class OpenGLSwapchain implements RenderTarget, Handle {
     }
   }
 
+  @Override
+  public int handle(int slot) {
+    return 0;
+  }
+
   static class GLReadRaii implements AutoCloseable {
     private final int alignment = glGetInteger(GL_PACK_ALIGNMENT);
     private final int rowLength = glGetInteger(GL_PACK_ROW_LENGTH);
@@ -171,10 +176,5 @@ public final class OpenGLSwapchain implements RenderTarget, Handle {
       glPixelStorei(GL_PACK_SKIP_PIXELS, skipPixels);
       glBindBuffer(GL_PIXEL_PACK_BUFFER, buffer);
     }
-  }
-
-  @Override
-  public int handle(int slot) {
-    return 0;
   }
 }

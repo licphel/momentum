@@ -37,7 +37,7 @@ import org.lwjgl.util.freetype.FT_Face;
 import org.lwjgl.util.freetype.FT_GlyphSlot;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
+import io.viki.momentum.util.Pool;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -61,7 +61,7 @@ import static org.lwjgl.util.freetype.FreeType.*;
 public final class FreetypeGlyphCache implements AutoCloseable {
   private final Device device;
   private final Map<GlyphKey, @Nullable Glyph> cache = new HashMap<>();
-  private final ArrayDeque<GlyphKey> glyphKeyPool = new ArrayDeque<>();
+  private final Pool<GlyphKey> glyphKeyPool = new Pool<>();
   private @Nullable TextureAtlas atlas;
   private int resolution = 0;
   private boolean disposed;
@@ -191,7 +191,7 @@ public final class FreetypeGlyphCache implements AutoCloseable {
   }
 
   private GlyphKey acquireGlyphKey(FreetypeFont font, int glyphIndex, int fontStyle) {
-    GlyphKey key = glyphKeyPool.pollFirst();
+    GlyphKey key = glyphKeyPool.poll();
     if (key == null) {
       return new GlyphKey(font, resolution, glyphIndex, fontStyle);
     }
@@ -200,7 +200,7 @@ public final class FreetypeGlyphCache implements AutoCloseable {
   }
 
   private void recycleGlyphKey(GlyphKey key) {
-    glyphKeyPool.addFirst(key);
+    glyphKeyPool.release(key);
   }
 
   /**

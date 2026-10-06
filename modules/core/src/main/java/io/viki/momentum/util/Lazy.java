@@ -51,7 +51,7 @@ public class Lazy<T> {
    * Creates a lazy value.
    *
    * @param supplier the lazy supplier
-   * @param <T> the supplier type
+   * @param <T>      the supplier type
    * @return a lazy value
    */
   public static <T> Lazy<T> of(Supplier<T> supplier) {
@@ -75,7 +75,7 @@ public class Lazy<T> {
    *
    * @param supplier the lazy supplier
    * @throws IllegalStateException if no supplier slot is available or a supplier
-   *     has already been injected
+   *                               has already been injected
    */
   public void inject(Supplier<T> supplier) {
   }

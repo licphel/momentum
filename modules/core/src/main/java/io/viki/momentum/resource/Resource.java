@@ -119,6 +119,53 @@ public interface Resource extends AutoCloseable {
   }
 
   /**
+   * Normalizes a provider-local resource path and rejects paths that escape
+   * the provider root.
+   *
+   * @param path the raw resource path
+   * @return a normalized relative path
+   * @throws IllegalArgumentException if the path escapes the provider root
+   */
+  static String normalizePath(String path) {
+    String raw = path.replace('\\', '/');
+    while (raw.startsWith("/")) {
+      raw = raw.substring(1);
+    }
+
+    Deque<String> segments = new ArrayDeque<>();
+    for (String segment : raw.split("/", -1)) {
+      if (segment.isEmpty() || segment.equals(".")) {
+        continue;
+      }
+      if (segment.equals("..")) {
+        if (segments.isEmpty()) {
+          throw new IllegalArgumentException("Path escapes resource root: " + path);
+        }
+        segments.removeLast();
+      } else {
+        segments.addLast(segment);
+      }
+    }
+    return String.join("/", segments);
+  }
+
+  /**
+   * Resolves a normalized resource path below a directory root.
+   *
+   * @param base the normalized absolute directory root
+   * @param path the provider-local path
+   * @return the resolved path
+   * @throws IOException if the path escapes the root
+   */
+  static Path resolve(Path base, String path) throws IOException {
+    Path resolved = base.resolve(normalizePath(path)).normalize();
+    if (!resolved.startsWith(base)) {
+      throw new IOException("Path traversal detected: " + path);
+    }
+    return resolved;
+  }
+
+  /**
    * Returns a provider rooted at a descendant directory.
    *
    * <p>Opening and walking use paths relative to the new root. Resolving an
@@ -137,7 +184,7 @@ public interface Resource extends AutoCloseable {
    *
    * @param path the resource path
    * @return an input stream, or {@code null} when the resource does not exist
-   * @throws IOException if an I/O error occurs
+   * @throws IOException          if an I/O error occurs
    * @throws NullPointerException if {@code path} is null
    */
   @Nullable InputStream open(String path) throws IOException;
@@ -150,7 +197,7 @@ public interface Resource extends AutoCloseable {
    *
    * @param relativeDir the directory to walk, or an empty string for the root
    * @return a stream of resource paths
-   * @throws IOException if walking fails
+   * @throws IOException                   if walking fails
    * @throws UnsupportedOperationException if this provider cannot walk
    */
   Stream<String> walk(String relativeDir) throws IOException;
@@ -205,52 +252,5 @@ public interface Resource extends AutoCloseable {
     } catch (IOException e) {
       return false;
     }
-  }
-
-  /**
-   * Normalizes a provider-local resource path and rejects paths that escape
-   * the provider root.
-   *
-   * @param path the raw resource path
-   * @return a normalized relative path
-   * @throws IllegalArgumentException if the path escapes the provider root
-   */
-  static String normalizePath(String path) {
-    String raw = path.replace('\\', '/');
-    while (raw.startsWith("/")) {
-      raw = raw.substring(1);
-    }
-
-    Deque<String> segments = new ArrayDeque<>();
-    for (String segment : raw.split("/", -1)) {
-      if (segment.isEmpty() || segment.equals(".")) {
-        continue;
-      }
-      if (segment.equals("..")) {
-        if (segments.isEmpty()) {
-          throw new IllegalArgumentException("Path escapes resource root: " + path);
-        }
-        segments.removeLast();
-      } else {
-        segments.addLast(segment);
-      }
-    }
-    return String.join("/", segments);
-  }
-
-  /**
-   * Resolves a normalized resource path below a directory root.
-   *
-   * @param base the normalized absolute directory root
-   * @param path the provider-local path
-   * @return the resolved path
-   * @throws IOException if the path escapes the root
-   */
-  static Path resolve(Path base, String path) throws IOException {
-    Path resolved = base.resolve(normalizePath(path)).normalize();
-    if (!resolved.startsWith(base)) {
-      throw new IOException("Path traversal detected: " + path);
-    }
-    return resolved;
   }
 }

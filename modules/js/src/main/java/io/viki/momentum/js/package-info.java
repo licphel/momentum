@@ -22,28 +22,7 @@
  * SOFTWARE.
  */
 
-rootProject.name = "momentum"
+@NullMarked
+package io.viki.momentum.js;
 
-// Shared-library versions, declared once here and injected into every
-// subproject from the root build script; modules must not repeat them.
-dependencyResolutionManagement {
-  versionCatalogs {
-    libs {
-      library('jspecify', 'org.jspecify', 'jspecify').version('1.0.0')
-      library('fastutil', 'it.unimi.dsi', 'fastutil').version('8.5.15')
-      library('jackson-databind', 'com.fasterxml.jackson.core', 'jackson-databind').version('2.21.1')
-      library('llama', 'net.ladenthin', 'llama').version('5.1.0')
-      version('graaljs', '25.0.1')
-      library('polyglot', 'org.graalvm.polyglot', 'polyglot').versionRef('graaljs')
-      library('graaljs', 'org.graalvm.polyglot', 'js-community').versionRef('graaljs')
-      library('luaj', 'org.luaj', 'luaj-jse').version('3.0.1')
-    }
-  }
-}
-
-var modulesDir = file("modules")
-modulesDir.listFiles()?.findAll { it.isDirectory() }?.each { dir ->
-  var projectName = "momentum-${dir.name}"
-  include(projectName)
-  project(":${projectName}").projectDir = dir
-}
+import org.jspecify.annotations.NullMarked;

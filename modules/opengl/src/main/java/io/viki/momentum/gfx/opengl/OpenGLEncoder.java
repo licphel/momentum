@@ -24,8 +24,10 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.gfx.GraphicsMetrics;
+import io.viki.momentum.util.Analysis;
+
 import io.viki.momentum.gfx.GraphicsException;
+import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.pass.RenderPass;
@@ -35,10 +37,11 @@ import io.viki.momentum.gfx.pipe.Topology;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.shader.ResourceSetLayout;
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.util.MspcRingBuffer;
-import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
+import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
+import io.viki.momentum.util.MspcRingBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
@@ -47,34 +50,19 @@ import static org.lwjgl.opengl.GL33.*;
 import static org.lwjgl.opengl.GL43.glDispatchCompute;
 
 /**
- * OpenGL implementation of {@link Encoder} that records GPU commands into a bounded
- * {@link MspcRingBuffer} of opcodes, executed by a switch on the render thread.
+ * Records graphics commands for ordered execution by an OpenGL device.
  *
- * <p>Commands are recorded as opcode + operands straight into the ring; a producer
- * whose recording would overflow the ring spins until the consumer frees a slot, so
- * recording can never run unbounded ahead of execution. Backend objects (pipelines,
- * resource sets, targets, buffers) cannot live in an int ring, so they are kept in a
- * per-batch reference pool and referenced by index. Buffer handles are read at
- * execution time, because they are assigned asynchronously at buffer creation.
- * Recording a command costs a few ints instead of a {@link Runnable} object, and
- * {@link #queuedExecute()} submits a consumer task that polls the batch straight off
- * the ring — no stream copy.
- *
- * <p><b>State tracking:</b> the encoder remembers the last-set pipeline,
- * vertex buffer, index buffer, and topology on the recording thread so that {@link #draw}
- * and {@link #drawIndexed} can capture the correct state without requiring it to be
- * re-specified before every draw call. Every call still records exactly one command; a
- * Vulkan backend can map them to {@code vkCmd*} calls verbatim.
- *
- * <p><b>Thread safety:</b> recording is single-threaded per instance.
- * {@link #queuedExecute()} and {@link #reset()} may be called from any thread.
+ * <p>Recording calls are single-threaded per instance, and submitted batches execute on the
+ * device's GL context thread. State remains in effect for later draws until a recording call
+ * changes it. Resource bindings are captured when {@link #setResource(int, ResourceSet)} is called,
+ * so later changes to that set do not alter commands already recorded.
  *
  * @see OpenGLDevice#submit(Runnable)
  */
 @InternalApi
 public final class OpenGLEncoder implements Encoder {
+  private static final @Nullable Object[] EMPTY_REFERENCES = new Object[0];
   private static final Logger LOGGER = Log.getLogger();
-
   private static final int OP_BEGIN_PASS = 0;
   private static final int OP_END_PASS = 1;
   private static final int OP_SET_TOPOLOGY = 2;
@@ -91,7 +79,6 @@ public final class OpenGLEncoder implements Encoder {
   private static final int OP_DRAW_INSTANCED = 13;
   private static final int OP_DRAW_INDEXED_INSTANCED = 14;
   private static final int OP_DISPATCH = 15;
-
   /**
    * Ring capacity: the consumer drains the ring every frame, so the capacity only
    * needs to hold one frame's worst-case stream (~35k ints today); the producer
@@ -99,7 +86,7 @@ public final class OpenGLEncoder implements Encoder {
    */
   private static final int RING_CAPACITY = 1 << 16;
   private static final int REF_CAPACITY = 1 << 4;
-
+  private final Pool<BatchCommand> batches = new Pool<>();
   private final OpenGLDevice ctx;
   private final MspcRingBuffer ring = new MspcRingBuffer(RING_CAPACITY);
   // Per-frame recording state (single-threaded)
@@ -130,14 +117,9 @@ public final class OpenGLEncoder implements Encoder {
   }
 
   /**
-   * Discards the current batch's recording state.
+   * Discards the current recording state so this encoder can be reused.
    *
-   * <p>The ring itself is not touched — its content belongs to the consumer —
-   * and the executed-side state is not cleared either: every batch re-establishes
-   * the state it needs from its own commands, and clearing it here would race a
-   * concurrently executing consumer.
-   *
-   * <p>Safe to call from any thread.
+   * <p>Coordinate this call with recording; each encoder supports one recording thread at a time.
    */
   @Override
   public void reset() {
@@ -149,22 +131,32 @@ public final class OpenGLEncoder implements Encoder {
   }
 
   /**
-   * Hands the recorded batch to the render thread: a consumer task polls exactly
-   * the batch's ints off the ring and executes them in order. The batch's
-   * reference pool is snapshot so the producer can start recording the next batch
-   * immediately.
+   * Submits the recorded command batch for ordered execution on the device's GL context thread.
+   *
+   * <p>The batch is captured at submission, so this encoder can be reset and reused while it runs.
    */
   @Override
   public void queuedExecute() {
-    int ints = pendingInts;
-    pendingInts = 0;
-    int refStart = batchRefStart;
-    batchRefStart = refCount;
-    @Nullable Object[] refsSnapshot = Arrays.copyOfRange(refs, refStart, refCount);
-    queryReset = true;
-    GraphicsMetrics.EncoderSum.add(cmdCount);
+    Analysis.start("encoder.snapshotReferencesAndQueueCommands");
+    try {
+      int ints = pendingInts;
+      pendingInts = 0;
+      int refStart = batchRefStart;
+      batchRefStart = refCount;
+      @Nullable Object[] refsSnapshot = Arrays.copyOfRange(refs, refStart, refCount);
+      queryReset = true;
+      GraphicsMetrics.EncoderSum.add(cmdCount);
 
-    ctx.submit(() -> executeBatch(ints, refsSnapshot));
+      BatchCommand command = batches.poll();
+      if (command == null) {
+        command = new BatchCommand(this);
+      }
+      command.intCount = ints;
+      command.references = refsSnapshot;
+      ctx.submit(command);
+    } finally {
+      Analysis.end("encoder.snapshotReferencesAndQueueCommands");
+    }
   }
 
   @Override
@@ -266,19 +258,29 @@ public final class OpenGLEncoder implements Encoder {
     operand(enable ? 1 : 0);
   }
 
+  /**
+   * Records a resource set for subsequent draw calls.
+   *
+   * <p>The set's bindings are captured at this call; later changes do not affect the recorded
+   * commands.
+   *
+   * @param slot the shader binding slot
+   * @param set the resource set whose current bindings are captured
+   */
   @Override
   public void setResource(int slot, ResourceSet set) {
     opStart(OP_SET_RESOURCE, 2);
     operand(slot);
-    operand(refId(set));
+    operand(refId(((OpenGLResourceSet) set).snapshot()));
   }
 
   /**
-   * Records a non-indexed draw call.
+   * Records a non-indexed draw for the active render pass.
    *
-   * <p>Acquires a VAO for the current (VBO, 0) pair from the pipeline's VAO cache, binds it, issues
-   * {@code glDrawArrays},
-   * and unbinds.
+   * <p>Requires a vertex buffer and render pipeline to have been set.
+   *
+   * @param vertexCount the number of vertices to draw
+   * @param firstVertex the index of the first vertex
    */
   @Override
   public void draw(int vertexCount, int firstVertex) {
@@ -322,6 +324,10 @@ public final class OpenGLEncoder implements Encoder {
    * Records a compute-shader dispatch.
    *
    * <p>The currently bound pipeline must contain a valid compute program.
+   *
+   * @param x the number of work groups in X
+   * @param y the number of work groups in Y
+   * @param z the number of work groups in Z
    */
   @Override
   public void dispatch(int x, int y, int z) {
@@ -361,210 +367,234 @@ public final class OpenGLEncoder implements Encoder {
   }
 
   /**
-   * Executes one recorded batch on the render thread, polling the batch's
-   * opcodes and operands straight off the ring.
+   * Executes one submitted command batch on the render thread.
    *
-   * @param intCount the number of ints the batch occupies in the ring
-   * @param pool     the batch's referenced objects
+   * @param intCount the number of recorded command values in the batch
+   * @param pool the objects referenced by the batch's commands
    */
   private void executeBatch(int intCount, @Nullable Object[] pool) {
-    int consumed = 0;
-    while (consumed < intCount) {
-      int op = ring.poll();
-      consumed++;
-      switch (op) {
-        case OP_BEGIN_PASS -> {
-          currentTarget = (RenderTarget) pool[ring.poll()];
-          int clearMask = ring.poll();
-          float cr = Float.intBitsToFloat(ring.poll());
-          float cg = Float.intBitsToFloat(ring.poll());
-          float cb = Float.intBitsToFloat(ring.poll());
-          float ca = Float.intBitsToFloat(ring.poll());
-          float cd = Float.intBitsToFloat(ring.poll());
-          int cs = ring.poll();
-          consumed += 8;
+    Analysis.start("gl.decodeAndExecuteCommandBatch");
+    try {
+      int consumed = 0;
+      while (consumed < intCount) {
+        int op = ring.poll();
+        consumed++;
+        switch (op) {
+          case OP_BEGIN_PASS -> {
+            currentTarget = (RenderTarget) pool[ring.poll()];
+            int clearMask = ring.poll();
+            float cr = Float.intBitsToFloat(ring.poll());
+            float cg = Float.intBitsToFloat(ring.poll());
+            float cb = Float.intBitsToFloat(ring.poll());
+            float ca = Float.intBitsToFloat(ring.poll());
+            float cd = Float.intBitsToFloat(ring.poll());
+            int cs = ring.poll();
+            consumed += 8;
 
-          if (currentTarget instanceof OpenGLSwapchain) {
-            ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, 0);
-          } else if (currentTarget instanceof OpenGLRenderTarget glTarget) {
-            ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, glTarget.fboHandle());
-          }
-
-          if (clearMask != 0) {
-            if ((clearMask & GL_COLOR_BUFFER_BIT) != 0) {
-              glClearColor(cr, cg, cb, ca);
+            if (currentTarget instanceof OpenGLSwapchain) {
+              ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, 0);
+            } else if (currentTarget instanceof OpenGLRenderTarget glTarget) {
+              ctx.cache.bindFramebuffer(GL_FRAMEBUFFER, glTarget.fboHandle());
             }
-            if ((clearMask & GL_DEPTH_BUFFER_BIT) != 0) {
-              glClearDepth(cd);
+
+            if (clearMask != 0) {
+              if ((clearMask & GL_COLOR_BUFFER_BIT) != 0) {
+                glClearColor(cr, cg, cb, ca);
+              }
+              if ((clearMask & GL_DEPTH_BUFFER_BIT) != 0) {
+                glClearDepth(cd);
+              }
+              if ((clearMask & GL_STENCIL_BUFFER_BIT) != 0) {
+                glClearStencil(cs);
+              }
+              glClear(clearMask);
             }
-            if ((clearMask & GL_STENCIL_BUFFER_BIT) != 0) {
-              glClearStencil(cs);
+          }
+          case OP_END_PASS -> {
+            if (currentTarget == null) {
+              throw new GraphicsException("endPass called without a prior beginPass");
             }
-            glClear(clearMask);
+            currentTarget = null;
           }
-        }
-        case OP_END_PASS -> {
-          if (currentTarget == null) {
-            throw new GraphicsException("endPass called without a prior beginPass");
+          case OP_SET_TOPOLOGY -> {
+            topology = ring.poll();
+            consumed++;
           }
-          currentTarget = null;
-        }
-        case OP_SET_TOPOLOGY -> {
-          topology = ring.poll();
-          consumed++;
-        }
-        case OP_SET_VERTEX_BUFFER -> {
-          Object o = pool[ring.poll()];
-          currentVboHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
-          consumed++;
-        }
-        case OP_SET_INDEX_BUFFER -> {
-          Object o = pool[ring.poll()];
-          currentEboHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
-          consumed++;
-        }
-        case OP_SET_INSTANCE_BUFFER -> {
-          Object o = pool[ring.poll()];
-          currentInstHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
-          consumed++;
-        }
-        case OP_SET_INSTANCE_BASE -> {
-          currentInstanceBase = ring.poll();
-          consumed++;
-        }
-        case OP_SET_RENDER_PIPE -> {
-          Object o = pool[ring.poll()];
-          if (o != null) {
-            currentPipe = (OpenGLPipeline) o;
-            currentPipe.apply(ctx.cache);
+          case OP_SET_VERTEX_BUFFER -> {
+            Object o = pool[ring.poll()];
+            currentVboHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
+            consumed++;
           }
-          consumed++;
-        }
-        case OP_SET_VIEWPORT -> {
-          int x = ring.poll();
-          int y = ring.poll();
-          int width = ring.poll();
-          int height = ring.poll();
-          consumed += 4;
-          if (currentTarget == null) {
-            throw new GraphicsException("setViewport called without an active render pass");
+          case OP_SET_INDEX_BUFFER -> {
+            Object o = pool[ring.poll()];
+            currentEboHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
+            consumed++;
           }
-          ctx.cache.setViewport(x, currentTarget.height() - y - height, width, height);
-        }
-        case OP_SET_SCISSOR -> {
-          int x = ring.poll();
-          int y = ring.poll();
-          int width = ring.poll();
-          int height = ring.poll();
-          boolean enable = ring.poll() != 0;
-          consumed += 5;
-          if (currentTarget == null) {
-            throw new GraphicsException("setScissor called without an active render pass");
+          case OP_SET_INSTANCE_BUFFER -> {
+            Object o = pool[ring.poll()];
+            currentInstHandle = o != null ? ((OpenGLBufferObject) o).handle : 0;
+            consumed++;
           }
-          ctx.cache.setScissor(x, currentTarget.height() - y - height, width, height, enable);
-        }
-        case OP_SET_RESOURCE -> {
-          int slot = ring.poll();
-          if (slot >= currentRss.length) {
-            throw new GraphicsException("Mostly support 64 slots, but got " + slot);
+          case OP_SET_INSTANCE_BASE -> {
+            currentInstanceBase = ring.poll();
+            consumed++;
           }
-          currentRss[slot] = (OpenGLResourceSet) pool[ring.poll()];
-          consumed += 2;
-        }
-        case OP_DRAW -> {
-          int vertexCount = ring.poll();
-          int firstVertex = ring.poll();
-          consumed += 2;
-          if (currentVboHandle == 0) {
-            throw new GraphicsException("VBO not bound");
+          case OP_SET_RENDER_PIPE -> {
+            Object o = pool[ring.poll()];
+            if (o != null) {
+              currentPipe = (OpenGLPipeline) o;
+              currentPipe.apply(ctx.cache);
+            }
+            consumed++;
           }
-          if (currentPipe == null) {
-            throw new GraphicsException("Pipeline not bound");
+          case OP_SET_VIEWPORT -> {
+            int x = ring.poll();
+            int y = ring.poll();
+            int width = ring.poll();
+            int height = ring.poll();
+            consumed += 4;
+            if (currentTarget == null) {
+              throw new GraphicsException("setViewport called without an active render pass");
+            }
+            ctx.cache.setViewport(x, currentTarget.height() - y - height, width, height);
           }
+          case OP_SET_SCISSOR -> {
+            int x = ring.poll();
+            int y = ring.poll();
+            int width = ring.poll();
+            int height = ring.poll();
+            boolean enable = ring.poll() != 0;
+            consumed += 5;
+            if (currentTarget == null) {
+              throw new GraphicsException("setScissor called without an active render pass");
+            }
+            ctx.cache.setScissor(x, currentTarget.height() - y - height, width, height, enable);
+          }
+          case OP_SET_RESOURCE -> {
+            int slot = ring.poll();
+            if (slot >= currentRss.length) {
+              throw new GraphicsException("Mostly support 64 slots, but got " + slot);
+            }
+            currentRss[slot] = (OpenGLResourceSet) pool[ring.poll()];
+            consumed += 2;
+          }
+          case OP_DRAW -> {
+            int vertexCount = ring.poll();
+            int firstVertex = ring.poll();
+            consumed += 2;
+            if (currentVboHandle == 0) {
+              throw new GraphicsException("VBO not bound");
+            }
+            if (currentPipe == null) {
+              throw new GraphicsException("Pipeline not bound");
+            }
 
-          applyResources();
+            applyResources();
 
-          int vao = currentPipe.acquireVao(currentVboHandle, 0, 0, currentInstanceBase);
-          ctx.cache.bindVao(vao);
-          GraphicsMetrics.Drawcalls.increment();
-          glDrawArrays(topology, firstVertex, vertexCount);
-          ctx.cache.bindVao(0);
+            int vao = currentPipe.acquireVao(currentVboHandle, 0, 0, currentInstanceBase);
+            ctx.cache.bindVao(vao);
+            GraphicsMetrics.Drawcalls.increment();
+            Analysis.start("gl.glDrawArrays");
+            try {
+              glDrawArrays(topology, firstVertex, vertexCount);
+            } finally {
+              Analysis.end("gl.glDrawArrays");
+            }
+            ctx.cache.bindVao(0);
+          }
+          case OP_DRAW_INDEXED -> {
+            int indexCount = ring.poll();
+            int firstIndex = ring.poll();
+            consumed += 2;
+            if (currentVboHandle == 0) {
+              throw new GraphicsException("VBO not bound");
+            }
+            if (currentEboHandle == 0) {
+              throw new GraphicsException("EBO not bound");
+            }
+            if (currentPipe == null) {
+              throw new GraphicsException("Pipeline not bound");
+            }
+
+            applyResources();
+
+            int vao = currentPipe.acquireVao(currentVboHandle, 0, currentEboHandle, currentInstanceBase);
+            ctx.cache.bindVao(vao);
+            GraphicsMetrics.Drawcalls.increment();
+            Analysis.start("gl.glDrawElements");
+            try {
+              glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
+            } finally {
+              Analysis.end("gl.glDrawElements");
+            }
+            ctx.cache.bindVao(0);
+          }
+          case OP_DRAW_INSTANCED -> {
+            int vertexCount = ring.poll();
+            int instanceCount = ring.poll();
+            int firstVertex = ring.poll();
+            consumed += 3;
+            if (currentVboHandle == 0) {
+              throw new GraphicsException("VBO not bound");
+            }
+            if (currentPipe == null) {
+              throw new GraphicsException("Pipeline not bound");
+            }
+
+            applyResources();
+
+            int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, 0, currentInstanceBase);
+            ctx.cache.bindVao(vao);
+            GraphicsMetrics.Drawcalls.increment();
+            Analysis.start("gl.glDrawArraysInstanced");
+            try {
+              glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
+            } finally {
+              Analysis.end("gl.glDrawArraysInstanced");
+            }
+            ctx.cache.bindVao(0);
+          }
+          case OP_DRAW_INDEXED_INSTANCED -> {
+            int indexCount = ring.poll();
+            int instanceCount = ring.poll();
+            int firstIndex = ring.poll();
+            consumed += 3;
+            if (currentVboHandle == 0) {
+              throw new GraphicsException("VBO not bound");
+            }
+            if (currentEboHandle == 0) {
+              throw new GraphicsException("EBO not bound");
+            }
+            if (currentPipe == null) {
+              throw new GraphicsException("Pipeline not bound");
+            }
+
+            applyResources();
+
+            int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, currentEboHandle, currentInstanceBase);
+            ctx.cache.bindVao(vao);
+            GraphicsMetrics.Drawcalls.increment();
+            Analysis.start("gl.glDrawElementsInstanced");
+            try {
+              glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
+            } finally {
+              Analysis.end("gl.glDrawElementsInstanced");
+            }
+            ctx.cache.bindVao(0);
+          }
+          case OP_DISPATCH -> {
+            int x = ring.poll();
+            int y = ring.poll();
+            int z = ring.poll();
+            consumed += 3;
+            GraphicsMetrics.Drawcalls.increment();
+            glDispatchCompute(x, y, z);
+          }
+          default -> throw new GraphicsException("Unknown command opcode: " + op);
         }
-        case OP_DRAW_INDEXED -> {
-          int indexCount = ring.poll();
-          int firstIndex = ring.poll();
-          consumed += 2;
-          if (currentVboHandle == 0) {
-            throw new GraphicsException("VBO not bound");
-          }
-          if (currentEboHandle == 0) {
-            throw new GraphicsException("EBO not bound");
-          }
-          if (currentPipe == null) {
-            throw new GraphicsException("Pipeline not bound");
-          }
-
-          applyResources();
-
-          int vao = currentPipe.acquireVao(currentVboHandle, 0, currentEboHandle, currentInstanceBase);
-          ctx.cache.bindVao(vao);
-          GraphicsMetrics.Drawcalls.increment();
-          glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
-          ctx.cache.bindVao(0);
-        }
-        case OP_DRAW_INSTANCED -> {
-          int vertexCount = ring.poll();
-          int instanceCount = ring.poll();
-          int firstVertex = ring.poll();
-          consumed += 3;
-          if (currentVboHandle == 0) {
-            throw new GraphicsException("VBO not bound");
-          }
-          if (currentPipe == null) {
-            throw new GraphicsException("Pipeline not bound");
-          }
-
-          applyResources();
-
-          int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, 0, currentInstanceBase);
-          ctx.cache.bindVao(vao);
-          GraphicsMetrics.Drawcalls.increment();
-          glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
-          ctx.cache.bindVao(0);
-        }
-        case OP_DRAW_INDEXED_INSTANCED -> {
-          int indexCount = ring.poll();
-          int instanceCount = ring.poll();
-          int firstIndex = ring.poll();
-          consumed += 3;
-          if (currentVboHandle == 0) {
-            throw new GraphicsException("VBO not bound");
-          }
-          if (currentEboHandle == 0) {
-            throw new GraphicsException("EBO not bound");
-          }
-          if (currentPipe == null) {
-            throw new GraphicsException("Pipeline not bound");
-          }
-
-          applyResources();
-
-          int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, currentEboHandle, currentInstanceBase);
-          ctx.cache.bindVao(vao);
-          GraphicsMetrics.Drawcalls.increment();
-          glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
-          ctx.cache.bindVao(0);
-        }
-        case OP_DISPATCH -> {
-          int x = ring.poll();
-          int y = ring.poll();
-          int z = ring.poll();
-          consumed += 3;
-          GraphicsMetrics.Drawcalls.increment();
-          glDispatchCompute(x, y, z);
-        }
-        default -> throw new GraphicsException("Unknown command opcode: " + op);
       }
+    } finally {
+      Analysis.end("gl.decodeAndExecuteCommandBatch");
     }
   }
 
@@ -575,18 +605,49 @@ public final class OpenGLEncoder implements Encoder {
     }
   }
 
+  /**
+   * Validates and applies the resource sets required by the current pipeline.
+   *
+   * @throws GraphicsException if a required resource set is missing or incompatible
+   */
   private void applyResources() {
-    assert currentPipe != null;
+    Analysis.start("gl.validateAndBindResources");
+    try {
+      assert currentPipe != null;
 
-    ResourceSetLayout[] layouts = currentPipe.desc().resourceLayouts();
-    for (int i = 0; i < layouts.length; i++) {
-      OpenGLResourceSet rs = currentRss[i];
-      if (rs == null) {
-        throw new GraphicsException("Null resource layout at slot " + i);
+      ResourceSetLayout[] layouts = currentPipe.desc().resourceLayouts();
+      for (int i = 0; i < layouts.length; i++) {
+        OpenGLResourceSet rs = currentRss[i];
+        if (rs == null) {
+          throw new GraphicsException("Null resource layout at slot " + i);
+        }
+
+        rs.validate(layouts[i]);
+        rs.apply(ctx.cache);
       }
+    } finally {
+      Analysis.end("gl.validateAndBindResources");
+    }
+  }
 
-      rs.validate(layouts[i]);
-      rs.apply(ctx.cache);
+  private static final class BatchCommand implements Runnable {
+    private final OpenGLEncoder encoder;
+    private int intCount;
+    private @Nullable Object[] references = EMPTY_REFERENCES;
+
+    private BatchCommand(OpenGLEncoder encoder) {
+      this.encoder = encoder;
+    }
+
+    @Override
+    public void run() {
+      try {
+        encoder.executeBatch(intCount, references);
+      } finally {
+        references = EMPTY_REFERENCES;
+        intCount = 0;
+        encoder.batches.release(this);
+      }
     }
   }
 }

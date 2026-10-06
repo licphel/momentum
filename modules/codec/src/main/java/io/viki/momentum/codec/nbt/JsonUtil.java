@@ -107,8 +107,9 @@ public final class JsonUtil {
    */
   public static CompoundNBT parse(String json) {
     try {
-      JsonNode root = MAPPER.readTree(json);
-      if (!root.isObject()) {
+      JsonNode root = MAPPER.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+          .readTree(json);
+      if (root == null || !root.isObject()) {
         throw new IllegalArgumentException("Root must be a JSON object");
       }
       return fromJsonNode(root);

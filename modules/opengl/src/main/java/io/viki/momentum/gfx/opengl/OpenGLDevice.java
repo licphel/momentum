@@ -26,7 +26,6 @@ package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsMetrics;
-import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
@@ -42,26 +41,24 @@ import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
-import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
-import org.lwjgl.opengl.GL;
-import org.lwjgl.opengl.GL11;
-
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import org.lwjgl.opengl.*;
+import org.lwjgl.system.Callback;
+import java.util.ArrayDeque;
+import java.util.Objects;
 
 /**
  * OpenGL implementation of {@link Device}.
  *
  * <p>GL commands are submitted from any thread via {@link #submit(Runnable)}
- * into a lock-free queue, then executed on the calling thread by {@link #pollEvents()} (the "command buffer execution"
- * pattern).
+ * into a synchronized array queue and execute on the context thread via {@link #execute()}.
  *
- * <p><b>Thread safety:</b> {@link #submit} is safe from any thread.
- * {@link #pollEvents()} drains and executes queued work on the calling thread (which must be the GL context thread).
- * The {@link #cache} is only touched during {@code pollEvents}.
+ * <p><b>Thread safety:</b> submission is thread-safe; execution and the state cache
+ * are confined to the GL context thread.
  *
  * @see OpenGLCache
  * @see View
@@ -70,8 +67,10 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @InternalApi
 public final class OpenGLDevice implements Device {
   private static final Logger LOGGER = Log.getLogger();
+  /** Caps diagnostic stack traces so a recurring driver error does not flood the log. */
+  private static final int MAX_DEBUG_ERRORS = 16;
   /**
-   * Shared GL state cache — only accessed during {@link #pollEvents()}.
+   * Shared GL state cache — only accessed by the context thread.
    */
   final OpenGLCache cache = new OpenGLCache();
   /**
@@ -79,11 +78,13 @@ public final class OpenGLDevice implements Device {
    */
   final VaoRegistry vaos = new VaoRegistry(this);
 
-  private final Queue<Runnable> queue = new ConcurrentLinkedQueue<>();
+  private final ArrayDeque<Runnable> queue = new ArrayDeque<>();
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
   @Nullable View view;
   private long lastCheckErrorMs;
+  private volatile @Nullable Callback debugCallback;
+  private int debugErrors;
 
   /**
    * Creates a new device.
@@ -94,10 +95,13 @@ public final class OpenGLDevice implements Device {
   }
 
   /**
-   * Loads this device onto the given view.
+   * Initializes this device for a GLFW view.
    *
-   * <p>Binds the GL context to the calling thread and initializes GL
-   * capabilities. Must be called before any resource creation.
+   * <p>The view's context is owned by the calling thread. This must be called before
+   * creating graphics resources.
+   *
+   * @param context platform values containing the view, backend identifier, and context lifecycle callbacks
+   * @throws IllegalArgumentException if the backend is not GLFW
    */
   @Override
   public void load(Object... context) {
@@ -107,6 +111,9 @@ public final class OpenGLDevice implements Device {
     if ("GLFW".equals(bk)) {
       ((Runnable) context[2]).run();
       GL.createCapabilities();
+      if (view.isDebug()) {
+        installDebugCallback();
+      }
     } else {
       throw new IllegalArgumentException("OpenGL device only supports GLFW");
     }
@@ -120,6 +127,51 @@ public final class OpenGLDevice implements Device {
      * correctly. At least it works for now.
      */
     FallbackFont.init(this);
+  }
+
+  /** Registers the supported OpenGL debug callback for reporting driver errors. */
+  private void installDebugCallback() {
+    GLCapabilities caps = GL.getCapabilities();
+    if (caps.OpenGL43 || caps.GL_KHR_debug) {
+      GLDebugMessageCallback callback = GLDebugMessageCallback.create(
+          (source, type, id, severity, length, message, user) -> {
+            if (type == KHRDebug.GL_DEBUG_TYPE_ERROR) {
+              reportDebugError(id, GLDebugMessageCallback.getMessage(length, message));
+            }
+          });
+      debugCallback = callback;
+      KHRDebug.glDebugMessageCallback(callback, 0L);
+      GL11.glEnable(KHRDebug.GL_DEBUG_OUTPUT);
+      GL11.glEnable(KHRDebug.GL_DEBUG_OUTPUT_SYNCHRONOUS);
+    } else if (caps.GL_ARB_debug_output) {
+      GLDebugMessageARBCallback callback = GLDebugMessageARBCallback.create(
+          (source, type, id, severity, length, message, user) -> {
+            if (type == ARBDebugOutput.GL_DEBUG_TYPE_ERROR_ARB) {
+              reportDebugError(id, GLDebugMessageARBCallback.getMessage(length, message));
+            }
+          });
+      debugCallback = callback;
+      ARBDebugOutput.glDebugMessageCallbackARB(callback, 0L);
+      GL11.glEnable(ARBDebugOutput.GL_DEBUG_OUTPUT_SYNCHRONOUS_ARB);
+    }
+  }
+
+  /**
+   * Reports a driver error while limiting repeated diagnostic stack traces.
+   *
+   * @param id the driver error identifier
+   * @param message the driver-provided error message
+   */
+  private void reportDebugError(int id, String message) {
+    if (debugErrors >= MAX_DEBUG_ERRORS) {
+      return;
+    }
+    debugErrors++;
+    LOGGER.warnExc("OpenGL driver error 0x" + Integer.toHexString(id) + ": " + message,
+        new IllegalStateException("Synchronous OpenGL call stack"));
+    if (debugErrors == MAX_DEBUG_ERRORS) {
+      LOGGER.warn("Further OpenGL error stacks suppressed for this device");
+    }
   }
 
   @Override
@@ -159,7 +211,7 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public ResourceSet getResourceSet(ResourceSetLayout layout) {
-    return new OpenGLResourceSet(this, layout);
+    return new OpenGLResourceSet(layout);
   }
 
   @Override
@@ -201,25 +253,33 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void submit(Runnable work) {
-    queue.add(work);
+    synchronized (queue) {
+      queue.addLast(work);
+    }
   }
 
   @Override
   public void execute() {
-    Runnable task;
-    GraphicsMetrics.DeviceQueueSize.add(queue.size());
+    synchronized (queue) {
+      GraphicsMetrics.DeviceQueueSize.add(queue.size());
+    }
     try {
-      while ((task = queue.poll()) != null) {
-        task.run();
-      }
-    } catch (Exception e) {
-      LOGGER.warn("OpenGL execution error", e);
+      Runnable task;
+      while ((task = pollCommand()) != null) task.run();
+    } catch (Exception exception) {
+      LOGGER.warn("OpenGL execution error", exception);
+    }
+  }
+
+  private @Nullable Runnable pollCommand() {
+    synchronized (queue) {
+      return queue.pollFirst();
     }
   }
 
   @Override
   public void pollEvents() {
-    if (view != null && view.isDebug()) {
+    if (view != null && view.isDebug() && debugCallback == null) {
       long ms = System.currentTimeMillis();
 
       if (ms - lastCheckErrorMs > 1000) {
@@ -234,9 +294,26 @@ public final class OpenGLDevice implements Device {
     }
   }
 
+  /**
+   * Releases device-owned GL resources on the context thread.
+   */
   @Override
   public void close() {
     submit(vaos::clear);
+    submit(() -> {
+      if (debugCallback != null) {
+        var caps = GL.getCapabilities();
+        if (caps.OpenGL43 || caps.GL_KHR_debug) {
+          KHRDebug.glDebugMessageCallback(null, 0L);
+        } else {
+          ARBDebugOutput.glDebugMessageCallbackARB(null, 0L);
+        }
+
+        Objects.requireNonNull(debugCallback).free();
+        debugCallback = null;
+      }
+    });
     execute();
   }
+
 }

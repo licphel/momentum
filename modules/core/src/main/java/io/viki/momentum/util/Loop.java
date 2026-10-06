@@ -15,14 +15,17 @@ public final class Loop {
   /** Maximum number of catch-up ticks per frame before the loop is considered "slow". */
   private static final int MAX_CATCH_UP_TICKS = 5;
 
-  /** If the tick schedule falls behind by this many tick lengths, reset instead of catching up. */
-  private static final double RESET_THRESHOLD_TICKS = 4.0;
-
   /** Stats are recomputed at this interval, in nanoseconds. */
   private static final long STATS_INTERVAL_NANOS = 500_000_000L;
 
   /** Busy-wait is used only for sleeps shorter than this, to avoid OS scheduler jitter. */
-  private static final long SPIN_THRESHOLD_NANOS = 1_000_000L;
+  private static final long SPIN_THRESHOLD_NANOS = 100_000L;
+
+  /** Leave scheduler headroom instead of sleeping all the way to the deadline. */
+  private static final long SLEEP_HEADROOM_NANOS = 2_000_000L;
+
+  /** Bound each sleep so a loaded scheduler cannot amplify a long sleep request. */
+  private static final long MAX_SLEEP_NANOS = 5_000_000L;
 
   private static volatile boolean stopped;
   private static int maxTps;
@@ -58,8 +61,8 @@ public final class Loop {
    *
    * <p>{@code tick} fires at a fixed rate of {@code maxTps} per second,
    * catching up at most {@value #MAX_CATCH_UP_TICKS} ticks per frame. If the
-   * schedule falls behind by more than {@value #RESET_THRESHOLD_TICKS} tick
-   * lengths, the schedule resets rather than spiraling. {@code draw} runs
+   * schedule still falls behind, excess whole tick intervals are discarded
+   * without resetting its fractional phase. {@code draw} runs
    * once per frame, with {@link #partialTicks()} holding the interpolation
    * between the last two ticks.
    *
@@ -101,34 +104,33 @@ public final class Loop {
       realFrameTime = (float) ((frameStartNanos - previousFrameNanos) / 1_000_000_000.0);
       previousFrameNanos = frameStartNanos;
 
-      // If we fell too far behind, reset the schedule instead of spiraling.
-      if (frameStartNanos - nextTickNanos > tickLength * RESET_THRESHOLD_TICKS) {
-        nextTickNanos = frameStartNanos;
-      }
-
       // Catch up on ticks.
       hasTicked = false;
       int loops = 0;
-      while (frameStartNanos > nextTickNanos && loops < MAX_CATCH_UP_TICKS) {
+      while (frameStartNanos >= nextTickNanos && loops < MAX_CATCH_UP_TICKS) {
         hasTicked = true;
-        tickTime += delta;
         nextTickNanos += tickLength;
         tickCount++;
+        tickTime = (float) ((double) tickCount / maxTps);
         loops++;
         tick.run();
       }
 
       // If we hit the catch-up limit, we are running slowly.
-      runningSlowly = loops >= MAX_CATCH_UP_TICKS && frameStartNanos > nextTickNanos;
+      runningSlowly = frameStartNanos >= nextTickNanos;
+      if (runningSlowly) {
+        // Drop only whole intervals; resetting to "now" caused interpolation
+        // to jump to 1 and then back to 0 without an intervening tick.
+        nextTickNanos += (Math.floor((frameStartNanos - nextTickNanos) / tickLength) + 1) * tickLength;
+      }
 
       // Interpolation between the previous and next tick.
-      // When caught up, nextTickNanos > frameStartNanos, so this is in [0, 1).
-      // After a reset, nextTickNanos == frameStartNanos, so this is 1.0 by the formula below.
-      double partial = (frameStartNanos + tickLength - nextTickNanos) / tickLength;
+      // Include time spent updating, rather than rendering with a stale frame-start timestamp.
+      double partial = (System.nanoTime() + tickLength - nextTickNanos) / tickLength;
       partialTicks = (float) Math.max(0.0, Math.min(partial, 1.0));
 
       // Frame time for rendering: accumulated tick time plus the interpolated step.
-      frameTime = tickTime + partialTicks * delta;
+      frameTime = (float) ((tickCount + (double) partialTicks) / maxTps);
 
       draw.run();
       frameCounter++;
@@ -166,38 +168,26 @@ public final class Loop {
    * Sleeps for the requested duration, using busy-wait for very short sleeps
    * to avoid OS scheduler jitter and {@link Thread#sleep} for longer ones.
    */
+  @SuppressWarnings("BusyWait")
   private static void sleepPrecise(double nanos) {
-    long start = System.nanoTime();
-    long target = start + (long) nanos;
-
-    // For very short sleeps, spin.
-    if (nanos < SPIN_THRESHOLD_NANOS) {
-      while (System.nanoTime() < target) {
+    long target = System.nanoTime() + (long) nanos;
+    long remaining;
+    // Like Starbound's Windows limiter, recheck the deadline between short
+    // sleeps and yield near it. Only the final tiny tail actively spins.
+    while (!stopped && (remaining = target - System.nanoTime()) > 0) {
+      if (remaining <= SPIN_THRESHOLD_NANOS) {
         Thread.onSpinWait();
+      } else if (remaining <= SLEEP_HEADROOM_NANOS) {
+        Thread.yield();
+      } else {
+        long sleepNanos = Math.min(MAX_SLEEP_NANOS, remaining - SLEEP_HEADROOM_NANOS);
+        try {
+          Thread.sleep(sleepNanos / 1_000_000L, (int) (sleepNanos % 1_000_000L));
+        } catch (InterruptedException e) {
+          Thread.currentThread().interrupt();
+          stopped = true;
+        }
       }
-      return;
-    }
-
-    // For longer sleeps, sleep most of it, then spin the remainder.
-    long remainingNanos = target - System.nanoTime();
-    long spinTailNanos = Math.min(SPIN_THRESHOLD_NANOS, remainingNanos / 2);
-
-    long sleepNanos = remainingNanos - spinTailNanos;
-    if (sleepNanos > 0) {
-      long millis = sleepNanos / 1_000_000L;
-      int nanosPart = (int) (sleepNanos % 1_000_000L);
-      try {
-        Thread.sleep(millis, nanosPart);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        stopped = true;
-        return;
-      }
-    }
-
-    // Spin the tail for precision.
-    while (System.nanoTime() < target) {
-      Thread.onSpinWait();
     }
   }
 

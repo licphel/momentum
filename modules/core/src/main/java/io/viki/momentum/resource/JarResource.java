@@ -38,7 +38,7 @@ import java.util.stream.Stream;
  * A {@link Resource} backed by a JAR file.
  *
  * @param jarPath the JAR file
- * @param root the normalized resource root inside the JAR
+ * @param root    the normalized resource root inside the JAR
  */
 public record JarResource(Path jarPath, String root) implements Resource {
   /**
@@ -54,7 +54,7 @@ public record JarResource(Path jarPath, String root) implements Resource {
    * Creates a JAR-backed provider.
    *
    * @param jarPath the JAR file
-   * @param root the normalized resource root inside the JAR
+   * @param root    the normalized resource root inside the JAR
    */
   public JarResource {
     jarPath = jarPath.toAbsolutePath().normalize();
@@ -75,11 +75,6 @@ public record JarResource(Path jarPath, String root) implements Resource {
   public JarResource resolve(String directory) {
     String child = Resource.normalizePath(directory);
     return child.isEmpty() ? this : new JarResource(jarPath, rootedPath(child));
-  }
-
-  private String rootedPath(String path) {
-    String child = Resource.normalizePath(path);
-    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
   }
 
   @Override
@@ -114,6 +109,11 @@ public record JarResource(Path jarPath, String root) implements Resource {
           .toList()
           .stream();
     }
+  }
+
+  private String rootedPath(String path) {
+    String child = Resource.normalizePath(path);
+    return root.isEmpty() ? child : child.isEmpty() ? root : root + '/' + child;
   }
 
   private static class JarResourceInputStream extends FilterInputStream {
