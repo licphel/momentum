@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * An ordered, heterogeneous list of NBT values.
@@ -288,6 +289,30 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
+   * Returns the byte array at the index or the supplied fallback if the index is invalid or has another tag type.
+   *
+   * @param index the element index
+   * @param fallback the fallback array to return as-is
+   * @return the stored byte array, or {@code fallback}
+   */
+  public byte[] getBytes(int index, byte[] fallback) {
+    byte @Nullable [] value = getBytes(index);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Returns the byte array at the index or lazily obtains the fallback if no compatible value exists.
+   *
+   * @param index the element index
+   * @param fallback supplies a non-null array only when the index is invalid or has another tag type
+   * @return the stored byte array, or the supplied fallback value
+   */
+  public byte[] getBytes(int index, Supplier<? extends byte[]> fallback) {
+    byte @Nullable [] value = getBytes(index);
+    return value != null ? value : fallback.get();
+  }
+
+  /**
    * Returns the element as an {@link CompoundNBT}.
    *
    * @param index the element index
@@ -299,6 +324,30 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   }
 
   /**
+   * Returns the compound at the index or the supplied fallback if the index is invalid or has another tag type.
+   *
+   * @param index the element index
+   * @param fallback the fallback compound to return as-is
+   * @return the stored compound, or {@code fallback}
+   */
+  public CompoundNBT getCompound(int index, CompoundNBT fallback) {
+    @Nullable CompoundNBT value = getCompound(index);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Returns the compound at the index or lazily obtains the fallback if no compatible value exists.
+   *
+   * @param index the element index
+   * @param fallback supplies a non-null compound only when the index is invalid or has another tag type
+   * @return the stored compound, or the supplied fallback value
+   */
+  public CompoundNBT getCompound(int index, Supplier<? extends CompoundNBT> fallback) {
+    @Nullable CompoundNBT value = getCompound(index);
+    return value != null ? value : fallback.get();
+  }
+
+  /**
    * Returns the element as a {@link ListNBT}.
    *
    * @param index the element index
@@ -307,6 +356,30 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   public @Nullable ListNBT getList(int index) {
     NBT v = get(index);
     return v instanceof ListNBT l ? l : null;
+  }
+
+  /**
+   * Returns the list at the index or the supplied fallback if the index is invalid or has another tag type.
+   *
+   * @param index the element index
+   * @param fallback the fallback list to return as-is
+   * @return the stored list, or {@code fallback}
+   */
+  public ListNBT getList(int index, ListNBT fallback) {
+    @Nullable ListNBT value = getList(index);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Returns the list at the index or lazily obtains the fallback if no compatible value exists.
+   *
+   * @param index the element index
+   * @param fallback supplies a non-null list only when the index is invalid or has another tag type
+   * @return the stored list, or the supplied fallback value
+   */
+  public ListNBT getList(int index, Supplier<? extends ListNBT> fallback) {
+    @Nullable ListNBT value = getList(index);
+    return value != null ? value : fallback.get();
   }
 
   /**

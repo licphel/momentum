@@ -30,6 +30,7 @@ import io.viki.momentum.codec.streaming.BinaryBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Supplier;
 
 /**
  * NBT (Named Binary Tag) compound — a tree-structured key-value container with optional path-based access.
@@ -577,6 +578,30 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   }
 
   /**
+   * Retrieves a byte array or returns the supplied fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback the fallback array to return as-is
+   * @return the stored byte array, or {@code fallback}
+   */
+  public byte[] getBytes(String key, byte[] fallback) {
+    byte @Nullable [] value = getBytes(key);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Retrieves a byte array or lazily obtains the fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback supplies a non-null array only when no compatible value is stored
+   * @return the stored byte array, or the supplied fallback value
+   */
+  public byte[] getBytes(String key, Supplier<? extends byte[]> fallback) {
+    byte @Nullable [] value = getBytes(key);
+    return value != null ? value : fallback.get();
+  }
+
+  /**
    * Retrieves a nested CompoundTag.
    *
    * @param key the key
@@ -588,6 +613,30 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   }
 
   /**
+   * Retrieves a nested compound or returns the supplied fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback the fallback compound to return as-is
+   * @return the stored compound, or {@code fallback}
+   */
+  public CompoundNBT getCompound(String key, CompoundNBT fallback) {
+    @Nullable CompoundNBT value = getCompound(key);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Retrieves a nested compound or lazily obtains the fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback supplies a non-null compound only when no compatible value is stored
+   * @return the stored compound, or the supplied fallback value
+   */
+  public CompoundNBT getCompound(String key, Supplier<? extends CompoundNBT> fallback) {
+    @Nullable CompoundNBT value = getCompound(key);
+    return value != null ? value : fallback.get();
+  }
+
+  /**
    * Retrieves a nested ListTag.
    *
    * @param key the key
@@ -596,6 +645,30 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   public @Nullable ListNBT getList(String key) {
     NBT v = get(key);
     return v instanceof ListNBT l ? l : null;
+  }
+
+  /**
+   * Retrieves a nested list or returns the supplied fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback the fallback list to return as-is
+   * @return the stored list, or {@code fallback}
+   */
+  public ListNBT getList(String key, ListNBT fallback) {
+    @Nullable ListNBT value = getList(key);
+    return value != null ? value : fallback;
+  }
+
+  /**
+   * Retrieves a nested list or lazily obtains the fallback when the key is missing or has another tag type.
+   *
+   * @param key the key
+   * @param fallback supplies a non-null list only when no compatible value is stored
+   * @return the stored list, or the supplied fallback value
+   */
+  public ListNBT getList(String key, Supplier<? extends ListNBT> fallback) {
+    @Nullable ListNBT value = getList(key);
+    return value != null ? value : fallback.get();
   }
 
   @Override

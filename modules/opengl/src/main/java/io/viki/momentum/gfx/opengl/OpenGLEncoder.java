@@ -24,8 +24,8 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.GraphicsException;
+import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.pass.RenderPass;
@@ -35,10 +35,11 @@ import io.viki.momentum.gfx.pipe.Topology;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.shader.ResourceSetLayout;
 import io.viki.momentum.gfx.tint.Color;
-import io.viki.momentum.util.MspcRingBuffer;
-import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
+import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
+import io.viki.momentum.util.MspcRingBuffer;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
@@ -73,8 +74,8 @@ import static org.lwjgl.opengl.GL43.glDispatchCompute;
  */
 @InternalApi
 public final class OpenGLEncoder implements Encoder {
+  private static final @Nullable Object[] EMPTY_REFERENCES = new Object[0];
   private static final Logger LOGGER = Log.getLogger();
-
   private static final int OP_BEGIN_PASS = 0;
   private static final int OP_END_PASS = 1;
   private static final int OP_SET_TOPOLOGY = 2;
@@ -91,7 +92,6 @@ public final class OpenGLEncoder implements Encoder {
   private static final int OP_DRAW_INSTANCED = 13;
   private static final int OP_DRAW_INDEXED_INSTANCED = 14;
   private static final int OP_DISPATCH = 15;
-
   /**
    * Ring capacity: the consumer drains the ring every frame, so the capacity only
    * needs to hold one frame's worst-case stream (~35k ints today); the producer
@@ -99,7 +99,7 @@ public final class OpenGLEncoder implements Encoder {
    */
   private static final int RING_CAPACITY = 1 << 16;
   private static final int REF_CAPACITY = 1 << 4;
-
+  private final Pool<BatchCommand> batches = new Pool<>();
   private final OpenGLDevice ctx;
   private final MspcRingBuffer ring = new MspcRingBuffer(RING_CAPACITY);
   // Per-frame recording state (single-threaded)
@@ -164,7 +164,13 @@ public final class OpenGLEncoder implements Encoder {
     queryReset = true;
     GraphicsMetrics.EncoderSum.add(cmdCount);
 
-    ctx.submit(() -> executeBatch(ints, refsSnapshot));
+    BatchCommand command = batches.poll();
+    if (command == null) {
+      command = new BatchCommand(this);
+    }
+    command.intCount = ints;
+    command.references = refsSnapshot;
+    ctx.submit(command);
   }
 
   @Override
@@ -587,6 +593,27 @@ public final class OpenGLEncoder implements Encoder {
 
       rs.validate(layouts[i]);
       rs.apply(ctx.cache);
+    }
+  }
+
+  private static final class BatchCommand implements Runnable {
+    private final OpenGLEncoder encoder;
+    private int intCount;
+    private @Nullable Object[] references = EMPTY_REFERENCES;
+
+    private BatchCommand(OpenGLEncoder encoder) {
+      this.encoder = encoder;
+    }
+
+    @Override
+    public void run() {
+      try {
+        encoder.executeBatch(intCount, references);
+      } finally {
+        references = EMPTY_REFERENCES;
+        intCount = 0;
+        encoder.batches.release(this);
+      }
     }
   }
 }

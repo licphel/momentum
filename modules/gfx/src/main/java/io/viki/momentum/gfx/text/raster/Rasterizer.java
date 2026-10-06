@@ -33,7 +33,7 @@ import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.shape.Rectangle;
 
 import java.util.*;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import io.viki.momentum.util.Pool;
 
 /**
  * Rasterizes a list of text literals into a {@link Raster} for rendering.
@@ -565,7 +565,7 @@ public final class Rasterizer {
   }
 
   private static final class GlyphBound {
-    private static final ConcurrentLinkedQueue<GlyphBound> GB_POOL = new ConcurrentLinkedQueue<>();
+    private static final Pool<GlyphBound> GB_POOL = new Pool<>();
 
     public float gx;
     public float gy;
@@ -589,7 +589,7 @@ public final class Rasterizer {
     }
 
     public void recycle() {
-      GB_POOL.offer(this);
+      GB_POOL.release(this);
     }
   }
 

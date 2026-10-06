@@ -27,6 +27,7 @@ package io.viki.momentum.gfx.util;
 import io.viki.momentum.codec.streaming.BinaryBuffer;
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.tint.ColorStack;
 import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.MatrixStack;
 
@@ -42,6 +43,7 @@ public class VertexBuilder {
   protected final float[] trCache = new float[3];
   protected final TransformHandler transformHandler;
   protected final MatrixStack matrixStack = new MatrixStack();
+  protected final ColorStack colorStack = new ColorStack();
   protected Gradient gradient = Color.WHITE;
   protected int flags = 0;
   protected VertexStore data;
@@ -73,6 +75,15 @@ public class VertexBuilder {
    */
   public Gradient gradient() {
     return gradient;
+  }
+
+  /**
+   * Returns nested color modifiers, independent of the local gradient tint.
+   *
+   * @return the color stack applied to subsequent draw operations
+   */
+  public ColorStack colorStack() {
+    return colorStack;
   }
 
   /**
@@ -132,7 +143,7 @@ public class VertexBuilder {
     buf.writeFloat(arr[0]);
     buf.writeFloat(arr[1]);
     buf.writeFloat(arr[2]);
-    buf.writeLong(packedColor);
+    buf.writeLong(colorStack.apply(packedColor));
   }
 
   /**
@@ -158,7 +169,7 @@ public class VertexBuilder {
     buf.writeFloat(arr[0]);
     buf.writeFloat(arr[1]);
     buf.writeFloat(arr[2]);
-    buf.writeLong(packedColor);
+    buf.writeLong(colorStack.apply(packedColor));
     buf.writeFloat(u);
     buf.writeFloat(v);
   }

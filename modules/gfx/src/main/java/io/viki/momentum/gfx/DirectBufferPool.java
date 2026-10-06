@@ -25,7 +25,7 @@
 package io.viki.momentum.gfx;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import io.viki.momentum.util.Pool;
 
 import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
@@ -42,7 +42,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * This class is thread-safe.
  */
 public final class DirectBufferPool {
-  private static final ConcurrentLinkedQueue<ByteBuffer> pool = new ConcurrentLinkedQueue<>();
+  private static final Pool<ByteBuffer> pool = new Pool<>();
 
   private DirectBufferPool() {
   }
@@ -83,14 +83,13 @@ public final class DirectBufferPool {
    * a native library or uploaded to the GPU), the buffer should be released to allow
    * other threads to reuse its underlying off-heap memory.
    *
-   * <p><b>Important:</b> Only direct buffers obtained from {@link #acquire(int)}
-   * should be passed to this method. Passing a heap-based {@code ByteBuffer}
-   * or an unmanaged direct buffer will be silently ignored.
+   * <p>Only buffers obtained from {@link #acquire(int)} may be released here.
+   * Release each buffer exactly once and do not access it afterward.
    *
-   * @param buffer the {@code DirectByteBuffer} to return to the pool; may be {@code null}
+   * @param buffer the acquired buffer whose use has finished
    */
   public static void release(ByteBuffer buffer) {
-    pool.offer(buffer);
+    pool.release(buffer);
   }
 
   /**
@@ -103,9 +102,6 @@ public final class DirectBufferPool {
    * will result in newly allocated buffers.
    */
   public static void close() {
-    ByteBuffer buffer;
-    while ((buffer = pool.poll()) != null) {
-      memFree(buffer);
-    }
+    pool.clear(org.lwjgl.system.MemoryUtil::memFree);
   }
 }

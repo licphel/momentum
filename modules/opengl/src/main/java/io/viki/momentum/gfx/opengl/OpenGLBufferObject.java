@@ -31,6 +31,7 @@ import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.buffer.BufferUsage;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
@@ -59,10 +60,12 @@ import static org.lwjgl.opengl.GL33.*;
  */
 @InternalApi
 public final class OpenGLBufferObject implements BufferObject, Handle {
+  private static final ByteBuffer EMPTY_UPLOAD = ByteBuffer.allocate(0);
   private final OpenGLDevice ctx;
   private final BufferObjectDesc desc;
   private final int target;
   private final int hint;
+  private final Pool<UploadCommand> uploads = new Pool<>();
 
   /**
    * The GL buffer handle (0 until the render thread creates it).
@@ -139,25 +142,13 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
     ByteBuffer bb = DirectBufferPool.acquire(size);
     bb.put(memory).flip();
 
-    ctx.submit(() -> {
-      OpenGLCache cache = ctx.cache;
-      int needed = offset + size;
-      cache.bindBuffer(target, handle);
-
-      if (needed > capacity) {
-        int newCap = Math.max(needed, capacity * 2);
-        glBufferData(target, newCap, hint);
-        capacity = newCap;
-      }
-
-      if (desc.frequency() == BufferFrequency.STREAM && offset == 0) {
-        // Buf orphaning: discard the old allocation before writing.
-        glBufferData(target, capacity, hint);
-      }
-
-      glBufferSubData(target, offset, bb);
-      DirectBufferPool.release(bb);
-    });
+    UploadCommand command = uploads.poll();
+    if (command == null) {
+      command = new UploadCommand(this);
+    }
+    command.bytes = bb;
+    command.offset = offset;
+    ctx.submit(command);
   }
 
   @Override
@@ -176,5 +167,36 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
   @Override
   public int handle(int slot) {
     return slot == 0 ? handle : target;
+  }
+
+  private static final class UploadCommand implements Runnable {
+    private final OpenGLBufferObject buffer;
+    private ByteBuffer bytes = EMPTY_UPLOAD;
+    private int offset;
+
+    private UploadCommand(OpenGLBufferObject buffer) {
+      this.buffer = buffer;
+    }
+
+    @Override
+    public void run() {
+      try {
+        buffer.ctx.cache.bindBuffer(buffer.target, buffer.handle);
+        int needed = offset + bytes.remaining();
+        if (needed > buffer.capacity) {
+          buffer.capacity = Math.max(needed, buffer.capacity * 2);
+          glBufferData(buffer.target, buffer.capacity, buffer.hint);
+        } else if (buffer.desc.frequency() == BufferFrequency.STREAM && offset == 0) {
+          // Growth already orphans storage; do not allocate twice.
+          glBufferData(buffer.target, buffer.capacity, buffer.hint);
+        }
+        glBufferSubData(buffer.target, offset, bytes);
+      } finally {
+        DirectBufferPool.release(bytes);
+        bytes = EMPTY_UPLOAD;
+        offset = 0;
+        buffer.uploads.release(this);
+      }
+    }
   }
 }

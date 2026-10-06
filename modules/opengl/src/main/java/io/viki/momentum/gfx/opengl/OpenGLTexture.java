@@ -34,6 +34,7 @@ import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.math.Cube;
 import io.viki.momentum.util.Handle;
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
 
 import java.nio.ByteBuffer;
 
@@ -54,19 +55,22 @@ import static org.lwjgl.opengl.GL33.*;
  */
 @InternalApi
 public final class OpenGLTexture implements Texture, Handle {
+  private static final ByteBuffer EMPTY_UPLOAD = ByteBuffer.allocate(0);
   /**
    * The GL texture target ({@code GL_TEXTURE_1D/2D/3D}).
    */
   final int target;
   private final OpenGLDevice ctx;
   private final TextureDesc desc;
+  private final int[] format;
+  private final Pool<UploadCommand> uploads = new Pool<>();
   private final byte[] pixels;
   private final int pixelStride;
-  private volatile boolean pixelsValid = true;
   /**
    * The GL texture handle (0 until created on the render thread).
    */
   int handle = 0;
+  private volatile boolean pixelsValid = true;
 
   /**
    * Creates a new OpenGL texture from the given descriptor.
@@ -81,6 +85,7 @@ public final class OpenGLTexture implements Texture, Handle {
   OpenGLTexture(OpenGLDevice ctx, TextureDesc desc) {
     this.ctx = ctx;
     this.desc = desc;
+    format = OpenGLUtils.textureFormat(desc.format());
     pixelStride = readablePixelStride(desc.format());
     pixels = createPixelMirror(desc, pixelStride);
     target = OpenGLUtils.textureTarget(desc.type());
@@ -89,7 +94,7 @@ public final class OpenGLTexture implements Texture, Handle {
       handle = glGenTextures();
       ctx.cache.setTexture(0, target, handle);
 
-      int[] fmt = OpenGLUtils.textureFormat(desc.format());
+      int[] fmt = format;
       int internal = fmt[0];
       int pixFmt = fmt[1];
       int pixType = fmt[2];
@@ -122,6 +127,35 @@ public final class OpenGLTexture implements Texture, Handle {
 
       ctx.cache.setTexture(0, target, 0);
     });
+  }
+
+  private static int readablePixelStride(TextureFormat format) {
+    return switch (format) {
+      case RED8 -> 1;
+      case RG8 -> 2;
+      case RGB8 -> 3;
+      case RGBA8 -> 4;
+      default -> 0;
+    };
+  }
+
+  private static byte[] createPixelMirror(TextureDesc desc, int stride) {
+    if (stride == 0) {
+      return new byte[0];
+    }
+    int size = Math.multiplyExact(Math.multiplyExact(
+        Math.multiplyExact(desc.width(), desc.height()), desc.depth()), stride);
+    byte[] result = new byte[size];
+    byte[] initial = desc.initialBytes();
+    if (initial != null) {
+      if (initial.length != size) {
+        throw new IllegalArgumentException("Initial texture byte count " + initial.length
+            + " does not match " + desc.width() + "x" + desc.height() + "x"
+            + desc.depth() + " " + desc.format() + " texture: " + size);
+      }
+      System.arraycopy(initial, 0, result, 0, size);
+    }
+    return result;
   }
 
   @Override
@@ -161,34 +195,18 @@ public final class OpenGLTexture implements Texture, Handle {
     // snapshot + flip on the calling thread: the caller may reuse or release its
     // buffer immediately; the GL work runs later on the render thread
     ByteBuffer bb = ImageUtil.pooledFlip(bytes, w, h);
-    ctx.submit(() -> {
-      ctx.cache.setTexture(0, target, handle);
-      int[] fmt = OpenGLUtils.textureFormat(desc.format());
-      int pixFmt = fmt[1];
-      int pixType = fmt[2];
-      try {
-        // The data block is flipped to GL row order (first row = bottom), so
-        // its destination Y must flip too: the API Y is top-origin, GL Y is
-        // bottom-origin. A full-texture upload (y=0, h=height) is unaffected.
-        int glY = desc.height() - y - h;
-        // row alignment 1: single-channel rows (e.g. RED8 lightmaps) can have
-        // any width; the default 4-byte alignment would shift every row whose
-        // width is not a multiple of four
-        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        switch (desc.type()) {
-          case TextureType.TEXTURE_1D -> glTexSubImage1D(target, 0, x, w, pixFmt, pixType, bb);
-          case TextureType.TEXTURE_2D -> glTexSubImage2D(target, 0, x, glY, w, h, pixFmt, pixType, bb);
-          case TextureType.TEXTURE_3D -> glTexSubImage3D(target, 0, x, glY, z, w, h, d, pixFmt, pixType, bb);
-        }
-      } finally {
-        DirectBufferPool.release(bb);
-      }
-
-      if (desc.mipLevels() > 1) {
-        glGenerateMipmap(target);
-      }
-      ctx.cache.setTexture(0, target, 0);
-    });
+    UploadCommand command = uploads.poll();
+    if (command == null) {
+      command = new UploadCommand(this);
+    }
+    command.bytes = bb;
+    command.x = x;
+    command.y = y;
+    command.z = z;
+    command.width = w;
+    command.height = h;
+    command.depth = d;
+    ctx.submit(command);
   }
 
   /**
@@ -288,32 +306,42 @@ public final class OpenGLTexture implements Texture, Handle {
     }
   }
 
-  private static int readablePixelStride(TextureFormat format) {
-    return switch (format) {
-      case RED8 -> 1;
-      case RG8 -> 2;
-      case RGB8 -> 3;
-      case RGBA8 -> 4;
-      default -> 0;
-    };
-  }
+  private static final class UploadCommand implements Runnable {
+    private final OpenGLTexture texture;
+    private ByteBuffer bytes = EMPTY_UPLOAD;
+    private int x, y, z, width, height, depth;
 
-  private static byte[] createPixelMirror(TextureDesc desc, int stride) {
-    if (stride == 0) {
-      return new byte[0];
+    private UploadCommand(OpenGLTexture texture) {
+      this.texture = texture;
     }
-    int size = Math.multiplyExact(Math.multiplyExact(
-        Math.multiplyExact(desc.width(), desc.height()), desc.depth()), stride);
-    byte[] result = new byte[size];
-    byte[] initial = desc.initialBytes();
-    if (initial != null) {
-      if (initial.length != size) {
-        throw new IllegalArgumentException("Initial texture byte count " + initial.length
-            + " does not match " + desc.width() + "x" + desc.height() + "x"
-            + desc.depth() + " " + desc.format() + " texture: " + size);
+
+    @Override
+    public void run() {
+      try {
+        texture.ctx.cache.setTexture(0, texture.target, texture.handle);
+        int[] fmt = texture.format;
+        int glY = texture.desc.height() - y - height;
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        switch (texture.desc.type()) {
+          case TextureType.TEXTURE_1D -> glTexSubImage1D(texture.target, 0, x, width, fmt[1], fmt[2], bytes);
+          case TextureType.TEXTURE_2D ->
+              glTexSubImage2D(texture.target, 0, x, glY, width, height, fmt[1], fmt[2], bytes);
+          case TextureType.TEXTURE_3D ->
+              glTexSubImage3D(texture.target, 0, x, glY, z, width, height, depth, fmt[1], fmt[2], bytes);
+        }
+        if (texture.desc.mipLevels() > 1) {
+          glGenerateMipmap(texture.target);
+        }
+      } finally {
+        try {
+          texture.ctx.cache.setTexture(0, texture.target, 0);
+        } finally {
+          DirectBufferPool.release(bytes);
+          bytes = EMPTY_UPLOAD;
+          x = y = z = width = height = depth = 0;
+          texture.uploads.release(this);
+        }
       }
-      System.arraycopy(initial, 0, result, 0, size);
     }
-    return result;
   }
 }

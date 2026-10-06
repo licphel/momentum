@@ -26,7 +26,6 @@ package io.viki.momentum.gfx.opengl;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsMetrics;
-import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
@@ -42,21 +41,22 @@ import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.texture.TextureDesc;
-import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
+import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL11;
 
-import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.ArrayDeque;
 
 /**
  * OpenGL implementation of {@link Device}.
  *
  * <p>GL commands are submitted from any thread via {@link #submit(Runnable)}
- * into a lock-free queue, then executed on the calling thread by {@link #pollEvents()} (the "command buffer execution"
+ * into a synchronized array queue, then executed on the calling thread by {@link #execute()} (the "command buffer
+ * execution"
  * pattern).
  *
  * <p><b>Thread safety:</b> {@link #submit} is safe from any thread.
@@ -79,7 +79,7 @@ public final class OpenGLDevice implements Device {
    */
   final VaoRegistry vaos = new VaoRegistry(this);
 
-  private final Queue<Runnable> queue = new ConcurrentLinkedQueue<>();
+  private final ArrayDeque<Runnable> queue = new ArrayDeque<>();
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
   @Nullable View view;
@@ -201,15 +201,19 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void submit(Runnable work) {
-    queue.add(work);
+    synchronized (queue) {
+      queue.addLast(work);
+    }
   }
 
   @Override
   public void execute() {
     Runnable task;
-    GraphicsMetrics.DeviceQueueSize.add(queue.size());
+    synchronized (queue) {
+      GraphicsMetrics.DeviceQueueSize.add(queue.size());
+    }
     try {
-      while ((task = queue.poll()) != null) {
+      while ((task = pollCommand()) != null) {
         task.run();
       }
     } catch (Exception e) {
@@ -238,5 +242,11 @@ public final class OpenGLDevice implements Device {
   public void close() {
     submit(vaos::clear);
     execute();
+  }
+
+  private @Nullable Runnable pollCommand() {
+    synchronized (queue) {
+      return queue.pollFirst();
+    }
   }
 }
