@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.Analysis;
+import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.pipe.*;
 import io.viki.momentum.util.InternalApi;

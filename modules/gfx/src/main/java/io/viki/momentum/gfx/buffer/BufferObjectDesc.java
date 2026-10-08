@@ -71,12 +71,10 @@ public record BufferObjectDesc(BufferFrequency frequency, BufferType type, int u
   /**
    * Creates a descriptor for a uniform buffer with dynamic frequency.
    *
-   * <p>Uniform buffers default to {@link BufferFrequency#DYNAMIC} since they
-   * are typically updated every frame.
-   *
+   * @param freq the expected update frequency
    * @return a uniform-buffer descriptor
    */
-  public static BufferObjectDesc uniform() {
-    return new BufferObjectDesc(BufferFrequency.DYNAMIC, BufferType.UNIFORM);
+  public static BufferObjectDesc uniform(BufferFrequency freq) {
+    return new BufferObjectDesc(freq, BufferType.UNIFORM);
   }
 }

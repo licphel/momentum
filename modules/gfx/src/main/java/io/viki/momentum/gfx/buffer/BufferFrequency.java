@@ -30,7 +30,7 @@ package io.viki.momentum.gfx.buffer;
  * <ul>
  *   <li>{@link #STATIC} — written once, drawn many times (e.g. level geometry).
  *   <li>{@link #DYNAMIC} — updated occasionally (e.g. per-frame uniforms).
- *   <li>{@link #STREAM} — updated every frame (e.g. particles), enables buffer orphaning.
+ *   <li>{@link #STREAM} — updated frequently (e.g. particles); previous contents are discarded only by explicit replacement.
  * </ul>
  *
  * @see BufferObjectDesc

@@ -24,15 +24,16 @@
 
 package io.viki.momentum.gfx.util.impl;
 
-import io.viki.momentum.util.Analysis;
+import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
-import io.viki.momentum.gfx.mesh.Material;
-import io.viki.momentum.gfx.mesh.Mesh;
-import io.viki.momentum.gfx.mesh.Section;
+import io.viki.momentum.gfx.util.Material;
+import io.viki.momentum.gfx.util.Mesh;
+import io.viki.momentum.gfx.util.MeshRecycledVertexStore;
+import io.viki.momentum.gfx.util.Section;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pipe.Pipeline;
 import io.viki.momentum.gfx.pipe.Topology;
@@ -64,6 +65,7 @@ import java.util.List;
  * @see Mesh
  */
 public final class MeshGraphics extends BatchedGraphics {
+  private final VertexStore defaultData;
   private final List<SectionDraft> drafts = new ArrayList<>();
 
   /**
@@ -74,6 +76,7 @@ public final class MeshGraphics extends BatchedGraphics {
    */
   public MeshGraphics(VertexStore data, Device device) {
     super(data, device);
+    defaultData = data;
   }
 
   /**
@@ -89,8 +92,20 @@ public final class MeshGraphics extends BatchedGraphics {
     }
     byte[] vertices = data.recordVertices();
     byte[] indices = data.recordIndices();
+    int vertexOffset = data.vertices().readerIndex();
+    int indexOffset = data.indices().readerIndex();
+    int vertexBytes = data.vertices().readableBytes();
+    int indexBytes = data.indices().readableBytes();
+    if (vertexOffset != 0) {
+      vertices = data.vertices().copiedArray();
+      vertexOffset = 0;
+    }
+    if (indexOffset != 0) {
+      indices = data.indices().copiedArray();
+      indexOffset = 0;
+    }
     data.clear();
-    drafts.add(new SectionDraft(vertices, indices,
+    drafts.add(new SectionDraft(vertices, indices, vertexOffset, indexOffset, vertexBytes, indexBytes,
         currentPrimitive, currentTexture, sampler == null ? defSampler : sampler,
         resolvePipeline(), resolveResourceSetLayout()));
   }
@@ -102,7 +117,23 @@ public final class MeshGraphics extends BatchedGraphics {
    */
   @Override
   public void begin(RenderPass pass) {
+    begin(pass, null);
+  }
+
+  /**
+   * Begins a mesh rebuild and reuses the previous mesh's CPU staging arrays when available.
+   *
+   * @param pass the render pass descriptor; ignored for retained meshes
+   * @param previous the previous mesh to recycle, or {@code null} for the initial build
+   */
+  public void begin(RenderPass pass, @Nullable Mesh previous) {
     drafts.clear();
+    if (previous == null) {
+      setVertexStore(defaultData);
+      data.clear();
+    } else {
+      setVertexStore(new MeshRecycledVertexStore(previous));
+    }
   }
 
   /**
@@ -130,13 +161,24 @@ public final class MeshGraphics extends BatchedGraphics {
   }
 
   /**
+   * Bakes the current geometry, updating compatible sections of {@code reuse} in place.
+   *
+   * @param device the GPU device that receives uploads
+   * @param reuse the previous mesh to update, or {@code null} to allocate a mesh
+   * @return the updated mesh
+   */
+  public Mesh bake(Device device, @Nullable Mesh reuse) {
+    return finish().bake(device, reuse);
+  }
+
+  /**
    * Freezes the recorded CPU geometry without creating or uploading GPU resources.
    *
    * <p>The builder is cleared and can record more geometry after this call.
    *
    * @return an immutable draft that can later be baked into a mesh
    */
-  public Draft finish() {
+  Draft finish() {
     flush(true);
     Draft draft = new Draft(List.copyOf(drafts));
     drafts.clear();
@@ -149,48 +191,67 @@ public final class MeshGraphics extends BatchedGraphics {
    * <p>A draft can be produced on a worker thread and baked into GPU resources on the context
    * thread.
    */
-  public static final class Draft {
+  static final class Draft {
     private final List<SectionDraft> drafts;
 
     private Draft(List<SectionDraft> drafts) {
       this.drafts = drafts;
     }
 
-    /**
-     * Creates the GPU resources for this draft and returns the resulting mesh.
-     *
-     * @param device the GPU device that receives the mesh resources
-     * @return the mesh containing this draft's geometry
-     */
-    public Mesh bake(Device device) {
+    Mesh bake(Device device) {
+      return bake(device, null);
+    }
+
+    Mesh bake(Device device, @Nullable Mesh reuse) {
       Analysis.start("mesh.allocateBuffersAndQueueUploads");
       try {
         List<Section> sections = new ArrayList<>();
+        List<Section> previous = reuse == null ? List.of() : reuse.sections();
+        int previousIndex = 0;
 
         for (SectionDraft d : drafts) {
           if (d.primitive() == null) {
             continue;
           }
+          Primitive2D primitive = d.primitive();
+          Topology top = primitive.topology();
+          int idxCount = d.indexBytes() / Integer.BYTES;
+          int vertCount = d.vertexBytes() / primitive.vertexSize();
+          Section old = previousIndex < previous.size() ? previous.get(previousIndex) : null;
+          if (old != null && old.compatible(d.pipeline, d.rsl, top, primitive.isIndexed())) {
+            ResourceSet rs = old.material().resourceSet();
+            if (primitive.isTextured() && d.texture() != null && d.sampler() != null) {
+              rs.bindTexture(1, d.texture(), d.sampler());
+            }
+            old.updateGeometry(d.vertices(), d.vertexBytes(), d.indices(), d.indexBytes(), vertCount, idxCount);
+            sections.add(old);
+            previousIndex++;
+            continue;
+          }
+
           ResourceSet rs = device.getResourceSet(d.rsl);
           boolean tex = d.primitive().isTextured();
           if (tex && d.texture() != null && d.sampler() != null) {
             rs.bindTexture(1, d.texture(), d.sampler());
           }
 
-          BufferObject vbo = device.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STATIC));
-          vbo.submit(d.vertices(), 0, d.vertices().length);
-          BufferObject ibo = d.primitive().isIndexed() ? device.getBuffer(BufferObjectDesc.index(BufferFrequency.STATIC)) : null;
+          BufferObject vbo = device.getBuffer(BufferObjectDesc.vertex(BufferFrequency.STREAM));
+          vbo.replace(d.vertices(), d.vertexBytes());
+          BufferObject ibo = d.primitive().isIndexed() ? device.getBuffer(BufferObjectDesc.index(BufferFrequency.STREAM)) : null;
           if (ibo != null) {
-            ibo.submit(d.indices(), 0, d.indices().length);
+            ibo.replace(d.indices(), d.indexBytes());
           }
 
-          Topology top = d.primitive().topology();
-          int idxCount = d.indices().length / Integer.BYTES;
-          int vertCount = d.vertices().length / d.primitive().vertexSize();
-          sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount, top));
+          sections.add(new Section(new Material(d.pipeline, rs), vbo, ibo, vertCount, 0, 0, idxCount,
+              top, d.vertices(), d.indices()));
+          previousIndex++;
         }
 
-        return new Mesh(List.copyOf(sections));
+        if (reuse == null) {
+          return new Mesh(sections);
+        }
+        reuse.replaceSections(sections);
+        return reuse;
       } finally {
         Analysis.end("mesh.allocateBuffersAndQueueUploads");
       }
@@ -199,6 +260,10 @@ public final class MeshGraphics extends BatchedGraphics {
 
   private record SectionDraft(byte[] vertices,
                               byte[] indices,
+                              int vertexOffset,
+                              int indexOffset,
+                              int vertexBytes,
+                              int indexBytes,
                               @Nullable Primitive2D primitive,
                               @Nullable Texture texture,
                               @Nullable Sampler sampler,

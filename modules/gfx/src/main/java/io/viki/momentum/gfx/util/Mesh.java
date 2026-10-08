@@ -22,20 +22,22 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.gfx.mesh;
+package io.viki.momentum.gfx.util;
 
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.cmd.Encoder;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 
 /**
- * An immutable collection of GPU geometry sections ready for rendering.
+ * A retained collection of GPU geometry sections ready for rendering.
  *
- * <p>A {@code Mesh} holds a uniform buffer object for view-projection data and a list of
- * {@link Section}s, each pairing a {@link Material} with vertex and index buffers. The mesh can
- * upload a view-projection matrix and draw all sections to an {@link Encoder}.
+ * <p>A {@code Mesh} holds a list of {@link Section}s, each pairing a {@link Material} with vertex
+ * and index buffers. The section list can be replaced while compatible sections retain their GPU
+ * buffers; this is used by chunk renderers when geometry changes.
  *
  * <p>This class implements {@link AutoCloseable}; closing a mesh releases the uniform buffer,
  * all vertex and index buffers, and all materials.
@@ -45,7 +47,9 @@ import java.util.Objects;
  */
 public final class Mesh implements AutoCloseable {
   private final List<Section> sections;
-  private final boolean isEmpty;
+  private final List<Section> readonlySections;
+  private boolean isEmpty;
+
 
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
@@ -53,21 +57,9 @@ public final class Mesh implements AutoCloseable {
    * @param sections the list of geometry sections
    */
   public Mesh(List<Section> sections) {
-    this.sections = sections;
-
-    if (sections.isEmpty()) {
-      isEmpty = true;
-    } else {
-      boolean hasNonempty = false;
-      for (Section section : sections) {
-        if (section.vertexCount() > 0) {
-          hasNonempty = true;
-          break;
-        }
-      }
-
-      isEmpty = !hasNonempty;
-    }
+    this.sections = new ArrayList<>(sections);
+    this.readonlySections = Collections.unmodifiableList(this.sections);
+    updateEmptyState();
   }
 
   /**
@@ -76,7 +68,33 @@ public final class Mesh implements AutoCloseable {
    * @return the list of sections
    */
   public List<Section> sections() {
-    return sections;
+    return readonlySections;
+  }
+
+  /**
+   * Replaces the section list and closes sections no longer retained by the mesh.
+   *
+   * <p>Sections present in both lists are compared by identity and remain open. The replacement
+   * list becomes owned by this mesh.
+   *
+   * @param replacement the sections for the next mesh contents
+   */
+  public void replaceSections(List<Section> replacement) {
+    for (Section old : sections) {
+      boolean retained = false;
+      for (Section next : replacement) {
+        if (old == next) {
+          retained = true;
+          break;
+        }
+      }
+      if (!retained) {
+        old.close();
+      }
+    }
+    sections.clear();
+    sections.addAll(replacement);
+    updateEmptyState();
   }
 
   /**
@@ -125,6 +143,16 @@ public final class Mesh implements AutoCloseable {
   public void close() {
     for (Section s : sections) {
       s.close();
+    }
+  }
+
+  private void updateEmptyState() {
+    isEmpty = true;
+    for (Section section : sections) {
+      if (section.vertexCount() > 0) {
+        isEmpty = false;
+        return;
+      }
     }
   }
 

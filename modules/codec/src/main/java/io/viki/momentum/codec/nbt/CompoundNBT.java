@@ -52,6 +52,8 @@ import java.util.function.Supplier;
  * @see DataType
  */
 public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> {
+  /** An empty, unmodifiable compound NBT. */
+  public static final CompoundNBT EMPTY = ofUnmodifiable(new CompoundNBT());
   /**
    * Prefix character that enables dot-separated path traversal.
    *
@@ -177,7 +179,9 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    * Removes all key-value pairs from this compound.
    */
   public void clear() {
-    map.clear();
+    if (modifiable) {
+      map.clear();
+    }
   }
 
   /**
@@ -964,7 +968,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
     for (Map.Entry<String, NBT> entry : map.entrySet()) {
       String key = entry.getKey();
       NBT value = entry.getValue();
-      copy.map.put(key, value.copy());
+      copy.put(key, value.copy());
     }
     return copy;
   }

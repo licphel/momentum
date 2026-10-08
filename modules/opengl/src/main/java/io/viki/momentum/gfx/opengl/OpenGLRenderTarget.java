@@ -221,6 +221,22 @@ public final class OpenGLRenderTarget implements RenderTarget {
     }
 
     @Override
+    public void replace(ByteBuffer data) {
+      ByteBuffer flipped = ImageUtil.pooledFlip(data, fboWidth, fboHeight);
+      ctx.submit(() -> {
+        OpenGLCache cache = ctx.cache;
+        cache.setTexture(0, GL_TEXTURE_2D, colorTex);
+        try {
+          glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fboWidth, fboHeight, 0,
+              GL_RGBA, GL_UNSIGNED_BYTE, flipped);
+        } finally {
+          DirectBufferPool.release(flipped);
+          cache.setTexture(0, GL_TEXTURE_2D, 0);
+        }
+      });
+    }
+
+    @Override
     public void blit(Texture target, int srcX, int srcY, int srcW, int srcH,
                      int dstX, int dstY, int dstW, int dstH) {
       OpenGLRenderTarget.this.ctx.submit(() -> {

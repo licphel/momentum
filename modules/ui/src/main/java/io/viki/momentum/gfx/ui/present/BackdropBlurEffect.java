@@ -25,6 +25,7 @@
 package io.viki.momentum.gfx.ui.present;
 
 import io.viki.momentum.gfx.Device;
+import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.math.Camera2D;
@@ -121,9 +122,9 @@ public final class BackdropBlurEffect implements AutoCloseable {
         .wrapY(TextureWrap.CLAMP_TO_EDGE)
         .wrapZ(TextureWrap.CLAMP_TO_EDGE)
         .build());
-    cameraUniform = device.getBuffer(BufferObjectDesc.uniform());
+    cameraUniform = device.getBuffer(BufferObjectDesc.uniform(BufferFrequency.STREAM));
     cameraUniform.allocate(CAMERA_UNIFORM_SIZE, null);
-    blurUniform = device.getBuffer(BufferObjectDesc.uniform());
+    blurUniform = device.getBuffer(BufferObjectDesc.uniform(BufferFrequency.STREAM));
     blurUniform.allocate(BLUR_UNIFORM_SIZE, null);
     resources = device.getResourceSet(layout);
     resources.bindUniform(0, cameraUniform, CAMERA_UNIFORM_SIZE);

@@ -51,7 +51,7 @@ public final class MatrixUtil {
   public static void store(Matrix4x4 vpm, BufferObject ubo) {
     ByteBuffer out = DirectBufferPool.acquire(4 * 4 * Float.BYTES);
     store(vpm, out);
-    ubo.submit(out.flip());
+    ubo.replace(out.flip());
     DirectBufferPool.release(out);
   }
 

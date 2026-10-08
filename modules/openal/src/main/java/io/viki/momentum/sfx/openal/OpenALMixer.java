@@ -113,30 +113,27 @@ public final class OpenALMixer implements Mixer {
     }
 
     submit(() -> {
-      List<OpenALClip> gc = new ArrayList<>();
-
       /*
        * OpenAL does not provide loop checkpoints
        * so we have to track all playing clips.
        *
        * Note that we do not close them. This is not our duty here.
        */
-      for (OpenALClip clip : trackingList) {
+      for (int i = trackingList.size() - 1; i >= 0; i--) {
+        OpenALClip clip = trackingList.get(i);
         clip.applyVolume();
         clip.state = alGetSourcei(clip.source, AL_SOURCE_STATE);
         clip.offset = alGetSourcef(clip.source, AL_SEC_OFFSET);
 
         if (clip.state == AL_STOPPED) {
           if (clip.remainingLoops <= 0) {
-            gc.add(clip);
+            trackingList.remove(i);
             clip.shouldClose = true;
           } else {
             clip.loop(clip.remainingLoops);
           }
         }
       }
-
-      trackingList.removeAll(gc);
 
       for (OpenALStreamingClip clip : streamingTrackingList) {
         clip.poll();

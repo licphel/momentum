@@ -123,6 +123,15 @@ public class VertexBuilder {
   }
 
   /**
+   * Replaces the staging area. Call only after pending vertices have been flushed or discarded.
+   *
+   * @param store the staging area for subsequent writes
+   */
+  public void setVertexStore(VertexStore store) {
+    data = store;
+  }
+
+  /**
    * Writes a vertex with a position and a packed gradient color.
    *
    * <p>The position is transformed by the current top of the transform stack, and the

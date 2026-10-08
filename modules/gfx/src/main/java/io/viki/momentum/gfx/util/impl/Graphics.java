@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.util.impl;
 
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.mesh.Mesh;
+import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.Pipeline;

@@ -34,6 +34,7 @@ import io.viki.momentum.util.Handle;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.Objects;
 
 /**
  * OpenGL resource set with a unified descriptor slot space.
@@ -48,53 +49,77 @@ import java.util.Arrays;
  * <p><b>Thread safety:</b> recording is single-threaded per instance.
  * {@link #apply(OpenGLCache)} is called on the render thread.
  */
+@SuppressWarnings("all")
 public final class OpenGLResourceSet implements ResourceSet {
   private static final byte TEXTURE = 1;
   private static final byte UNIFORM = 2;
 
-  private final ResourceSetLayout layout;
+  private @Nullable ResourceSetLayout layout;
   /** Entries for slots with recorded resource bindings. */
   private ResourceSlot[] slots = new ResourceSlot[2];
   private int slotCount = 0;
-  private @Nullable OpenGLResourceSet recordedSnapshot;
 
   OpenGLResourceSet(ResourceSetLayout layout) {
     this.layout = layout;
   }
 
+  OpenGLResourceSet() {
+  }
+
   @Override
   public ResourceSetLayout layout() {
-    return layout;
+    return Objects.requireNonNull(layout);
   }
 
   /**
-   * Captures the current bindings for commands recorded before the next binding change.
+   * Copies the current bindings into a command-local target.
    *
-   * @return a resource set containing the current bindings
+   * <p>The copy owns no GPU resources. It only copies the backend handles and
+   * can therefore be reset and returned to the encoder pool after its batch
+   * has executed.
    */
-  OpenGLResourceSet snapshot() {
-    if (recordedSnapshot != null) return recordedSnapshot;
-    OpenGLResourceSet copy = new OpenGLResourceSet(layout);
-    copy.slots = new ResourceSlot[slotCount];
-    copy.slotCount = slotCount;
+  void copyTo(OpenGLResourceSet target) {
+    target.reset();
+    target.layout = layout;
+    if (target.slots.length < slotCount) {
+      target.slots = Arrays.copyOf(target.slots, slotCount);
+    }
+    target.slotCount = slotCount;
     for (int i = 0; i < slotCount; i++) {
       ResourceSlot source = slots[i];
-      ResourceSlot target = new ResourceSlot(source.index);
-      target.type = source.type;
-      target.texture = source.texture;
-      target.sampler = source.sampler;
-      target.ubo = source.ubo;
-      target.uboSize = source.uboSize;
-      target.uboOffset = source.uboOffset;
-      copy.slots[i] = target;
+      ResourceSlot destination = target.slots[i];
+      if (destination == null) {
+        target.slots[i] = destination = new ResourceSlot(source.index);
+      }
+      destination.index = source.index;
+      destination.type = source.type;
+      destination.texture = source.texture;
+      destination.sampler = source.sampler;
+      destination.ubo = source.ubo;
+      destination.uboSize = source.uboSize;
+      destination.uboOffset = source.uboOffset;
     }
-    recordedSnapshot = copy;
-    return copy;
+  }
+
+  /** Clears bindings before this set is returned to the encoder pool. */
+  void reset() {
+    for (int i = 0; i < slotCount; i++) {
+      ResourceSlot slot = slots[i];
+      if (slot == null) {
+        continue;
+      }
+      slot.type = 0;
+      slot.texture = null;
+      slot.sampler = null;
+      slot.ubo = null;
+      slot.uboSize = 0;
+      slot.uboOffset = 0;
+    }
+    slotCount = 0;
   }
 
   @Override
   public void bindTexture(int slot, Texture texture, Sampler sampler) {
-    recordedSnapshot = null;
     ResourceSlot s = findOrCreate(slot);
     s.type = TEXTURE;
     s.texture = (Handle) texture;
@@ -103,7 +128,6 @@ public final class OpenGLResourceSet implements ResourceSet {
 
   @Override
   public void bindUniform(int slot, BufferObject buffer, int size, int offset) {
-    recordedSnapshot = null;
     ResourceSlot s = findOrCreate(slot);
     s.type = UNIFORM;
     s.ubo = (OpenGLBufferObject) buffer;
@@ -141,6 +165,7 @@ public final class OpenGLResourceSet implements ResourceSet {
    * @param cache the state cache that receives these bindings
    */
   public void apply(OpenGLCache cache) {
+    assert layout != null;
     for (int i = 0; i < slotCount; i++) {
       ResourceSlot s = slots[i];
       int binding = layout.slots[s.index].binding();
@@ -166,6 +191,7 @@ public final class OpenGLResourceSet implements ResourceSet {
    * @throws GraphicsException if the layouts are incompatible, including when {@code pipelineLayout} is null
    */
   void validate(@Nullable ResourceSetLayout pipelineLayout) {
+    assert layout != null;
     if (!layout.matches(pipelineLayout)) {
       throw new GraphicsException("Resource set layout does not match pipeline layout");
     }
@@ -173,7 +199,7 @@ public final class OpenGLResourceSet implements ResourceSet {
 
   /** Holds the resources bound to one shader-visible slot. */
   private static final class ResourceSlot {
-    final int index;
+    int index;
     byte type;
     @Nullable Handle texture;
     @Nullable Handle sampler;

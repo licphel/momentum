@@ -29,11 +29,7 @@ import io.viki.momentum.codec.nbt.primitives.*;
 import io.viki.momentum.codec.streaming.BinaryBuffer;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.function.Supplier;
 
 /**
@@ -53,6 +49,9 @@ import java.util.function.Supplier;
  * @see DataType
  */
 public final class ListNBT implements NBT, Iterable<NBT> {
+  /** An empty, unmodifiable list NBT. */
+  public static final ListNBT EMPTY = ofUnmodifiable(new ListNBT());
+
   /**
    * Codec for list values: the NBT tree form is the tag itself, and the binary
    * payload is a length-prefixed sequence of typed elements.
@@ -90,11 +89,33 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   };
 
   private final List<NBT> list = new ArrayList<>();
+  private boolean modifiable = true;
 
   /**
    * Creates an empty NBT list.
    */
   public ListNBT() {
+  }
+
+  /**
+   * Creates a NBT list from a content source
+   *
+   * @param list content source
+   */
+  public ListNBT(List<NBT> list) {
+    this.list.addAll(list);
+  }
+
+  /**
+   * Creates an unmodifiable list tag from another tag.
+   *
+   * @param tag content source
+   * @return an unmodifiable view of the given tag
+   */
+  public static ListNBT ofUnmodifiable(ListNBT tag) {
+    ListNBT unmodifiable = new ListNBT(tag.list);
+    unmodifiable.modifiable = false;
+    return unmodifiable;
   }
 
   /**
@@ -119,7 +140,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * Removes all elements from this list.
    */
   public void clear() {
-    list.clear();
+    if (modifiable) {
+      list.clear();
+    }
   }
 
   /**
@@ -672,6 +695,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the tag value to add, may be {@code null} (stored as {@link NullNBT})
    */
   public void add(@Nullable NBT value) {
+    if (!modifiable) {
+      return;
+    }
     list.add(value != null ? value : NullNBT.INSTANCE);
   }
 
@@ -681,7 +707,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the byte value to add
    */
   public void addByte(byte value) {
-    list.add(new ByteNBT(value));
+    add(new ByteNBT(value));
   }
 
   /**
@@ -690,7 +716,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the short value to add
    */
   public void addShort(short value) {
-    list.add(new ShortNBT(value));
+    add(new ShortNBT(value));
   }
 
   /**
@@ -699,7 +725,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the int value to add
    */
   public void addInt(int value) {
-    list.add(new IntNBT(value));
+    add(new IntNBT(value));
   }
 
   /**
@@ -708,7 +734,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the long value to add
    */
   public void addLong(long value) {
-    list.add(new LongNBT(value));
+    add(new LongNBT(value));
   }
 
   /**
@@ -717,7 +743,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the float value to add
    */
   public void addFloat(float value) {
-    list.add(new FloatNBT(value));
+    add(new FloatNBT(value));
   }
 
   /**
@@ -726,7 +752,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the double value to add
    */
   public void addDouble(double value) {
-    list.add(new DoubleNBT(value));
+    add(new DoubleNBT(value));
   }
 
   /**
@@ -735,7 +761,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the boolean value to add
    */
   public void addBoolean(boolean value) {
-    list.add(new BooleanNBT(value));
+    add(new BooleanNBT(value));
   }
 
   /**
@@ -744,7 +770,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the string value to add
    */
   public void addString(String value) {
-    list.add(new StringNBT(value));
+    add(new StringNBT(value));
   }
 
   /**
@@ -753,7 +779,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the byte array to copy and add
    */
   public void addBytes(byte[] value) {
-    list.add(new ByteArrayNBT(value));
+    add(new ByteArrayNBT(value));
   }
 
   /**
@@ -762,7 +788,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the compound to add
    */
   public void addCompound(CompoundNBT value) {
-    list.add(value);
+    add(value);
   }
 
   /**
@@ -771,7 +797,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @param value the list to add
    */
   public void addList(ListNBT value) {
-    list.add(value);
+    add(value);
   }
 
   /**
@@ -782,6 +808,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @throws IndexOutOfBoundsException if {@code index} is out of range
    */
   public void insert(int index, @Nullable NBT value) {
+    if (!modifiable) {
+      return;
+    }
     list.add(index, value != null ? value : NullNBT.INSTANCE);
   }
 
@@ -793,6 +822,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @throws IndexOutOfBoundsException if {@code index} is out of range
    */
   public void set(int index, @Nullable NBT value) {
+    if (!modifiable) {
+      return;
+    }
     list.set(index, value != null ? value : NullNBT.INSTANCE);
   }
 
@@ -803,6 +835,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @throws IndexOutOfBoundsException if {@code index} is out of range
    */
   public void removeAt(int index) {
+    if (!modifiable) {
+      return;
+    }
     list.remove(index);
   }
 
@@ -813,6 +848,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * @return {@code true} if an element was removed
    */
   public boolean remove(@Nullable NBT value) {
+    if (!modifiable) {
+      return false;
+    }
     return list.remove(value);
   }
 

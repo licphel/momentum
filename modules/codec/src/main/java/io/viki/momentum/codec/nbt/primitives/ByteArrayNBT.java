@@ -66,12 +66,14 @@ public final class ByteArrayNBT implements NBT {
   private final byte[] value;
 
   /**
-   * Wraps the given byte array. A copy is made internally.
+   * Wraps the given byte array.
+   *
+   * <p>We DO NOT copy intentionally for efficiency. If you want to secure, copy it yourself.
    *
    * @param value the binary value
    */
   public ByteArrayNBT(byte[] value) {
-    this.value = Arrays.copyOf(value, value.length);
+    this.value = value;
   }
 
   /**
@@ -81,15 +83,6 @@ public final class ByteArrayNBT implements NBT {
    * @return the value
    */
   public byte[] get() {
-    return value.clone();
-  }
-
-  /**
-   * Returns the wrapped byte array (copy).
-   *
-   * @return the value
-   */
-  public byte[] getUnsafe() {
     return value;
   }
 

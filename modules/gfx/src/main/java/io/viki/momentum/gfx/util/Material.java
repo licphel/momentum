@@ -22,7 +22,38 @@
  * SOFTWARE.
  */
 
-@NullMarked
-package io.viki.momentum.gfx.mesh;
+package io.viki.momentum.gfx.util;
 
-import org.jspecify.annotations.NullMarked;
+import io.viki.momentum.gfx.cmd.Encoder;
+import io.viki.momentum.gfx.pipe.Pipeline;
+import io.viki.momentum.gfx.shader.ResourceSet;
+
+/**
+ * An immutable pair of a {@link Pipeline} and a {@link ResourceSet}.
+ *
+ * <p>Applying a material binds its pipeline and resource set to an encoder at the given slot.
+ * Closing a material releases the resource set but does not close the pipeline.
+ *
+ * @param pipeline    the render pipeline
+ * @param resourceSet the resource set with bound textures and uniforms
+ */
+public record Material(Pipeline pipeline, ResourceSet resourceSet) implements AutoCloseable {
+  /**
+   * Applies this material by binding the pipeline and resource set to the given encoder.
+   *
+   * @param encoder the encoder to bind to
+   * @param slot    the resource binding slot
+   */
+  public void apply(Encoder encoder, int slot) {
+    encoder.setRenderPipe(pipeline);
+    encoder.setResource(slot, resourceSet);
+  }
+
+  /**
+   * Releases the resource set. The pipeline is not closed.
+   */
+  @Override
+  public void close() {
+    resourceSet.close();
+  }
+}

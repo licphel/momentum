@@ -47,10 +47,9 @@ import java.nio.ByteBuffer;
  *   <li>Call {@link #close()} when the buffer is no longer needed.
  * </ol>
  *
- * <p><b>Buffer orphaning:</b> for {@link BufferFrequency#STREAM} buffers,
- * calling {@link #submit} with {@code offset == 0} discards the previous
- * allocation (via {@code glBufferData}) before uploading, which avoids
- * GPU pipeline stalls at the cost of an extra allocation per frame.
+ * <p>{@link #replace(ByteBuffer)} explicitly discards previous contents. The backend may replace
+ * storage to avoid pending GPU reads. {@link #submit} updates a region; frequency hints do not
+ * authorize discarding the remaining contents. Neither operation guarantees a nonblocking upload.
  *
  * <p><b>Thread safety:</b> creation and mutation must happen on the render
  * thread (or be submitted to it via the backend queue). Reading
@@ -104,13 +103,45 @@ public interface BufferObject extends AutoCloseable {
   void allocate(int capacity, byte @Nullable [] data);
 
   /**
+   * Replaces all contents with the buffer's remaining bytes.
+   *
+   * <p>Bytes beyond the supplied data become undefined, and the existing capacity
+   * may be retained. The buffer position advances as the upload is consumed.
+   *
+   * @param data the bytes that become the beginning of the buffer contents
+   */
+  void replace(ByteBuffer data);
+
+  /**
+   * Replaces all contents with the supplied bytes.
+   *
+   * <p>Bytes beyond the supplied data become undefined.
+   *
+   * @param data the bytes that become the beginning of the buffer contents
+   */
+  default void replace(byte[] data) {
+    replace(ByteBuffer.wrap(data));
+  }
+
+  /**
+   * Replaces all contents with the first {@code size} bytes of the supplied array.
+   *
+   * <p>Bytes beyond the supplied data become undefined.
+   *
+   * @param data the source bytes
+   * @param size the number of source bytes to use
+   */
+  default void replace(byte[] data, int size) {
+    replace(ByteBuffer.wrap(data, 0, size));
+  }
+
+  /**
    * Uploads bytes into the buffer at the given offset.
    *
    * <p>If the upload overflows the current capacity and {@link #canExpand()}
    * returns {@code true}, the buffer is transparently reallocated.
    *
-   * <p>For {@link BufferFrequency#STREAM} buffers, an upload at offset 0
-   * orphans the previous allocation before writing, which avoids pipeline stalls.
+   * <p>Use {@link #replace(ByteBuffer)} when previous contents can be discarded.
    *
    * @param data   the bytes to upload.
    * @param offset byte offset within the buffer to start writing
@@ -126,8 +157,7 @@ public interface BufferObject extends AutoCloseable {
    * <p>If the upload overflows the current capacity and {@link #canExpand()}
    * returns {@code true}, the buffer is transparently reallocated.
    *
-   * <p>For {@link BufferFrequency#STREAM} buffers, an upload at offset 0
-   * orphans the previous allocation before writing, which avoids pipeline stalls.
+   * <p>Use {@link #replace(ByteBuffer)} when previous contents can be discarded.
    *
    * @param data   the bytes to upload.
    * @param offset byte offset within the buffer to start writing
@@ -153,8 +183,7 @@ public interface BufferObject extends AutoCloseable {
    * <p>If the upload overflows the current capacity and {@link #canExpand()}
    * returns {@code true}, the buffer is transparently reallocated.
    *
-   * <p>For {@link BufferFrequency#STREAM} buffers, an upload at offset 0
-   * orphans the previous allocation before writing, which avoids pipeline stalls.
+   * <p>Use {@link #replace(ByteBuffer)} when previous contents can be discarded.
    *
    * @param memory the bytes to upload.
    * @param offset byte offset within the buffer to start writing

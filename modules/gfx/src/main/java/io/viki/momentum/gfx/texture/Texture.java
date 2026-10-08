@@ -81,6 +81,13 @@ public interface Texture extends FragileTexture, AutoCloseable {
     return device.getTexture(desc);
   }
 
+  /**
+   * Returns the source pixels unchanged for RGBA input or appends opaque alpha
+   * bytes to RGB input.
+   *
+   * @param info decoded image metadata and pixels
+   * @return pixel data in RGBA8 channel order
+   */
   private static byte[] fillAlphaChannel(ImageInfo info) {
     if (info.channels() == 4) {
       return info.pixels();
@@ -186,6 +193,31 @@ public interface Texture extends FragileTexture, AutoCloseable {
    * @param region the target sub-region in texel coordinates (x, y, z, width, height, depth)
    */
   void submit(ByteBuffer data, Cube region);
+
+  /**
+   * Replaces the complete image from the buffer's remaining bytes.
+   *
+   * <p>Previous contents are discarded, and a backend may replace the underlying
+   * storage to avoid overwriting pending GPU reads. The buffer position advances
+   * as the upload is consumed.
+   *
+   * @param data the complete image data in the texture's format
+   */
+  default void replace(ByteBuffer data) {
+    submit(data, Cube.of(0, 0, 0, width(), height(), depth()));
+  }
+
+  /**
+   * Replaces the complete image with the supplied bytes.
+   *
+   * <p>Previous contents are discarded, and the upload may execute asynchronously
+   * after this method returns.
+   *
+   * @param data the complete image data in the texture's format
+   */
+  default void replace(byte[] data) {
+    replace(ByteBuffer.wrap(data));
+  }
 
   /**
    * Blits (copies) a rectangular region of this texture into another texture.

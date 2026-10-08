@@ -39,7 +39,8 @@ import io.viki.momentum.gfx.texture.Texture;
  * <p>Bindings are recorded lazily on the calling thread and applied in bulk
  * on the render thread when the command executes. Re-binding a slot overwrites the previous binding.
  *
- * <p><b>Thread safety:</b> recording bindings is single-threaded per instance.
+ * <p><b>Thread safety:</b> this interface provides no synchronization. Recording bindings
+ * is single-threaded per instance and must not overlap execution that reads them.
  * The set does not own the resources it references — closing a resource set does not close the textures, samplers, or
  * buffers bound to it.
  *

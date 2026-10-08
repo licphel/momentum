@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.util.impl;
 
-import io.viki.momentum.util.Analysis;
+import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsException;
@@ -33,7 +33,7 @@ import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.cmd.EncoderDesc;
-import io.viki.momentum.gfx.mesh.Mesh;
+import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.*;
@@ -113,7 +113,7 @@ public class BatchedGraphics extends StatefulGraphics {
     vbo.allocate(1024, null);
     ibo = device.getBuffer(BufferObjectDesc.index(BufferFrequency.STREAM));
     ibo.allocate(512, null);
-    ubo = device.getBuffer(BufferObjectDesc.uniform());
+    ubo = device.getBuffer(BufferObjectDesc.uniform(BufferFrequency.STREAM));
     ubo.allocate(64, null);
     this.device = device;
   }
@@ -250,9 +250,9 @@ public class BatchedGraphics extends StatefulGraphics {
       // we've set volatile = true.
       data.clear();
 
-      vbo.submit(rawV, vr, vw - vr);
+      vbo.replace(java.nio.ByteBuffer.wrap(rawV, vr, vw - vr));
       if (ic > 0 && currentPrimitive.isIndexed()) {
-        ibo.submit(rawI, ir, iw - ir);
+        ibo.replace(java.nio.ByteBuffer.wrap(rawI, ir, iw - ir));
       }
 
       encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),

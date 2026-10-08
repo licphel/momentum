@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.Analysis;
+import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.DirectBufferPool;
 import io.viki.momentum.gfx.io.ImageUtil;
@@ -185,6 +185,15 @@ public final class OpenGLTexture implements Texture, Handle {
 
   @Override
   public void submit(ByteBuffer bytes, Cube region) {
+    queueUpload(bytes, region, false);
+  }
+
+  @Override
+  public void replace(ByteBuffer bytes) {
+    queueUpload(bytes, Cube.of(0, 0, 0, width(), height(), depth()), true);
+  }
+
+  private void queueUpload(ByteBuffer bytes, Cube region, boolean replacement) {
     Analysis.start("texture.copyUploadDataAndQueue");
     try {
       int x = (int) region.minX();
@@ -210,6 +219,7 @@ public final class OpenGLTexture implements Texture, Handle {
       command.width = w;
       command.height = h;
       command.depth = d;
+      command.replacement = replacement;
       ctx.submit(command);
     } finally {
       Analysis.end("texture.copyUploadDataAndQueue");
@@ -317,6 +327,7 @@ public final class OpenGLTexture implements Texture, Handle {
     private final OpenGLTexture texture;
     private ByteBuffer bytes = EMPTY_UPLOAD;
     private int x, y, z, width, height, depth;
+    private boolean replacement;
 
     private UploadCommand(OpenGLTexture texture) {
       this.texture = texture;
@@ -329,17 +340,26 @@ public final class OpenGLTexture implements Texture, Handle {
         int[] fmt = texture.format;
         int glY = texture.desc.height() - y - height;
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        Analysis.start("gl.textureSubImage");
+        String timing = replacement ? "gl.textureReplace" : "gl.textureSubImage";
+        Analysis.start(timing);
         try {
-          switch (texture.desc.type()) {
-            case TextureType.TEXTURE_1D -> glTexSubImage1D(texture.target, 0, x, width, fmt[1], fmt[2], bytes);
-            case TextureType.TEXTURE_2D ->
-                glTexSubImage2D(texture.target, 0, x, glY, width, height, fmt[1], fmt[2], bytes);
-            case TextureType.TEXTURE_3D ->
-                glTexSubImage3D(texture.target, 0, x, glY, z, width, height, depth, fmt[1], fmt[2], bytes);
+          if (replacement) {
+            switch (texture.desc.type()) {
+              case TEXTURE_1D -> glTexImage1D(texture.target, 0, fmt[0], width, 0, fmt[1], fmt[2], bytes);
+              case TEXTURE_2D -> glTexImage2D(texture.target, 0, fmt[0], width, height, 0, fmt[1], fmt[2], bytes);
+              case TEXTURE_3D -> glTexImage3D(texture.target, 0, fmt[0], width, height, depth, 0, fmt[1], fmt[2], bytes);
+            }
+          } else {
+            switch (texture.desc.type()) {
+              case TextureType.TEXTURE_1D -> glTexSubImage1D(texture.target, 0, x, width, fmt[1], fmt[2], bytes);
+              case TextureType.TEXTURE_2D ->
+                  glTexSubImage2D(texture.target, 0, x, glY, width, height, fmt[1], fmt[2], bytes);
+              case TextureType.TEXTURE_3D ->
+                  glTexSubImage3D(texture.target, 0, x, glY, z, width, height, depth, fmt[1], fmt[2], bytes);
+            }
           }
         } finally {
-          Analysis.end("gl.textureSubImage");
+          Analysis.end(timing);
         }
         if (texture.desc.mipLevels() > 1) {
           glGenerateMipmap(texture.target);
@@ -351,6 +371,7 @@ public final class OpenGLTexture implements Texture, Handle {
           DirectBufferPool.release(bytes);
           bytes = EMPTY_UPLOAD;
           x = y = z = width = height = depth = 0;
+          replacement = false;
           texture.uploads.release(this);
         }
       }

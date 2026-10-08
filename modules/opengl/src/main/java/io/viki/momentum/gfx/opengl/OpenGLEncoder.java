@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.Analysis;
+import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.gfx.GraphicsMetrics;
@@ -81,12 +81,13 @@ public final class OpenGLEncoder implements Encoder {
   private static final int OP_DISPATCH = 15;
   /**
    * Ring capacity: the consumer drains the ring every frame, so the capacity only
-   * needs to hold one frame's worst-case stream (~35k ints today); the producer
+   * needs to hold one frame's worst-case stream (256 Kib); the producer
    * spins only if the consumer ever runs behind.
    */
-  private static final int RING_CAPACITY = 1 << 16;
+  private static final int RING_CAPACITY = 1 << 18;
   private static final int REF_CAPACITY = 1 << 4;
   private final Pool<BatchCommand> batches = new Pool<>();
+  private final Pool<OpenGLResourceSet> resourceSets = new Pool<>();
   private final OpenGLDevice ctx;
   private final MspcRingBuffer ring = new MspcRingBuffer(RING_CAPACITY);
   // Per-frame recording state (single-threaded)
@@ -269,9 +270,17 @@ public final class OpenGLEncoder implements Encoder {
    */
   @Override
   public void setResource(int slot, ResourceSet set) {
+    if (!(set instanceof OpenGLResourceSet source)) {
+      throw new GraphicsException("Resource set was created by a different graphics device");
+    }
+    OpenGLResourceSet snapshot = resourceSets.poll();
+    if (snapshot == null) {
+      snapshot = new OpenGLResourceSet();
+    }
+    source.copyTo(snapshot);
     opStart(OP_SET_RESOURCE, 2);
     operand(slot);
-    operand(refId(((OpenGLResourceSet) set).snapshot()));
+    operand(refId(snapshot));
   }
 
   /**
@@ -598,6 +607,19 @@ public final class OpenGLEncoder implements Encoder {
     }
   }
 
+  /** Returns command-local resource snapshots once their batch has executed. */
+  private void releaseResourceSnapshots(@Nullable Object @Nullable [] references) {
+    if (references == null) {
+      return;
+    }
+    for (Object reference : references) {
+      if (reference instanceof OpenGLResourceSet resourceSet) {
+        resourceSet.reset();
+        resourceSets.release(resourceSet);
+      }
+    }
+  }
+
   private void warnIfNotReset() {
     if (queryReset && !loggedResetWarn) {
       loggedResetWarn = true;
@@ -644,6 +666,7 @@ public final class OpenGLEncoder implements Encoder {
       try {
         encoder.executeBatch(intCount, references);
       } finally {
+        encoder.releaseResourceSnapshots(references);
         references = EMPTY_REFERENCES;
         intCount = 0;
         encoder.batches.release(this);
