@@ -36,6 +36,9 @@ import org.jspecify.annotations.Nullable;
  * <p>The geometry counters are mutable so a retained mesh can upload a replacement without
  * allocating another pair of GPU buffers. A section is compatible with a replacement when its
  * pipeline, resource layout, topology, and indexed/non-indexed mode are unchanged.
+ *
+ * <p>This class is not thread-safe. Mutate and close a section on the render thread or through
+ * the owning graphics queue, and do not use it while its owning {@link Mesh} is being drawn.
  */
 public final class Section implements AutoCloseable {
   private final Material material;
@@ -49,7 +52,18 @@ public final class Section implements AutoCloseable {
   private byte[] vertexStaging = new byte[0];
   private byte[] indexStaging = new byte[0];
 
-  /** Creates a retained mesh section. */
+  /**
+   * Creates a retained mesh section with no CPU staging arrays.
+   *
+   * @param material the material used to render this section
+   * @param vbo the vertex buffer retained by this section
+   * @param ibo the index buffer, or {@code null} for non-indexed geometry
+   * @param vertexCount the number of vertices to draw
+   * @param firstVertex the first vertex to draw
+   * @param firstIndex the first index to draw
+   * @param indexCount the number of indices to draw
+   * @param topology the primitive topology used for drawing
+   */
   public Section(Material material, BufferObject vbo, @Nullable BufferObject ibo,
                  int vertexCount, int firstVertex, int firstIndex, int indexCount,
                  Topology topology) {
@@ -63,7 +77,23 @@ public final class Section implements AutoCloseable {
     this.topology = topology;
   }
 
-  /** Creates a section and retains the CPU staging arrays used to build it. */
+  /**
+   * Creates a section and retains the CPU staging arrays used to build it.
+   *
+   * <p>The arrays are retained by reference so a mesh rebuild can reuse their capacity.
+   * Callers must not modify them while the section is being rebuilt or drawn.
+   *
+   * @param material the material used to render this section
+   * @param vbo the vertex buffer retained by this section
+   * @param ibo the index buffer, or {@code null} for non-indexed geometry
+   * @param vertexCount the number of vertices to draw
+   * @param firstVertex the first vertex to draw
+   * @param firstIndex the first index to draw
+   * @param indexCount the number of indices to draw
+   * @param topology the primitive topology used for drawing
+   * @param vertexStaging the retained CPU-side vertex data
+   * @param indexStaging the retained CPU-side index data
+   */
   public Section(Material material, BufferObject vbo, @Nullable BufferObject ibo,
                  int vertexCount, int firstVertex, int firstIndex, int indexCount,
                  Topology topology, byte[] vertexStaging, byte[] indexStaging) {
@@ -72,48 +102,112 @@ public final class Section implements AutoCloseable {
     this.indexStaging = indexStaging;
   }
 
+  /**
+   * Returns the material used to render this section.
+   *
+   * @return the retained material
+   */
   public Material material() {
     return material;
   }
 
+  /**
+   * Returns the vertex buffer retained by this section.
+   *
+   * @return the vertex buffer
+   */
   public BufferObject vbo() {
     return vbo;
   }
 
+  /**
+   * Returns the index buffer retained by this section.
+   *
+   * @return the index buffer, or {@code null} for non-indexed geometry
+   */
   public @Nullable BufferObject ibo() {
     return ibo;
   }
 
+  /**
+   * Returns the number of vertices drawn for this section.
+   *
+   * @return the vertex count
+   */
   public int vertexCount() {
     return vertexCount;
   }
 
+  /**
+   * Returns the first vertex offset used for non-indexed drawing.
+   *
+   * @return the first vertex offset
+   */
   public int firstVertex() {
     return firstVertex;
   }
 
+  /**
+   * Returns the first index offset used for indexed drawing.
+   *
+   * @return the first index offset
+   */
   public int firstIndex() {
     return firstIndex;
   }
 
+  /**
+   * Returns the number of indices drawn for this section.
+   *
+   * @return the index count
+   */
   public int indexCount() {
     return indexCount;
   }
 
+  /**
+   * Returns the primitive topology used to draw this section.
+   *
+   * @return the section topology
+   */
   public Topology topology() {
     return topology;
   }
 
-  /** Returns whether this section can retain its material and GPU buffers for a new primitive. */
-  public boolean compatible(Pipeline pipeline, ResourceSetLayout layout, Topology topology,
-                            boolean indexed) {
+  /**
+   * Returns whether this section can retain its material and GPU buffers for a new primitive.
+   *
+   * <p>Compatibility requires identity equality for the pipeline and resource layout,
+   * equal topology, and the same indexed or non-indexed mode.
+   *
+   * @param pipeline the replacement primitive's render pipeline
+   * @param layout the replacement primitive's resource-set layout
+   * @param topology the replacement primitive's topology
+   * @param indexed whether the replacement uses an index buffer
+   * @return {@code true} when this section's resources can be reused
+   */
+  public boolean isCompatibleWith(Pipeline pipeline, ResourceSetLayout layout, Topology topology,
+                                  boolean indexed) {
     return material.pipeline() == pipeline
         && material.resourceSet().layout() == layout
         && this.topology == topology
         && (ibo != null) == indexed;
   }
 
-  /** Uploads replacement geometry into this section's retained buffers. */
+  /**
+   * Uploads replacement geometry into this section's retained buffers and updates its draw counts.
+   *
+   * <p>Both staging arrays are retained by reference. The first vertex and index offsets
+   * are reset to zero. An index upload occurs only when this section has an index buffer
+   * and {@code indexBytes} is positive.
+   *
+   * @param vertices the replacement vertex data
+   * @param vertexBytes the number of vertex bytes to upload
+   * @param indices the replacement index data
+   * @param indexBytes the number of index bytes to upload
+   * @param vertexCount the replacement vertex count
+   * @param indexCount the replacement index count
+   */
   public void updateGeometry(byte[] vertices, int vertexBytes, byte[] indices, int indexBytes,
                              int vertexCount, int indexCount) {
     vbo.replace(vertices, vertexBytes);
@@ -128,12 +222,20 @@ public final class Section implements AutoCloseable {
     this.indexStaging = indices;
   }
 
-  /** Returns the reusable CPU-side vertex backing array. */
+  /**
+   * Returns the reusable CPU-side vertex backing array.
+   *
+   * @return the retained vertex staging array by reference
+   */
   byte[] vertexStaging() {
     return vertexStaging;
   }
 
-  /** Returns the reusable CPU-side index backing array. */
+  /**
+   * Returns the reusable CPU-side index backing array.
+   *
+   * @return the retained index staging array by reference
+   */
   byte[] indexStaging() {
     return indexStaging;
   }

@@ -87,7 +87,7 @@ public final class MeshGraphics extends BatchedGraphics {
    */
   @Override
   public void flush(boolean force) {
-    if (!force && data.vertexCount() <= 0 && data.indexCount() <= 0) {
+    if (data.vertexCount() <= 0 && data.indexCount() <= 0) {
       return;
     }
     byte[] vertices = data.recordVertices();
@@ -218,7 +218,7 @@ public final class MeshGraphics extends BatchedGraphics {
           int idxCount = d.indexBytes() / Integer.BYTES;
           int vertCount = d.vertexBytes() / primitive.vertexSize();
           Section old = previousIndex < previous.size() ? previous.get(previousIndex) : null;
-          if (old != null && old.compatible(d.pipeline, d.rsl, top, primitive.isIndexed())) {
+          if (old != null && old.isCompatibleWith(d.pipeline, d.rsl, top, primitive.isIndexed())) {
             ResourceSet rs = old.material().resourceSet();
             if (primitive.isTextured() && d.texture() != null && d.sampler() != null) {
               rs.bindTexture(1, d.texture(), d.sampler());

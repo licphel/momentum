@@ -24,8 +24,6 @@
 
 package io.viki.momentum.event;
 
-import org.jspecify.annotations.Nullable;
-
 /**
  * Mutable context carried alongside an {@link Event} during dispatch.
  *
