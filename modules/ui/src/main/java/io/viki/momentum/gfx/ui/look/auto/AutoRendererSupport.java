@@ -43,7 +43,7 @@ final class AutoRendererSupport {
   static final float SLIDER_THUMB_VERTICAL_INSET = 4.0F;
   static final float SLIDER_THUMB_RADIUS = 2.0F;
   static final Alignment LEFT_CENTER = new Alignment(-1, 0);
-  static final TextFormat TEXT_FORMAT = TextFormat.of().size(8.0F);
+  static final TextFormat TEXT_FORMAT = TextFormat.of();
   static final Color CONTROL_SURFACE = Color.EMPTY;
   static final Color GLASS_SURFACE = new Color(0.08F, 0.10F, 0.14F, 0.28F);
   static final Color GLASS_TITLE_SURFACE = new Color(0.92F, 0.95F, 1.0F, 0.055F);

@@ -94,7 +94,7 @@ public class Look {
     if (tooltipRenderer != null) {
       return tooltipRenderer;
     }
-    Look global = io.viki.momentum.gfx.ui.look.AutoLook.get();
+    Look global = AutoLook.get();
     return global.tooltipRenderer == null ? AUTO_TOOLTIP_RENDERER : global.tooltipRenderer;
   }
 

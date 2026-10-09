@@ -112,7 +112,7 @@ public final class TextView extends Element {
    * @return a new, directly renderable text
    */
   public MutableText layoutForRender(float width) {
-    long version = text instanceof MutableText mutable ? mutable.version() : 0L;
+    long version = text.version();
     if (layout != null && layoutSource == text && layoutVersion == version
         && layoutWidth == width && layoutWrap == wrapText) {
       return layout;

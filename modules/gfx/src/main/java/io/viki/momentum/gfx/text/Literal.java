@@ -25,6 +25,8 @@
 package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.text.raster.Raster;
+import io.viki.momentum.gfx.tint.Color;
+import io.viki.momentum.gfx.tint.Gradient;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
@@ -42,9 +44,13 @@ import java.util.Objects;
  * Style and metadata are set fluently with
  * {@link #with(TextFormat)} and {@link #with(Meta...)}.
  */
-public final class Literal implements Text {
+public final class Literal implements FormattableText<Literal> {
   private final String text;
-  private TextFormat fmt = TextFormat.of();
+  private FontInsta font = FallbackFont.acquire();
+  private Gradient tint = Color.WHITE;
+  private int fontStyle = Font.REGULAR;
+  private @Nullable TextFormat fmt;
+  private long version;
   private Meta @Nullable [] meta;
 
   /**
@@ -66,15 +72,42 @@ public final class Literal implements Text {
     return new Literal(text);
   }
 
-  /**
-   * Returns a copy of this literal with the given text style.
-   *
-   * @param fmt the text style
-   * @return this literal
-   */
-  public Literal with(TextFormat fmt) {
-    this.fmt = fmt;
+  @Override
+  public Literal font(FontInsta value) {
+    font = value;
+    changed();
     return this;
+  }
+
+  @Override
+  public Literal tint(Gradient value) {
+    tint = value;
+    changed();
+    return this;
+  }
+
+  @Override
+  public Literal size(float value) {
+    font = font.resized(value);
+    changed();
+    return this;
+  }
+
+  @Override
+  public Literal style(int value) {
+    fontStyle = value;
+    changed();
+    return this;
+  }
+
+  private void changed() {
+    fmt = null;
+    version++;
+  }
+
+  @Override
+  public long version() {
+    return version;
   }
 
   /**
@@ -85,6 +118,7 @@ public final class Literal implements Text {
    */
   public Literal with(Meta @Nullable ... meta) {
     this.meta = meta;
+    version++;
     return this;
   }
 
@@ -96,7 +130,7 @@ public final class Literal implements Text {
   @Override
   public Literal cut(int begin, int length) {
     Objects.checkFromIndexSize(begin, length, text.length());
-    Literal result = Literal.of(text.substring(begin, begin + length)).with(fmt);
+    Literal result = Literal.of(text.substring(begin, begin + length)).with(format());
     result.meta = meta == null ? null : meta.clone();
     return result;
   }
@@ -118,7 +152,7 @@ public final class Literal implements Text {
 
   @Override
   public TextFormat forwadingStyle() {
-    return fmt;
+    return format();
   }
 
   /**
@@ -127,6 +161,9 @@ public final class Literal implements Text {
    * @return the text style
    */
   public TextFormat format() {
+    if (fmt == null) {
+      fmt = new TextFormat(font, tint, fontStyle);
+    }
     return fmt;
   }
 
@@ -141,7 +178,7 @@ public final class Literal implements Text {
 
   @Override
   public int hashCode() {
-    return Objects.hash(text, fmt, Arrays.hashCode(meta));
+    return Objects.hash(text, format(), Arrays.hashCode(meta));
   }
 
   @Override
@@ -154,7 +191,7 @@ public final class Literal implements Text {
     }
     Literal that = (Literal) obj;
     return Objects.equals(this.text, that.text) &&
-        Objects.equals(this.fmt, that.fmt) &&
+        Objects.equals(this.format(), that.format()) &&
         Arrays.equals(this.meta, that.meta);
   }
 
@@ -162,7 +199,7 @@ public final class Literal implements Text {
   public String toString() {
     return "Literal[" +
         "text=" + text + ", " +
-        "fmt=" + fmt + ", " +
+        "fmt=" + format() + ", " +
         "meta=" + Arrays.toString(meta) + ']';
   }
 }

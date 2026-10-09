@@ -24,6 +24,7 @@
 
 package io.viki.momentum.codec.nbt;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -105,7 +106,7 @@ public final class JsonUtil {
    */
   public static CompoundNBT parse(String json) {
     try {
-      JsonNode root = MAPPER.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+      JsonNode root = MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
           .readTree(json);
       if (root == null || !root.isObject()) {
         throw new IllegalArgumentException("Root must be a JSON object");

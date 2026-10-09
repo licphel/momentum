@@ -30,8 +30,8 @@ import io.viki.momentum.gfx.tint.Gradient;
 /**
  * Immutable text styling attributes for a span of text.
  *
- * <p>A {@code TextFormat} combines a {@link Font}, a text gradient, font style
- * flags, and a font size. Each wither method returns a new instance, leaving
+ * <p>A {@code TextFormat} combines a {@link FontInsta}, a text gradient and font style
+ * flags. Each wither method returns a new instance, leaving
  * the original unchanged.
  *
  * <p>Use {@link #of()} for a default style, or {@link Builder} for fluent
@@ -40,12 +40,11 @@ import io.viki.momentum.gfx.tint.Gradient;
  * @param font      the font used to render the text
  * @param tint      the text gradient
  * @param fontStyle a bitmask of style flags from {@link Font}
- * @param fontSize  the font size in pixels
  * @see Font#REGULAR
  * @see Font#BOLD
  * @see Font#ITALIC
  */
-public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize) {
+public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
   /**
    * Returns a default style using the built-in font, white gradient, regular
    * weight, and the default font size.
@@ -56,8 +55,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
     return new TextFormat(
         FallbackFont.acquire(),
         Color.WHITE,
-        Font.REGULAR,
-        Font.DEFAULT_SIZE[0]
+        Font.REGULAR
     );
   }
 
@@ -67,8 +65,8 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
    * @param font the replacement font
    * @return a new style with the updated font
    */
-  public TextFormat font(Font font) {
-    return new TextFormat(font, tint, fontStyle, fontSize);
+  public TextFormat font(FontInsta font) {
+    return new TextFormat(font, tint, fontStyle);
   }
 
   /**
@@ -78,7 +76,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
    * @return a new style with the updated gradient
    */
   public TextFormat tint(Gradient gradient) {
-    return new TextFormat(font, gradient, fontStyle, fontSize);
+    return new TextFormat(font, gradient, fontStyle);
   }
 
   /**
@@ -88,17 +86,17 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
    * @return a new style with the updated font size
    */
   public TextFormat size(float fontSize) {
-    return new TextFormat(font, tint, fontStyle, fontSize);
+    return new TextFormat(font.resized(fontSize), tint, fontStyle);
   }
 
   /**
-   * Returns a copy of this style with the given font.
+   * Returns a copy with the replacement style flags.
    *
-   * @param font the replacement font
-   * @return a new style with the updated font
+   * @param fontStyle the replacement style flags
+   * @return a new style with the updated flags
    */
-  public TextFormat style(Font font) {
-    return new TextFormat(font, tint, fontStyle, fontSize);
+  public TextFormat style(int fontStyle) {
+    return new TextFormat(font, tint, fontStyle);
   }
 
   /**
@@ -108,17 +106,16 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
    * {@link Font#REGULAR}, font size is {@link Font#DEFAULT_SIZE}.
    */
   public static final class Builder {
-    private final Font font;
+    private FontInsta font;
     private Gradient gradient = Color.WHITE;
     private int fontStyle = Font.REGULAR;
-    private float fontSize = Float.NaN;
 
     /**
      * Creates a builder for the given font.
      *
      * @param font the font for the style being built
      */
-    public Builder(Font font) {
+    public Builder(FontInsta font) {
       this.font = font;
     }
 
@@ -154,7 +151,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
      * @return this builder, for chaining
      */
     public Builder size(float fontSize) {
-      this.fontSize = fontSize;
+      this.font = font.resized(fontSize);
       return this;
     }
 
@@ -164,8 +161,7 @@ public record TextFormat(Font font, Gradient tint, int fontStyle, float fontSize
      * @return a new style with the configured attributes
      */
     public TextFormat build() {
-      fontSize = Float.isNaN(fontSize) ? Font.DEFAULT_SIZE[0] : fontSize;
-      return new TextFormat(font, gradient, fontStyle, fontSize);
+      return new TextFormat(font, gradient, fontStyle);
     }
   }
 }

@@ -46,6 +46,7 @@ public final class MutableText implements Text {
   private volatile @Nullable Raster cached;
   private String text = "";
   private long version;
+  private long cachedVersion = -1;
 
   private static void flatten(Text c, List<Literal> out) {
     if (c instanceof Literal lit) {
@@ -63,7 +64,11 @@ public final class MutableText implements Text {
    * @return monotonically increasing revision for this sequence
    */
   public long version() {
-    return version;
+    long result = version;
+    for (Text child : children) {
+      result += child.version();
+    }
+    return result;
   }
 
   /**
@@ -236,10 +241,12 @@ public final class MutableText implements Text {
 
   @Override
   public Raster raster() {
-    if (cached == null) {
+    long currentVersion = version();
+    if (cached == null || cachedVersion != currentVersion) {
       List<Literal> literals = new ArrayList<>();
       flatten(this, literals);
       cached = rasterizer.render(literals);
+      cachedVersion = currentVersion;
     }
     return Objects.requireNonNull(cached);
   }

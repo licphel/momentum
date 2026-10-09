@@ -41,6 +41,15 @@ import org.jspecify.annotations.Nullable;
  */
 public interface Text {
   /**
+   * Returns the content and style revision used to detect in-place changes.
+   *
+   * @return the current revision, or {@code 0} for an immutable component
+   */
+  default long version() {
+    return 0;
+  }
+
+  /**
    * Returns the concatenated plain text of this component and all its
    * descendants.
    *
@@ -63,8 +72,8 @@ public interface Text {
    * Returns inline metadata at a UTF-16 character index obtained by hit-testing.
    * The returned array is borrowed and must not be modified.
    *
-   * @param index the character index, or a hit-test miss
-   * @return the metadata, or {@code null} if absent or outside the content
+   * @param index the UTF-16 code-unit index to inspect
+   * @return the metadata at that index, or {@code null} if absent or outside the content
    */
   default Meta @Nullable [] getMeta(int index) {
     return null;

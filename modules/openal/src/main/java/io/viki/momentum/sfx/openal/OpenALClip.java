@@ -53,6 +53,7 @@ public final class OpenALClip implements Clip {
   volatile float offset = 0.0F;
   volatile boolean shouldClose = false;
   volatile int remainingLoops;
+  volatile boolean autoClosure;
   private int buffer = 0;
   private @Nullable AudioFormat format;
   private boolean open = false;
@@ -101,6 +102,21 @@ public final class OpenALClip implements Clip {
 
       alSourcei(source, AL_BUFFER, this.buffer);
     });
+  }
+
+  @Override
+  public void poll() {
+    applyVolume();
+    state = alGetSourcei(source, AL_SOURCE_STATE);
+    offset = alGetSourcef(source, AL_SEC_OFFSET);
+
+    if (state == AL_STOPPED) {
+      if (remainingLoops <= 0) {
+        shouldClose = true;
+      } else {
+        loop(remainingLoops);
+      }
+    }
   }
 
   @Override
@@ -232,8 +248,13 @@ public final class OpenALClip implements Clip {
         alDeleteBuffers(buffer);
         buffer = 0;
       }
-    });
 
-    mixer.untrack(this);
+      mixer.untrack(this);
+    });
+  }
+
+  @Override
+  public void __enableNativeAutoClosure() {
+    autoClosure = true;
   }
 }

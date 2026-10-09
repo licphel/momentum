@@ -64,6 +64,12 @@ public interface Clip extends AutoCloseable {
   }
 
   /**
+   * Polls events for this clip, such as streaming read, state/volume read, etc.
+   */
+  default void poll() {
+  }
+
+  /**
    * Returns whether this clip is open for playback.
    *
    * @return {@code true} when {@link #open} has completed
@@ -186,4 +192,11 @@ public interface Clip extends AutoCloseable {
    */
   @Override
   void close();
+
+  /**
+   * Tries to enable native auto closure extension.
+   */
+  default void __enableNativeAutoClosure() {
+    throw new UnsupportedOperationException();
+  }
 }

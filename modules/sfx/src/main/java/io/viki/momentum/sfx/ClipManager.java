@@ -2,6 +2,7 @@ package io.viki.momentum.sfx;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
+import java.util.Iterator;
 import java.util.Set;
 
 /**
@@ -46,7 +47,11 @@ public final class ClipManager implements AutoCloseable {
     if (!running) {
       throw new IllegalStateException("ClipManager is closed");
     }
-    clips.add(clip);
+    try {
+      clip.__enableNativeAutoClosure();
+    } catch (Exception _) {
+      clips.add(clip); // Native auto closure is not supported. Fallback to our management.
+    }
   }
 
   /**
@@ -63,6 +68,8 @@ public final class ClipManager implements AutoCloseable {
   /**
    * Returns the number of clips whose release is currently managed.
    *
+   * <p>May not be the same as the count of playing clips.
+   *
    * @return the registered clip count
    */
   public synchronized int activeCount() {
@@ -76,7 +83,7 @@ public final class ClipManager implements AutoCloseable {
    * Calling it after closure has no effect.
    */
   public synchronized void update() {
-    var iterator = clips.iterator();
+    Iterator<Clip> iterator = clips.iterator();
     while (iterator.hasNext()) {
       Clip clip = iterator.next();
       if (clip.shouldClose()) {

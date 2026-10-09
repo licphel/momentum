@@ -26,6 +26,7 @@ package io.viki.momentum.gfx;
 
 import java.nio.ByteBuffer;
 import io.viki.momentum.util.Pool;
+import org.lwjgl.system.MemoryUtil;
 
 import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
@@ -102,6 +103,6 @@ public final class DirectBufferPool {
    * will result in newly allocated buffers.
    */
   public static void close() {
-    pool.clear(org.lwjgl.system.MemoryUtil::memFree);
+    pool.clear(MemoryUtil::memFree);
   }
 }

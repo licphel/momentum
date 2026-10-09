@@ -24,6 +24,7 @@
 
 package io.viki.momentum.international;
 
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.viki.momentum.util.Identifier;
@@ -128,7 +129,7 @@ public final class Language {
    * @return an immutable snapshot sorted by locale code
    */
   public static Collection<Language> languages() {
-    return LANGUAGES.values().stream().sorted(java.util.Comparator.comparing(Language::key)).toList();
+    return LANGUAGES.values().stream().sorted(Comparator.comparing(Language::key)).toList();
   }
 
   /**
@@ -228,7 +229,7 @@ public final class Language {
    */
   private static Map<Identifier, String> parse(Namespace namespace, String json) {
     try {
-      JsonNode root = JSON.reader().with(com.fasterxml.jackson.databind.DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
+      JsonNode root = JSON.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
           .readTree(json);
       if (root == null || !root.isObject()) {
         throw new IllegalArgumentException("Language JSON must be an object");

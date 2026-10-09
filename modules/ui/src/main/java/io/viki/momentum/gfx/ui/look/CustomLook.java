@@ -1,6 +1,6 @@
 package io.viki.momentum.gfx.ui.look;
 
-import io.viki.momentum.gfx.text.Font;
+import io.viki.momentum.gfx.text.FontInsta;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.texture.Drawable2D;
 import io.viki.momentum.gfx.ui.look.custom.*;
@@ -13,8 +13,6 @@ import org.jspecify.annotations.Nullable;
  * Factory calls do not modify AutoLook. Use resulting renderers on the owning UI thread.
  */
 public final class CustomLook {
-  /** Matches the automatic editor's logical text size. */
-  private static final float DEFAULT_TEXT_SIZE = 8.0F;
   /** Logical spacing used by the factory overloads; explicit constructors allow other values. */
   private static final int DEFAULT_PADDING = 4;
   /** Matches the automatic tooltip's spacing between rich-text entries. */
@@ -30,8 +28,8 @@ public final class CustomLook {
    * @param font       editor font, or {@code null} to use the standard UI font
    * @return a renderer using this font for text and pointer hit testing
    */
-  public static CustomTextBoxRenderer textBox(Drawable2D background, @Nullable Font font) {
-    TextFormat format = TextFormat.of().size(DEFAULT_TEXT_SIZE);
+  public static CustomTextBoxRenderer textBox(Drawable2D background, @Nullable FontInsta font) {
+    TextFormat format = TextFormat.of();
     if (font != null) {
       format = format.font(font);
     }

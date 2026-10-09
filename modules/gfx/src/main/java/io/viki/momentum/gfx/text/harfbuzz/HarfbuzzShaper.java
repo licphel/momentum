@@ -26,6 +26,7 @@ package io.viki.momentum.gfx.text.harfbuzz;
 
 import com.ibm.icu.text.Bidi;
 import io.viki.momentum.gfx.text.Font;
+import io.viki.momentum.gfx.text.FontInsta;
 import io.viki.momentum.gfx.text.raster.ShapeResult;
 import io.viki.momentum.util.InternalApi;
 import org.lwjgl.util.harfbuzz.hb_glyph_info_t;
@@ -54,17 +55,18 @@ public final class HarfbuzzShaper implements AutoCloseable {
    * handles bidirectional text, applies font scaling, and converts UTF-8 byte indices to character
    * indices. The shaped result is suitable for rendering with OpenGL or similar APIs.
    *
-   * @param font      the font containing the face data (must provide {@code fileData()} byte array)
+   * @param instance  the resolved font and logical size used for shaping
    * @param text      the text string to shape
-   * @param fontSize  the font size in points (used to scale glyph metrics)
-   * @param flipY     whether to flip the Y-axis offsets ({@code true} for OpenGL coordinates,
+     * @param flipY     whether to flip the Y-axis offsets ({@code true} for OpenGL coordinates,
    *                  {@code false} for screen coordinates)
    * @param fontStyle the font style (currently unused, reserved for future use)
    * @return a {@code ShapeResult} containing glyph IDs, character indices, advances, and X/Y offsets
    * @throws NullPointerException if {@code font}, {@code text}, or {@code font.fileData()} is null
    * @throws AssertionError       if HarfBuzz returns null glyph info or position buffers
    */
-  public ShapeResult shape(Font font, String text, float fontSize, boolean flipY, int fontStyle) {
+  public ShapeResult shape(FontInsta instance, String text, boolean flipY, int fontStyle) {
+    Font font = instance.font();
+    float fontSize = instance.size();
     Bidi bidi = new Bidi(text, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
     byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
 

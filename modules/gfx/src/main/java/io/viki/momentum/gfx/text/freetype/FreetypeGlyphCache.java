@@ -111,14 +111,14 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       recycleGlyphKey(key);
       return cached;
     }
-    Glyph c = rasterize(font.ftFaceRaw(), glyphIndex, fontStyle);
+    Glyph c = rasterize(font.ftFaceRaw(), glyphIndex, fontStyle, font.isPixel());
     cache.put(key, c);
     return c;
   }
 
-  private @Nullable Glyph rasterize(FT_Face ftFace, int glyphIndex, int fontStyle) {
+  private @Nullable Glyph rasterize(FT_Face ftFace, int glyphIndex, int fontStyle, boolean pixel) {
     FT_Set_Pixel_Sizes(ftFace, 0, resolution);
-    FT_Load_Glyph(ftFace, glyphIndex, FT_LOAD_DEFAULT);
+    FT_Load_Glyph(ftFace, glyphIndex, pixel ? FT_FT_LOAD_TARGET_MONO : FT_LOAD_DEFAULT);
     FT_GlyphSlot slot = ftFace.glyph();
 
     assert slot != null;
@@ -129,7 +129,7 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       FT_GlyphSlot_Oblique(slot);
     }
 
-    FT_Render_Glyph(slot, FT_RENDER_MODE_NORMAL);
+    FT_Render_Glyph(slot, pixel ? FT_RENDER_MODE_MONO : FT_RENDER_MODE_NORMAL);
     FT_Bitmap bitmap = slot.bitmap();
 
     int w = bitmap.width();
@@ -157,7 +157,13 @@ public final class FreetypeGlyphCache implements AutoCloseable {
         int srcBase = srcRow * pitch;
         int dstBase = row * w * 4;
         for (int col = 0; col < w; col++) {
-          byte grey = buf.get(srcBase + col);
+          byte grey;
+          if (pixel) {
+            int bits = Byte.toUnsignedInt(buf.get(srcBase + (col >>> 3)));
+            grey = (byte) ((bits & (0x80 >>> (col & 7))) == 0 ? 0 : 255);
+          } else {
+            grey = buf.get(srcBase + col);
+          }
           int dst = dstBase + col * 4;
           rgba[dst] = (byte) 255;
           rgba[dst + 1] = (byte) 255;
@@ -193,9 +199,9 @@ public final class FreetypeGlyphCache implements AutoCloseable {
   private GlyphKey acquireGlyphKey(FreetypeFont font, int glyphIndex, int fontStyle) {
     GlyphKey key = glyphKeyPool.poll();
     if (key == null) {
-      return new GlyphKey(font, resolution, glyphIndex, fontStyle);
+      return new GlyphKey(font, resolution, glyphIndex, fontStyle, font.isPixel());
     }
-    key.reset(font, resolution, glyphIndex, fontStyle);
+    key.reset(font, resolution, glyphIndex, fontStyle, font.isPixel());
     return key;
   }
 
@@ -211,16 +217,18 @@ public final class FreetypeGlyphCache implements AutoCloseable {
     private int resolution;
     private int glyphIndex;
     private int fontStyle;
+    private boolean pixel;
 
-    private GlyphKey(Font font, int resolution, int glyphIndex, int fontStyle) {
-      reset(font, resolution, glyphIndex, fontStyle);
+    private GlyphKey(Font font, int resolution, int glyphIndex, int fontStyle, boolean pixel) {
+      reset(font, resolution, glyphIndex, fontStyle, pixel);
     }
 
-    private void reset(Font font, int resolution, int glyphIndex, int fontStyle) {
+    private void reset(Font font, int resolution, int glyphIndex, int fontStyle, boolean pixel) {
       this.font = font;
       this.resolution = resolution;
       this.glyphIndex = glyphIndex;
       this.fontStyle = fontStyle;
+      this.pixel = pixel;
     }
 
     @Override
@@ -228,7 +236,8 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       int result = font.hashCode();
       result = 31 * result + resolution;
       result = 31 * result + glyphIndex;
-      return 31 * result + fontStyle;
+      result = 31 * result + fontStyle;
+      return 31 * result + (pixel ? 1 : 0);
     }
 
     @Override
@@ -242,6 +251,7 @@ public final class FreetypeGlyphCache implements AutoCloseable {
       return resolution == other.resolution
           && glyphIndex == other.glyphIndex
           && fontStyle == other.fontStyle
+          && pixel == other.pixel
           && font.equals(other.font);
     }
   }

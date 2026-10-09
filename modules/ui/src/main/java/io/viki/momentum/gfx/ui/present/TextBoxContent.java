@@ -275,15 +275,13 @@ public final class TextBoxContent implements ElementRenderer, TextBoxPresentatio
   }
 
   private float caretTop(LayoutRun run) {
-    float ascender = this.format.font().metrics().ascender()
-        * this.format.fontSize();
+    float ascender = this.format.font().ascender();
     return run.lineY() - ascender;
   }
 
   private float caretHeight() {
-    float fontSize = this.format.fontSize();
-    float ascender = this.format.font().metrics().ascender() * fontSize;
-    float descender = this.format.font().metrics().descender() * fontSize;
+    float ascender = this.format.font().ascender();
+    float descender = this.format.font().descender();
     return Math.max(1.0F, ascender - descender);
   }
 }

@@ -48,6 +48,7 @@ public final class OpenALStreamingClip implements StreamingClip {
   private static final int BUFFER_COUNT = 4;
   private static final int BUFFER_BYTES = 64 * 1024;
 
+  volatile boolean autoClosure;
   private final OpenALMixer mixer;
   private final int[] buffers = new int[BUFFER_COUNT];
   private final int[] bufferSizes = new int[BUFFER_COUNT];
@@ -240,7 +241,7 @@ public final class OpenALStreamingClip implements StreamingClip {
     }
     closed = true;
     open = false;
-    mixer.untrack(this);
+
     mixer.submit(() -> {
       alSourceStop(source);
       closeStream();
@@ -251,10 +252,17 @@ public final class OpenALStreamingClip implements StreamingClip {
           buffers[i] = 0;
         }
       }
+      mixer.untrack(this);
     });
   }
 
-  void poll() {
+  @Override
+  public void __enableNativeAutoClosure() {
+    autoClosure = true;
+  }
+
+  @Override
+  public void poll() {
     applyVolume();
     int processed = alGetSourcei(source, AL_BUFFERS_PROCESSED);
     for (int i = 0; i < processed; i++) {

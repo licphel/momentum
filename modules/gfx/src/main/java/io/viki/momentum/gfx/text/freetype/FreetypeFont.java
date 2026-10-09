@@ -59,6 +59,7 @@ public final class FreetypeFont implements Font {
   private boolean disposed;
   private @Nullable FreetypeGlyphCache glyphCache;
   private float resolution = DEFAULT_RESOLUTION;
+  private boolean pixel;
 
   /**
    * Constructs a FreeType-based font with metrics computed from the specified font data.
@@ -116,6 +117,16 @@ public final class FreetypeFont implements Font {
   @Override
   public FontMetrics metrics() {
     return metrics;
+  }
+
+  @Override
+  public void setPixel(boolean flag) {
+    pixel = flag;
+  }
+
+  @Override
+  public boolean isPixel() {
+    return pixel;
   }
 
   @Override

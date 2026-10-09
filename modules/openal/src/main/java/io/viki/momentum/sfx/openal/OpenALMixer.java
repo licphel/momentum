@@ -37,9 +37,10 @@ import org.lwjgl.openal.ALC10;
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -64,8 +65,8 @@ public final class OpenALMixer implements Mixer {
   private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
 
-  private final List<OpenALClip> trackingList = new CopyOnWriteArrayList<>();
-  private final List<OpenALStreamingClip> streamingTrackingList = new CopyOnWriteArrayList<>();
+  private final List<OpenALClip> trackingList = new LinkedList<>();
+  private final List<OpenALStreamingClip> streamingTrackingList = new LinkedList<>();
   private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
@@ -119,26 +120,30 @@ public final class OpenALMixer implements Mixer {
        *
        * Note that we do not close them. This is not our duty here.
        */
-      for (int i = trackingList.size() - 1; i >= 0; i--) {
-        OpenALClip clip = trackingList.get(i);
-        clip.applyVolume();
-        clip.state = alGetSourcei(clip.source, AL_SOURCE_STATE);
-        clip.offset = alGetSourcef(clip.source, AL_SEC_OFFSET);
+      for (Iterator<OpenALClip> it = trackingList.iterator(); it.hasNext(); ) {
+        OpenALClip clip = it.next();
 
-        if (clip.state == AL_STOPPED) {
-          if (clip.remainingLoops <= 0) {
-            trackingList.remove(i);
-            clip.shouldClose = true;
-          } else {
-            clip.loop(clip.remainingLoops);
+        clip.poll();
+        if (clip.shouldClose()) {
+          it.remove();
+          if (clip.autoClosure) {
+            clip.close();
           }
         }
       }
 
-      for (OpenALStreamingClip clip : streamingTrackingList) {
+      for (Iterator<OpenALStreamingClip> it = streamingTrackingList.iterator(); it.hasNext(); ) {
+        OpenALStreamingClip clip = it.next();
+
         clip.poll();
+
+        if (clip.shouldClose()) {
+          it.remove();
+          if  (clip.autoClosure) {
+            clip.close();
+          }
+        }
       }
-      streamingTrackingList.removeIf(OpenALStreamingClip::shouldClose);
     });
   }
 
@@ -257,19 +262,14 @@ public final class OpenALMixer implements Mixer {
     }
   }
 
-  /**
-   * Removes a clip from the tracking list.
-   *
-   * @param clip the clip to untrack
-   */
-  void untrack(OpenALClip clip) {
-    trackingList.remove(clip);
-  }
-
   void track(OpenALStreamingClip clip) {
     if (!streamingTrackingList.contains(clip)) {
       streamingTrackingList.addLast(clip);
     }
+  }
+
+  void untrack(OpenALClip clip) {
+    trackingList.remove(clip);
   }
 
   void untrack(OpenALStreamingClip clip) {

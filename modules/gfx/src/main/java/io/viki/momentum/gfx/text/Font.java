@@ -46,10 +46,10 @@ import java.nio.ByteBuffer;
  */
 public interface Font extends AutoCloseable {
   /**
-   * Default font size in pixels.
-   * Can be set by configuration.
+   * Default font size in logical drawing units, independent of glyph rasterization resolution.
+   * Configure through {@link FallbackFont#setDefaultSize(float)} before creating text formats.
    */
-  float[] DEFAULT_SIZE = new float[] {8.0F};
+  float[] DEFAULT_SIZE = new float[] {16.0F};
   /** Plain (regular) weight — the default style. */
   int REGULAR = 0;
   /** Bold weight flag. */
@@ -83,6 +83,20 @@ public interface Font extends AutoCloseable {
    * @return the font metrics
    */
   FontMetrics metrics();
+
+  /**
+   * Sets whether to use pixel rendering (nearest filter and possible snapping)
+   *
+   * @param flag pixel rendering flag
+   */
+  void setPixel(boolean flag);
+
+  /**
+   * Returns whether to use pixel rendering.
+   *
+   * @return pixel rendering flag
+   */
+  boolean isPixel();
 
   /**
    * Tests whether this font covers the given Unicode code point.

@@ -45,6 +45,8 @@ import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.resource.Resource;
 
+import java.nio.ByteBuffer;
+
 /**
  * A per-frame 2D batch renderer that submits draw calls directly to the GPU on each flush.
  *
@@ -250,9 +252,9 @@ public class BatchedGraphics extends StatefulGraphics {
       // we've set volatile = true.
       data.clear();
 
-      vbo.replace(java.nio.ByteBuffer.wrap(rawV, vr, vw - vr));
+      vbo.replace(ByteBuffer.wrap(rawV, vr, vw - vr));
       if (ic > 0 && currentPrimitive.isIndexed()) {
-        ibo.replace(java.nio.ByteBuffer.wrap(rawI, ir, iw - ir));
+        ibo.replace(ByteBuffer.wrap(rawI, ir, iw - ir));
       }
 
       encoder.setViewport((int) viewport.minX(), (int) viewport.minY(),

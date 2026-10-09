@@ -30,20 +30,21 @@ import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.io.InputStream;
+import java.util.Objects;
 
 /**
- * Lazy-initialized built-in font.
+ * Configurable default font, with a lazily initialized built-in fallback.
  *
  * <p>Call {@link #init(Device)} once before use; subsequent calls are no-ops.
  *
- * <p>All fields are thread-safe after initialization.
+ * <p>Font selection is safely published. Configure size before creating text styles;
+ * existing styles keep their font and size. Caller-provided fonts remain caller-owned.
  */
-@SuppressWarnings("all")
 @InternalApi
 public final class FallbackFont {
-  private static @Nullable Font font;
-  private static AtomicBoolean init = new AtomicBoolean();
+  private static volatile @Nullable Font builtin;
+  private static volatile @Nullable FontInsta font;
 
   private FallbackFont() {
   }
@@ -53,24 +54,67 @@ public final class FallbackFont {
    *
    * @param device the graphics device
    */
-  public static void init(Device device) {
-    if (!init.compareAndSet(false, true)) {
+  public static synchronized void init(Device device) {
+    if (builtin != null) {
       return;
     }
 
     // Font init
-    try {
-      ByteBuffer ffd = ByteBuffer.wrap(FallbackFont.class.getResource("/font.ttf").openStream().readAllBytes());
-      font = Font.open(device, ffd);
+    try (InputStream input = FallbackFont.class.getResourceAsStream("/font.ttf")) {
+      if (input == null) {
+        throw new GraphicsException("Builtin font resource /font.ttf is missing");
+      }
+      builtin = Font.open(device, ByteBuffer.wrap(input.readAllBytes()));
+      if (builtin == null) {
+        throw new GraphicsException("Cannot decode builtin font /font.ttf");
+      }
+      if (font == null) {
+        font = FontInsta.of(Objects.requireNonNull(builtin), Font.DEFAULT_SIZE[0]);
+      }
     } catch (Exception e) {
       throw new GraphicsException("Cannot initialize builtin font", e);
     }
   }
 
-  static Font acquire() {
-    if (font == null) {
+  /**
+   * Sets the default font of default {@link TextFormat}.
+   *
+   * @param value font to set
+   */
+  public static synchronized void set(FontInsta value) {
+    font = value;
+  }
+
+  /**
+   * Sets the logical font size used by subsequently created default {@link TextFormat}s.
+   *
+   * <p>This controls layout and glyph destination sizes in the drawing coordinate system.
+   * It does not change {@link Font#resolution() the font's rasterization resolution}, existing
+   * text formats, or cached glyph textures. The framebuffer size additionally depends on the
+   * active camera, viewport, and drawing transform.
+   *
+   * <p>For example, a font rasterized at 16 pixels can be drawn at a logical size of 8. With a
+   * two-times canvas scale, one glyph texel covers one framebuffer pixel. A smaller logical
+   * size therefore does not by itself imply lost pixel detail; the combined scale determines
+   * whether texels are preserved, enlarged, or downsampled.
+   *
+   * <p>Configure this on the UI thread before creating text formats.
+   *
+   * @param size the default font size in logical drawing units
+   */
+  public static synchronized void setDefaultSize(float size) {
+    FontInsta current = font;
+    if (current != null) {
+      font = current.resized(size);
+    }
+    Font.DEFAULT_SIZE[0] = size;
+  }
+
+  static FontInsta acquire() {
+    FontInsta current = font;
+    if (current == null) {
       throw new GraphicsException("Font not initialized");
     }
-    return font;
+    return current;
   }
 }

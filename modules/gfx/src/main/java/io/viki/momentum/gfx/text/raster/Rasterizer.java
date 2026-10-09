@@ -34,6 +34,7 @@ import io.viki.momentum.math.shape.Rectangle;
 
 import java.util.*;
 import io.viki.momentum.util.Pool;
+import io.viki.momentum.gfx.text.FontInsta;
 
 /**
  * Rasterizes a list of text literals into a {@link Raster} for rendering.
@@ -60,6 +61,41 @@ public final class Rasterizer {
   /** Maximum number of visible lines; text beyond this is clipped. */
   public int maxLines = Integer.MAX_VALUE;
 
+  private static List<Literal> resolveFonts(List<Literal> literals) {
+    boolean combined = false;
+    for (Literal literal : literals) {
+      if (literal.format().font().isCombined()) {
+        combined = true;
+        break;
+      }
+    }
+    if (!combined) {
+      return literals;
+    }
+    List<Literal> result = new ArrayList<>();
+    for (Literal literal : literals) {
+      FontInsta font = literal.format().font();
+      if (!font.isCombined() || literal.text().isEmpty()) {
+        result.add(literal);
+        continue;
+      }
+      int start = 0;
+      FontInsta selected = font.resolve(literal.text().codePointAt(0));
+      for (int offset = 0; offset < literal.text().length();) {
+        int codepoint = literal.text().codePointAt(offset);
+        FontInsta next = font.resolve(codepoint);
+        if (selected != next) {
+          result.add(literal.cut(start, offset - start).font(selected));
+          start = offset;
+          selected = next;
+        }
+        offset += Character.charCount(codepoint);
+      }
+      result.add(literal.cut(start, literal.text().length() - start).font(selected));
+    }
+    return result;
+  }
+
   private static void computeEnds(ShapeGlyph[] glyphs, int litEnd) {
     for (int i = glyphs.length - 1; i >= 1; i--) {
       ShapeGlyph cur = glyphs[i];
@@ -73,7 +109,7 @@ public final class Rasterizer {
   private static float[] buildCharAdvances(int textLen, ShapeGlyph[] glyphs, List<Literal> literals) {
     float[] ca = new float[textLen];
     for (ShapeGlyph sg : glyphs) {
-      float fs = literals.get(sg.ownerIndex()).format().fontSize();
+      float fs = literals.get(sg.ownerIndex()).format().font().size();
       float pixAdv = sg.xAdvance() * fs;
       int start = sg.start();
       int end = Math.min(sg.end(), textLen);
@@ -216,8 +252,8 @@ public final class Rasterizer {
 
         float baseline = lg.y();
         Gradient gradient = lit.format().tint();
-        float fs = lit.format().fontSize();
-        FontMetrics m = lit.format().font().metrics();
+        float fs = lit.format().font().size();
+        FontMetrics m = lit.format().font().font().metrics();
         float thicknessU = Math.abs(m.underlineThickness()) * fs;
         float offsetU = m.underlinePos() * fs;
         @SuppressWarnings("UnnecessaryLocalVariable")
@@ -275,6 +311,7 @@ public final class Rasterizer {
    * @return the rasterized output
    */
   public Raster render(List<Literal> literals) {
+    literals = resolveFonts(literals);
     if (literals.isEmpty()) {
       return empty();
     }
@@ -293,9 +330,9 @@ public final class Rasterizer {
       }
       int offset = litCharOffset[si];
       int litLen = lit.text().length();
-      float fs = lit.format().fontSize();
+      float fs = lit.format().font().size();
 
-      ShapeResult sr = shaper.shape(lit.format().font(), lit.text(), fs, flipY, lit.format().fontStyle());
+      ShapeResult sr = shaper.shape(lit.format().font(), lit.text(), flipY, lit.format().fontStyle());
       int gc = sr.glyphs().length;
       if (gc == 0) {
         continue;
@@ -353,7 +390,7 @@ public final class Rasterizer {
       for (LayoutGlyph lg : run.glyphs()) {
         Literal lit = literals.get(lg.ownerIndex());
         float scale = lg.scale();
-        Glyph g = lit.format().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
+        Glyph g = lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
         float penX = lg.x() + lg.xOffset();
         float penY = lg.y() + lg.yOffset();
         float gx;
@@ -410,7 +447,7 @@ public final class Rasterizer {
     for (LayoutRun run : layoutRuns) {
       for (LayoutGlyph lg : run.glyphs()) {
         Literal lit = literals.get(lg.ownerIndex());
-        Glyph g = lit.format().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
+        Glyph g = lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
         GlyphBound gb = layoutBounds.get(gbIdx++);
         Rectangle vb = Rectangle.of(gb.gx, gb.gy, gb.gw, gb.gh);
         // charIndex: absolute index in mergedText
@@ -461,8 +498,8 @@ public final class Rasterizer {
       float maxAscender = 0;
       for (int g = lineGlyphStart; g < lineGlyphEnd; g++) {
         Literal lit = literals.get(glyphs[g].ownerIndex());
-        FontMetrics m = lit.format().font().metrics();
-        float fs = lit.format().fontSize();
+        FontMetrics m = lit.format().font().font().metrics();
+        float fs = lit.format().font().size();
         float lh = m.lineHeight() * fs * lineSpacing;
         float asc = m.ascender() * fs;
         if (lh > lineHeight) {
@@ -474,8 +511,8 @@ public final class Rasterizer {
       }
       if (lineHeight <= 0 && lineGlyphEnd > lineGlyphStart) {
         Literal lit = literals.get(glyphs[lineGlyphStart].ownerIndex());
-        lineHeight = lit.format().fontSize() * lineSpacing;
-        maxAscender = lit.format().font().metrics().ascender() * lit.format().fontSize();
+        lineHeight = lit.format().font().size() * lineSpacing;
+        maxAscender = lit.format().font().font().metrics().ascender() * lit.format().font().size();
       }
       if (lineHeight <= 0) {
         lineHeight = 16 * lineSpacing;
@@ -496,7 +533,7 @@ public final class Rasterizer {
         float lineWidthSum = 0;
         for (int g = lineGlyphStart; g < lineGlyphEnd; g++) {
           ShapeGlyph sg = glyphs[g];
-          lineWidthSum += sg.xAdvance() * literals.get(sg.ownerIndex()).format().fontSize();
+          lineWidthSum += sg.xAdvance() * literals.get(sg.ownerIndex()).format().font().size();
           if (sg.start() < textLen && mergedText.charAt(sg.start()) == ' ') {
             spaces++;
           }
@@ -524,8 +561,8 @@ public final class Rasterizer {
         }
 
         Literal lit = literals.get(sg.ownerIndex());
-        float fs = lit.format().fontSize();
-        float scale = fs / lit.format().font().resolution();
+        float fs = lit.format().font().size();
+        float scale = fs / lit.format().font().font().resolution();
         float adv = sg.xAdvance() * fs;
         if (sg.start() < textLen && mergedText.charAt(sg.start()) == ' ') {
           adv += extra;
