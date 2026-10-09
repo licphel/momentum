@@ -24,21 +24,17 @@
 
 package io.viki.momentum.sfx.openal;
 
-import io.viki.momentum.sfx.AudioException;
+import io.viki.momentum.sfx.AudioBuffer;
 import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.sfx.Clip;
 import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
-import java.nio.ByteBuffer;
-
 import static org.lwjgl.openal.AL11.*;
-import static org.lwjgl.system.MemoryUtil.memAlloc;
-import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * Implements an in-memory audio clip using one OpenAL source and buffer.
+ * Borrows shared samples and acquires a pooled source only while playing or paused.
  *
  * <p>Playback commands are submitted to the owning mixer's audio thread, while the controller
  * values exposed to callers remain observable across that thread boundary. Finite looping is
@@ -54,7 +50,8 @@ public final class OpenALClip implements Clip {
   volatile boolean shouldClose = false;
   volatile int remainingLoops;
   volatile boolean autoClosure;
-  private int buffer = 0;
+  private @Nullable OpenALAudioBuffer buffer;
+  private boolean ownsBuffer;
   private @Nullable AudioFormat format;
   private boolean open = false;
   private boolean closed;
@@ -65,47 +62,36 @@ public final class OpenALClip implements Clip {
 
   OpenALClip(OpenALMixer mixer) {
     this.mixer = mixer;
-
-    mixer.submit(() -> {
-      source = alGenSources();
-
-      if (source == 0) {
-        throw new AudioException("Failed to generate OpenAL source");
-      }
-    });
   }
 
   @Override
   public void open(AudioFormat format, byte[] data) {
-    if (closed) throw new IllegalStateException("Clip is closed");
-    if (open) {
-      throw new IllegalStateException("Clip already open");
+    checkUnopened();
+    AudioBuffer uploaded = mixer.createBuffer(format, data);
+    open(uploaded);
+    ownsBuffer = true;
+  }
+
+  @Override
+  public void open(AudioBuffer samples) {
+    checkUnopened();
+    if (!(samples instanceof OpenALAudioBuffer uploaded) || uploaded.mixer != mixer) {
+      throw new IllegalArgumentException("Audio buffer belongs to a different mixer");
     }
+    uploaded.borrow();
+    buffer = uploaded;
+    format = uploaded.format();
     open = true;
+  }
 
-    this.format = format;
-
-    mixer.submit(() -> {
-      buffer = alGenBuffers();
-      if (buffer == 0) {
-        throw new AudioException("Failed to generate OpenAL buffer");
-      }
-
-      int alFormat = OpenALUtils.convertFormat(format);
-      ByteBuffer buffer = memAlloc(data.length);
-      try {
-        buffer.put(data).flip();
-        alBufferData(this.buffer, alFormat, buffer, format.sampleRate());
-      } finally {
-        memFree(buffer);
-      }
-
-      alSourcei(source, AL_BUFFER, this.buffer);
-    });
+  private void checkUnopened() {
+    if (closed) throw new IllegalStateException("Clip is closed");
+    if (open) throw new IllegalStateException("Clip already open");
   }
 
   @Override
   public void poll() {
+    if (source == 0) return;
     applyVolume();
     state = alGetSourcei(source, AL_SOURCE_STATE);
     offset = alGetSourcef(source, AL_SEC_OFFSET);
@@ -113,8 +99,12 @@ public final class OpenALClip implements Clip {
     if (state == AL_STOPPED) {
       if (remainingLoops <= 0) {
         shouldClose = true;
+        releaseSource();
       } else {
-        loop(remainingLoops);
+        if (remainingLoops != LOOP_CONTINUOUSLY) {
+          remainingLoops--;
+        }
+        alSourcePlay(source);
       }
     }
   }
@@ -127,7 +117,10 @@ public final class OpenALClip implements Clip {
   @Override
   public void pause() {
     mixer.submit(() -> {
-      alSourcePause(source);
+      if (source != 0) {
+        alSourcePause(source);
+        state = AL_PAUSED;
+      }
     });
   }
 
@@ -135,8 +128,10 @@ public final class OpenALClip implements Clip {
   public void resume() {
     if (!open || shouldClose) throw new IllegalStateException("Clip is not available for resumed playback");
     mixer.submit(() -> {
+      if (source == 0) return;
       applyVolume();
       alSourcePlay(source);
+      state = AL_PLAYING;
       mixer.track(this);
     });
   }
@@ -144,7 +139,11 @@ public final class OpenALClip implements Clip {
   @Override
   public void stop() {
     mixer.submit(() -> {
-      alSourceStop(source);
+      remainingLoops = 0;
+      releaseSource();
+      offset = 0;
+      state = AL_STOPPED;
+      shouldClose = true;
     });
   }
 
@@ -160,12 +159,41 @@ public final class OpenALClip implements Clip {
      * For loops, we tend to handle manually.
      * OpenAL only supports infinite looping natively.
      */
-    remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
     shouldClose = false;
 
     mixer.submit(() -> {
+      if (buffer == null) {
+        throw new IllegalStateException("Audio buffer is null");
+      }
+      remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
+      if (count == 0) {
+        releaseSource();
+        state = AL_STOPPED;
+        shouldClose = true;
+        mixer.track(this);
+        return;
+      }
+      if (source == 0) source = mixer.acquireSource();
+      if (source == 0) {
+        state = AL_STOPPED;
+        shouldClose = true;
+        mixer.track(this);
+        return;
+      }
+      alSourceStop(source);
+      alSourcei(source, AL_BUFFER, buffer.id);
+      alSourcei(source, AL_LOOPING, count == LOOP_CONTINUOUSLY ? AL_TRUE : AL_FALSE);
+      alSourcei(source, AL_SOURCE_RELATIVE, AL_TRUE);
+      alSourcef(source, AL_ROLLOFF_FACTOR, 0);
+      alSource3f(source, AL_POSITION, 0, 0, 0);
+      alSource3f(source, AL_VELOCITY, 0, 0, 0);
+      alSourcef(source, AL_PITCH, Math.max(pitch, 1E-5F));
+      alSourcef(source, AL_SEC_OFFSET, 0);
+      offset = 0;
+      appliedVolume = -1;
       applyVolume();
       alSourcePlay(source);
+      state = AL_PLAYING;
       mixer.track(this); // track at last. This prevents the clip from being removed instantly.
     });
   }
@@ -200,6 +228,7 @@ public final class OpenALClip implements Clip {
   }
 
   void applyVolume() {
+    if (source == 0) return;
     float effective = Math.max(0, getVolume());
     if (appliedVolume != effective) {
       alSourcef(source, AL_GAIN, effective);
@@ -214,7 +243,10 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void setPitch(float value) {
-    mixer.submit(() -> alSourcef(source, AL_PITCH, pitch = Math.max(value, 1E-5F)));
+    pitch = Math.max(value, 1E-5F);
+    mixer.submit(() -> {
+      if (source != 0) alSourcef(source, AL_PITCH, Math.max(pitch, 1E-5F));
+    });
   }
 
   @Override
@@ -224,7 +256,10 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void setPosition(float value) {
-    mixer.submit(() -> alSourcef(source, AL_SEC_OFFSET, offset = Math.max(value, 0.0F)));
+    offset = Math.max(value, 0.0F);
+    mixer.submit(() -> {
+      if (source != 0) alSourcef(source, AL_SEC_OFFSET, offset);
+    });
   }
 
   @Override
@@ -241,16 +276,23 @@ public final class OpenALClip implements Clip {
     open = false;
 
     mixer.submit(() -> {
-      alSourceStop(source);
-      alDeleteSources(source);
-
-      if (buffer != 0) {
-        alDeleteBuffers(buffer);
-        buffer = 0;
+      releaseSource();
+      state = AL_STOPPED;
+      shouldClose = true;
+      if (buffer != null) {
+        buffer.release();
+        if (ownsBuffer) buffer.close();
+        buffer = null;
       }
 
       mixer.untrack(this);
     });
+  }
+
+  private void releaseSource() {
+    if (source == 0) return;
+    mixer.releaseSource(source);
+    source = 0;
   }
 
   @Override

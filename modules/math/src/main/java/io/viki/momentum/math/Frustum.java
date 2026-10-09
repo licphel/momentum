@@ -306,7 +306,7 @@ public final class Frustum {
    * @param ray the ray to test
    * @return ray parameter {@code t} at the entry, or {@link Float#NaN} if no intersection
    */
-  public float testRay(Ray ray) {
+  public float testRay(Ray3D ray) {
     float tMin = 0.0F;
     float tMax = Float.MAX_VALUE;
     for (int i = 0; i < 6; i++) {

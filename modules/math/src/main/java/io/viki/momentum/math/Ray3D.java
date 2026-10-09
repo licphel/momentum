@@ -35,8 +35,9 @@ import org.jspecify.annotations.Nullable;
  * @param origin    the starting point of the ray
  * @param direction the direction vector (automatically normalized)
  */
-public record Ray(Vector3 origin, Vector3 direction) {
-  public static final Ray ZERO = new Ray(Vector3.ZERO, Vector3.UNIT_X);
+public record Ray3D(Vector3 origin, Vector3 direction) {
+  /** A ray at the origin pointing along the positive X axis. */
+  public static final Ray3D ZERO = new Ray3D(Vector3.ZERO, Vector3.UNIT_X);
 
   /**
    * Auto-normalizes the direction on construction.
@@ -44,7 +45,7 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param origin    ray origin point
    * @param direction ray direction
    */
-  public Ray {
+  public Ray3D {
     direction = direction.normalize();
   }
 
@@ -55,8 +56,8 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param to   end point
    * @return ray from {@code from} toward {@code to}
    */
-  public static Ray createFromPoints(Vector3 from, Vector3 to) {
-    return new Ray(from, to.subtract(from));
+  public static Ray3D createFromPoints(Vector3 from, Vector3 to) {
+    return new Ray3D(from, to.subtract(from));
   }
 
   /**
@@ -67,8 +68,8 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param t interpolation factor
    * @return interpolated ray
    */
-  public static Ray lerp(Ray a, Ray b, float t) {
-    return new Ray(Vector3.lerp(a.origin, b.origin, t), Vector3.lerp(a.direction, b.direction, t));
+  public static Ray3D lerp(Ray3D a, Ray3D b, float t) {
+    return new Ray3D(Vector3.lerp(a.origin, b.origin, t), Vector3.lerp(a.direction, b.direction, t));
   }
 
   /**
@@ -82,8 +83,8 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param viewMatrix       view matrix
    * @return world-space ray
    */
-  public static Ray createFromScreen(float screenX, float screenY, float screenWidth, float screenHeight,
-                                     Matrix4x4 projectionMatrix, Matrix4x4 viewMatrix) {
+  public static Ray3D createFromScreen(float screenX, float screenY, float screenWidth, float screenHeight,
+                                       Matrix4x4 projectionMatrix, Matrix4x4 viewMatrix) {
     float ndcX = 2.0F * screenX / screenWidth - 1.0F;
     float ndcY = 1.0F - 2.0F * screenY / screenHeight;
     Matrix4x4 invVP = projectionMatrix.multiply(viewMatrix).invert();
@@ -256,8 +257,8 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param point  reflection point on the surface
    * @return reflected ray
    */
-  public Ray reflect(Vector3 normal, Vector3 point) {
-    return new Ray(point, direction.reflect(normal));
+  public Ray3D reflect(Vector3 normal, Vector3 point) {
+    return new Ray3D(point, direction.reflect(normal));
   }
 
   /**
@@ -266,8 +267,8 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param normal surface normal (must be normalized)
    * @return reflected ray
    */
-  public Ray reflect(Vector3 normal) {
-    return new Ray(origin, direction.reflect(normal));
+  public Ray3D reflect(Vector3 normal) {
+    return new Ray3D(origin, direction.reflect(normal));
   }
 
   /**
@@ -278,7 +279,7 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param ior    index of refraction (n2 / n1)
    * @return refracted ray, or {@code null} if total internal reflection
    */
-  public @Nullable Ray refract(Vector3 normal, Vector3 point, float ior) {
+  public @Nullable Ray3D refract(Vector3 normal, Vector3 point, float ior) {
     float cosI = -normal.dot(direction);
     float sinT2 = ior * ior * (1.0F - cosI * cosI);
     if (sinT2 > 1.0F) {
@@ -286,7 +287,7 @@ public record Ray(Vector3 origin, Vector3 direction) {
     }
     float cosT = (float) Math.sqrt(1.0F - sinT2);
     Vector3 refDir = direction.multiply(ior).add(normal.multiply(ior * cosI - cosT));
-    return new Ray(point, refDir);
+    return new Ray3D(point, refDir);
   }
 
   /**
@@ -295,9 +296,92 @@ public record Ray(Vector3 origin, Vector3 direction) {
    * @param m transformation matrix
    * @return transformed ray
    */
-  public Ray transform(Matrix4x4 m) {
+  public Ray3D transform(Matrix4x4 m) {
     Vector3 newOrigin = m.transform(origin);
     Vector3 newDir = m.transform(origin.add(direction)).subtract(newOrigin);
-    return new Ray(newOrigin, newDir);
+    return new Ray3D(newOrigin, newDir);
+  }
+
+  /**
+   * Visits each grid cell traversed by this ray up to a maximum distance.
+   *
+   * <p>The origin cell is visited first, including when the maximum distance is zero. Returning
+   * {@code false} from the visitor stops traversal immediately, including from the origin.
+   *
+   * @param maximumDistance the largest distance to traverse, which must be non-negative
+   * @param visitor callback receiving cell coordinates and entry and exit distances
+   * @return {@code true} if traversal reaches the maximum distance, or {@code false} if the
+   *         visitor stops it or a cell coordinate exceeds the integer range
+   * @throws IllegalArgumentException if {@code maximumDistance} is negative
+   */
+  public boolean visitTiles(double maximumDistance, TileVisitor visitor) {
+    if (maximumDistance < 0) {
+      throw new IllegalArgumentException("Ray distance cannot be negative");
+    }
+    long x = (long) Math.floor(origin.x());
+    long y = (long) Math.floor(origin.y());
+    long z = (long) Math.floor(origin.z());
+    int sx = direction.x() > 0 ? 1 : direction.x() < 0 ? -1 : 0;
+    int sy = direction.y() > 0 ? 1 : direction.y() < 0 ? -1 : 0;
+    int sz = direction.z() > 0 ? 1 : direction.z() < 0 ? -1 : 0;
+    double stepX = sx == 0 ? Double.POSITIVE_INFINITY : Math.abs(1D / direction.x());
+    double stepY = sy == 0 ? Double.POSITIVE_INFINITY : Math.abs(1D / direction.y());
+    double stepZ = sz == 0 ? Double.POSITIVE_INFINITY : Math.abs(1D / direction.z());
+    double nextX = sx == 0 ? Double.POSITIVE_INFINITY
+        : ((sx > 0 ? x + 1 : x) - origin.x()) / direction.x();
+    double nextY = sy == 0 ? Double.POSITIVE_INFINITY
+        : ((sy > 0 ? y + 1 : y) - origin.y()) / direction.y();
+    double nextZ = sz == 0 ? Double.POSITIVE_INFINITY
+        : ((sz > 0 ? z + 1 : z) - origin.z()) / direction.z();
+    double entry = 0;
+    while (entry <= maximumDistance) {
+      if (x < Integer.MIN_VALUE || x > Integer.MAX_VALUE
+          || y < Integer.MIN_VALUE || y > Integer.MAX_VALUE
+          || z < Integer.MIN_VALUE || z > Integer.MAX_VALUE) {
+        return false;
+      }
+      double exit = Math.min(nextX, Math.min(nextY, nextZ));
+      if (!visitor.visit((int) x, (int) y, (int) z, entry, Math.min(exit, maximumDistance))) {
+        return false;
+      }
+      if (exit >= maximumDistance) {
+        return true;
+      }
+      boolean crossX = nextX <= nextY && nextX <= nextZ;
+      boolean crossY = nextY <= nextX && nextY <= nextZ;
+      boolean crossZ = nextZ <= nextX && nextZ <= nextY;
+      if (crossX) {
+        x += sx;
+        nextX += stepX;
+      }
+      if (crossY) {
+        y += sy;
+        nextY += stepY;
+      }
+      if (crossZ) {
+        z += sz;
+        nextZ += stepZ;
+      }
+      entry = exit;
+    }
+    return true;
+  }
+
+  /**
+   * Receives the segment of a ray's path through one grid cell.
+   */
+  @FunctionalInterface
+  public interface TileVisitor {
+    /**
+     * Processes one traversed cell.
+     *
+     * @param x the cell's horizontal coordinate
+     * @param y the cell's vertical coordinate
+     * @param z the cell's depth coordinate
+     * @param entry the distance at which the ray enters the cell
+     * @param exit the distance at which the ray exits the cell
+     * @return {@code true} to continue traversal, or {@code false} to stop
+     */
+    boolean visit(int x, int y, int z, double entry, double exit);
   }
 }

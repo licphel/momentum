@@ -111,6 +111,15 @@ public final class JsRuntime implements AutoCloseable {
     return eval(path, resources.readString(path));
   }
 
+  /**
+   * Cancels and closes this runtime, including code currently executing on its owner thread.
+   * This method may be called by a watchdog thread; create, normal use, and ordinary close still
+   * belong to the owner thread.
+   */
+  public void cancel() {
+    context.close(true);
+  }
+
   @Override
   public void close() {
     context.close();

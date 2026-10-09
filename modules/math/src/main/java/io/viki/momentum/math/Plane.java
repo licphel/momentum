@@ -144,7 +144,7 @@ public record Plane(Vector3 normal, float distance) {
    * @param ray the ray to intersect
    * @return intersection point, or {@code null} if the ray is parallel or behind the origin
    */
-  public @Nullable Vector3 intersectRay(Ray ray) {
+  public @Nullable Vector3 intersectRay(Ray3D ray) {
     float d = normal.dot(ray.direction());
     if (Math.abs(d) < 1E-7F) {
       return null; // Parallel
@@ -162,7 +162,7 @@ public record Plane(Vector3 normal, float distance) {
    * @param other the other plane
    * @return the line of intersection as a ray, or {@code null} if planes are parallel
    */
-  public @Nullable Ray intersectPlane(Plane other) {
+  public @Nullable Ray3D intersectPlane(Plane other) {
     Vector3 dir = normal.cross(other.normal);
     float d = dir.lengthSquared();
     if (d < 1E-10F) {
@@ -177,7 +177,7 @@ public record Plane(Vector3 normal, float distance) {
     Vector3 point = n2.cross(n1).multiply(d2).add(n2.multiply(distance)).subtract(n1.multiply(d2));
     point = point.divide(d);
 
-    return new Ray(point, dir.normalize());
+    return new Ray3D(point, dir.normalize());
   }
 
   /**

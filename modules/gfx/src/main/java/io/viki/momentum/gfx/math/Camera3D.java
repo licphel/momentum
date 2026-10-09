@@ -314,8 +314,8 @@ public abstract class Camera3D {
    * @param viewport       viewport rectangle (Y-down)
    * @return unprojected world ray
    */
-  public Ray unproject(Vector2 screenPosition, Rectangle viewport) {
-    return Ray.createFromScreen(screenPosition.x(), screenPosition.y(), viewport.width(), viewport.height(),
+  public Ray3D unproject(Vector2 screenPosition, Rectangle viewport) {
+    return Ray3D.createFromScreen(screenPosition.x(), screenPosition.y(), viewport.width(), viewport.height(),
         getProjectionMatrix(), getViewMatrix());
   }
 

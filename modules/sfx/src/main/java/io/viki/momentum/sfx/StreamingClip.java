@@ -54,6 +54,17 @@ public interface StreamingClip extends Clip {
     open(() -> AudioInputStream.wrap(format, data));
   }
 
+  /**
+   * Uploaded buffers are in-memory effects, not reopenable streaming inputs.
+   *
+   * @param buffer in-memory samples
+   * @throws UnsupportedOperationException always; use a regular clip
+   */
+  @Override
+  default void open(AudioBuffer buffer) {
+    throw new UnsupportedOperationException("Use a non-streaming clip for an AudioBuffer");
+  }
+
   @Override
   default void setPosition(float position) {
     throw new UnsupportedOperationException("While streaming, reset capability is unknown");

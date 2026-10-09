@@ -50,6 +50,15 @@ public interface Mixer extends AutoCloseable {
   Clip getClip();
 
   /**
+   * Uploads reusable PCM samples once. The caller owns the returned buffer.
+   *
+   * @param format sample layout
+   * @param data   complete PCM frames; captured before this method returns
+   * @return shared storage belonging to this mixer
+   */
+  AudioBuffer createBuffer(AudioFormat format, byte[] data);
+
+  /**
    * Creates a new, unopened streaming clip backed by this mixer.
    *
    * @return a new streaming clip in unopened state

@@ -25,6 +25,8 @@
 package io.viki.momentum.sfx.openal;
 
 import io.viki.momentum.sfx.Clip;
+import io.viki.momentum.sfx.AudioBuffer;
+import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.sfx.Mixer;
 import io.viki.momentum.sfx.StreamingClip;
 import io.viki.momentum.util.InternalApi;
@@ -64,12 +66,18 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 public final class OpenALMixer implements Mixer {
   private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
+  /** Maximum concurrent in-memory effect sources; streaming music is independent. */
+  public static final int DEFAULT_SOURCE_CAPACITY = 32;
 
   private final List<OpenALClip> trackingList = new LinkedList<>();
   private final List<OpenALStreamingClip> streamingTrackingList = new LinkedList<>();
   private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
+  final List<OpenALAudioBuffer> buffers = new ArrayList<>();
+  private final int[] sources;
+  private final int[] availableSources;
+  private int availableCount;
   private long lastCheckErrorMs;
   private boolean debug = false;
 
@@ -81,6 +89,19 @@ public final class OpenALMixer implements Mixer {
    * {@link IllegalStateException}.
    */
   public OpenALMixer() {
+    this(DEFAULT_SOURCE_CAPACITY);
+  }
+
+  /**
+   * Creates a mixer with a fixed in-memory voice budget. Exhausted play requests
+   * are dropped rather than blocking or allocating additional native sources.
+   *
+   * @param sourceCapacity maximum simultaneous effect sources, greater than zero
+   */
+  public OpenALMixer(int sourceCapacity) {
+    if (sourceCapacity <= 0) throw new IllegalArgumentException("Source capacity must be positive: " + sourceCapacity);
+    sources = new int[sourceCapacity];
+    availableSources = new int[sourceCapacity];
     audioThread = new Thread(this::run, "OpenAL-Mixer");
     audioThread.setDaemon(true);
     audioThread.start();
@@ -153,6 +174,22 @@ public final class OpenALMixer implements Mixer {
   }
 
   @Override
+  public AudioBuffer createBuffer(AudioFormat format, byte[] data) {
+    return new OpenALAudioBuffer(this, format, data);
+  }
+
+  int acquireSource() {
+    return availableCount == 0 ? 0 : availableSources[--availableCount];
+  }
+
+  void releaseSource(int source) {
+    alSourceStop(source);
+    alSourcei(source, AL_BUFFER, 0);
+    alSourcei(source, AL_LOOPING, AL_FALSE);
+    availableSources[availableCount++] = source;
+  }
+
+  @Override
   public StreamingClip getStreamingClip() {
     return new OpenALStreamingClip(this);
   }
@@ -213,6 +250,11 @@ public final class OpenALMixer implements Mixer {
 
     alcMakeContextCurrent(context);
     AL.createCapabilities(ALC.createCapabilities(device));
+    for (int i = 0; i < sources.length; i++) {
+      sources[i] = alGenSources();
+      if (sources[i] == 0) throw new IllegalStateException("Failed to allocate OpenAL source pool at " + i);
+      availableSources[availableCount++] = sources[i];
+    }
 
     // Blocks and waits for consuming tasks.
     while (running.get()) {
@@ -236,6 +278,12 @@ public final class OpenALMixer implements Mixer {
     while ((pending = queue.poll()) != null) {
       consume(pending);
     }
+    for (int source : sources) {
+      alSourceStop(source);
+      alSourcei(source, AL_BUFFER, 0);
+      alDeleteSources(source);
+    }
+    while (!buffers.isEmpty()) buffers.getLast().delete();
     alcDestroyContext(context);
     alcCloseDevice(device);
   }

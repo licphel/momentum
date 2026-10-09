@@ -92,6 +92,15 @@ public class Camera2D {
   }
 
   /**
+   * Returns the visible world-space rectangle, including the current zoom.
+   *
+   * @return the currently visible area
+   */
+  public Rectangle view() {
+    return Rectangle.ofCentral(center.x(), center.y(), width / zoom, height / zoom);
+  }
+
+  /**
    * Sets the center of the visible area.
    *
    * @param center the new center in world coordinates
@@ -223,14 +232,11 @@ public class Camera2D {
    * Rebuilds the projection matrix from current camera parameters.
    */
   private void rebuild() {
-    float effectiveW = width / zoom;
-    float effectiveH = height / zoom;
-    float halfW = effectiveW * 0.5F;
-    float halfH = effectiveH * 0.5F;
-    float left = center.x() - halfW;
-    float right = center.x() + halfW;
-    float top = center.y() + halfH;
-    float bottom = center.y() - halfH;
+    Rectangle view = view();
+    float left = view.minX();
+    float right = view.maxX();
+    float top = view.maxY();
+    float bottom = view.minY();
     float projectionBottom = flipY ? top : bottom;
     float projectionTop = flipY ? bottom : top;
     vpMatrix = handler.createOrthographic(left, right, projectionBottom, projectionTop, 0.0F, -1.0F);

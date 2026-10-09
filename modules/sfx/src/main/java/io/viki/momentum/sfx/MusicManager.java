@@ -38,7 +38,11 @@ public final class MusicManager implements AutoCloseable {
     track.fadeElapsed = 0;
     track.envelope = track.fade.inSeconds() > 0 ? 0 : 1;
     track.applyVolume();
-    track.clip.resume();
+    if (track.delay > 0) {
+      track.clip.pause();
+    } else {
+      track.clip.resume();
+    }
   }
 
   /**
@@ -46,7 +50,7 @@ public final class MusicManager implements AutoCloseable {
    *
    * <p>The previous clip's configured fade-out still applies.
    *
-   * @param clip an open, unfinished clip whose ownership is transferred
+   * @param clip    an open, unfinished clip whose ownership is transferred
    * @param baseVol supplies the current nonnegative local gain on this control thread
    * @throws IllegalStateException    if this manager or the clip is unavailable
    * @throws IllegalArgumentException if the clip is already retained
@@ -61,9 +65,9 @@ public final class MusicManager implements AutoCloseable {
    * <p>Ownership transfers immediately. The incoming clip is paused until the outgoing fade
    * completes. The supplied gain is read at every update, including during either fade.
    *
-   * @param clip an open, unfinished clip to own
+   * @param clip    an open, unfinished clip to own
    * @param baseVol supplies the current nonnegative local gain on this control thread
-   * @param fade independent fade settings retained with the clip
+   * @param fade    independent fade settings retained with the clip
    * @throws IllegalStateException    if this manager or the clip is unavailable
    * @throws IllegalArgumentException if the clip is already retained
    */
@@ -77,7 +81,7 @@ public final class MusicManager implements AutoCloseable {
    *
    * <p>The interrupted clip's configured fade-out still applies.
    *
-   * @param clip an open, unfinished clip whose ownership is transferred
+   * @param clip    an open, unfinished clip whose ownership is transferred
    * @param baseVol supplies the current nonnegative local gain on this control thread
    * @throws IllegalStateException    if this manager or the clip is unavailable
    * @throws IllegalArgumentException if the clip is already retained
@@ -92,15 +96,54 @@ public final class MusicManager implements AutoCloseable {
    * <p>The previous clip fades out before being paused. Its fade-in applies again on resumption.
    * Insertions may be nested; repetition counts and categories remain unchanged.
    *
-   * @param clip an open, unfinished clip to own
+   * @param clip    an open, unfinished clip to own
    * @param baseVol supplies the current nonnegative local gain on this control thread
-   * @param fade independent fade settings retained with the clip
+   * @param fade    independent fade settings retained with the clip
    * @throws IllegalStateException    if this manager or the clip is unavailable
    * @throws IllegalArgumentException if the clip is already retained
    */
   public void insert(Clip clip, FloatSupplier baseVol, Fade fade) {
     checkTransfer(clip);
     begin(Transition.INSERT, new Track(clip, baseVol, fade));
+  }
+
+  /**
+   * Pauses the previous track immediately and inserts a potentially delayed track.
+   * Unlike {@link #insert(Clip, FloatSupplier, Fade)}, interruption bypasses the outgoing fade.
+   * The delay advances only while this track is on top; insertions preserve previous progress.
+   *
+   * @param clip         open clip whose ownership is transferred
+   * @param baseVol      dynamically sampled local gain
+   * @param fade         fades used when playback starts and for subsequent normal transitions
+   * @param delaySeconds nonnegative delay before playback
+   */
+  public void insertImmediately(Clip clip, FloatSupplier baseVol, Fade fade, float delaySeconds) {
+    if (delaySeconds < 0) {
+      throw new IllegalArgumentException("Music delay must be nonnegative");
+    }
+    checkTransfer(clip);
+    if (transition != Transition.NONE) {
+      finishTransition();
+    }
+    if (!tracks.isEmpty()) {
+      tracks.peek().clip.pause();
+    }
+    clip.pause();
+    Track next = new Track(clip, baseVol, fade);
+    next.delay = delaySeconds;
+    tracks.push(next);
+    activate(next);
+  }
+
+  /** Removes the top clip immediately and resumes its predecessor, without fades. */
+  public void popImmediately() {
+    if (transition != Transition.NONE) {
+      finishTransition();
+    }
+    if (!tracks.isEmpty()) {
+      tracks.pop().clip.close();
+    }
+    resumePrevious();
   }
 
   /**
@@ -159,6 +202,15 @@ public final class MusicManager implements AutoCloseable {
       return;
     }
     current = tracks.peek();
+    if (current.delay > 0) {
+      float consumed = Math.min(elapsedSeconds, current.delay);
+      current.delay -= consumed;
+      elapsedSeconds -= consumed;
+      if (current.delay > 0) {
+        return;
+      }
+      activate(current);
+    }
     if (current.fade.inSeconds() > 0 && current.fadeElapsed < current.fade.inSeconds()) {
       current.fadeElapsed = Math.min(current.fade.inSeconds(), current.fadeElapsed + elapsedSeconds);
       current.envelope = current.fadeElapsed / current.fade.inSeconds();
@@ -342,6 +394,7 @@ public final class MusicManager implements AutoCloseable {
     final FloatSupplier baseVol;
     float envelope = 1;
     float fadeElapsed;
+    float delay;
 
     Track(Clip clip, FloatSupplier baseVol, Fade fade) {
       this.clip = clip;

@@ -1,28 +1,107 @@
 package io.viki.momentum.sfx;
 
+import io.viki.momentum.util.FloatSupplier;
+
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.random.RandomGenerator;
+
 /**
- * Decoded PCM samples without any playback or resource ownership.
+ * Shared samples and independently sampled pitch/gain multipliers for each play request.
  *
- * <p>Sample storage is copied on construction. The record exposes its sample array;
- * callers must not modify it during playback or concurrent access. Sharing is safe
- * when callers treat those samples as read-only. Opening a sound never transfers
- * a clip's ownership.
+ * <p>This immutable descriptor does not own or close its buffer. It is safe to share
+ * across threads while its owning mixer remains alive. Equal range endpoints disable
+ * randomization. Playback volume controls multiply the sampled gain.
  *
- * @param format the PCM sample layout
- * @param data   complete PCM frames matching the format
+ * @param buffer reusable uploaded samples
+ * @param pitch  playback-speed range, relative to the clip's configured pitch
+ * @param volume gain range, relative to the clip's configured volume
  */
-public record Sound(AudioFormat format, byte[] data) {
+public record Sound(AudioBuffer buffer, Range pitch, Range volume) {
   /**
-   * Captures a reusable snapshot of decoded samples.
+   * Creates a sound without pitch or volume variation.
    *
-   * @param format the PCM sample layout
-   * @param data   complete PCM frames; an empty array represents silence
-   * @throws IllegalArgumentException if the data ends with an incomplete frame
+   * @param buffer reusable samples, owned by the caller
    */
-  public Sound {
-    if (data.length % format.frameSize() != 0) {
-      throw new IllegalArgumentException("Sound data must contain complete PCM frames: " + data.length);
+  public Sound(AudioBuffer buffer) {
+    this(buffer, Range.UNITY, Range.UNITY);
+  }
+
+  /**
+   * Creates and starts one clip with independently sampled playback parameters.
+   *
+   * <p>The caller owns the returned clip and may transfer it to a {@link ClipManager}.
+   * Closing it does not close this sound's buffer. A saturated voice pool skips
+   * playback and reports completion through {@link Clip#shouldClose()}.
+   *
+   * @param mixer mixer owning this sound's buffer
+   * @return caller-owned playback clip
+   */
+  public Clip play(Mixer mixer) {
+    return play(mixer, () -> 1F);
+  }
+
+  /**
+   * Starts one clip, multiplying its sampled gain by a dynamic volume control.
+   *
+   * @param mixer      mixer owning this sound's buffer
+   * @param baseVolume thread-safe dynamic volume source
+   * @return caller-owned playback clip
+   */
+  public Clip play(Mixer mixer, FloatSupplier baseVolume) {
+    Clip clip = mixer.getClip();
+    try {
+      clip.open(buffer);
+      clip.setPitch(pitch.sample());
+      float gain = volume.sample();
+      clip.setVolume(() -> gain * baseVolume.getAsFloat());
+      clip.play();
+      return clip;
+    } catch (RuntimeException exception) {
+      clip.close();
+      throw exception;
     }
-    data = data.clone();
+  }
+
+  /**
+   * Uniform multiplier range. Instances are immutable and thread-safe.
+   *
+   * @param min inclusive minimum multiplier
+   * @param max upper multiplier; equal endpoints produce a constant
+   */
+  public record Range(float min, float max) {
+    /** No variation or scaling. */
+    public static final Range UNITY = new Range(1, 1);
+
+    /**
+     * Validates the multiplier interval.
+     *
+     * @param min inclusive minimum multiplier
+     * @param max upper multiplier; equal endpoints produce a constant
+     * @throws IllegalArgumentException if the minimum is negative or exceeds the maximum
+     */
+    public Range {
+      if (min < 0 || max < min) {
+        throw new IllegalArgumentException("Invalid sound multiplier range: " + min + ".." + max);
+      }
+    }
+
+    /**
+     * Samples using the current thread's random generator.
+     *
+     * @return sampled multiplier
+     */
+    public float sample() {
+      return sample(ThreadLocalRandom.current());
+    }
+
+    /**
+     * Samples using the supplied random generator.
+     *
+     * @param random caller-owned random source
+     * @return sampled multiplier
+     */
+    public float sample(RandomGenerator random) {
+      return min == max ? min : min + random.nextFloat() * (max - min);
+    }
   }
 }

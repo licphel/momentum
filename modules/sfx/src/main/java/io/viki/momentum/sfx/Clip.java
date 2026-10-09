@@ -50,18 +50,12 @@ public interface Clip extends AutoCloseable {
   void open(AudioFormat format, byte[] data);
 
   /**
-   * Opens reusable decoded samples without taking responsibility for playback or release.
+   * Borrows uploaded samples without uploading them again or taking ownership.
    *
-   * <p>The caller owns this clip, directly or through {@link ClipManager}. This method
-   * neither starts playback nor registers the clip with a manager.
-   *
-   * @param sound the decoded samples to open
-   * @throws IllegalStateException    if this clip is already open
-   * @throws IllegalArgumentException if the sample format is unsupported
+   * @param buffer reusable samples belonging to this clip's mixer
+   * @throws IllegalArgumentException if the buffer belongs to another mixer
    */
-  default void open(Sound sound) {
-    open(sound.format(), sound.data());
-  }
+  void open(AudioBuffer buffer);
 
   /**
    * Polls events for this clip, such as streaming read, state/volume read, etc.
