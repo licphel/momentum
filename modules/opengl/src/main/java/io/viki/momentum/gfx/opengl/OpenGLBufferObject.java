@@ -113,13 +113,13 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
       OpenGLCache cache = ctx.cache;
       cache.bindBuffer(target, handle);
       if (data != null && data.length == cap) {
-        ByteBuffer bb = DirectBufferPool.acquire(cap);
+        ByteBuffer bb = DirectBufferPool.MEDIUM.acquire(cap);
         try {
           bb.put(data).flip();
           glBufferData(target, bb, hint);
           GraphicsMetrics.recordBufferUpload(cap);
         } finally {
-          DirectBufferPool.release(bb);
+          DirectBufferPool.MEDIUM.release(bb);
         }
       } else {
         glBufferData(target, cap, hint);
@@ -152,7 +152,7 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
       if (size == 0 && !replacement) {
         return;
       }
-      ByteBuffer bb = DirectBufferPool.acquire(Math.max(1, size));
+      ByteBuffer bb = DirectBufferPool.MEDIUM.acquire(Math.max(1, size));
       bb.put(memory).flip();
 
       UploadCommand command = uploads.poll();
@@ -233,7 +233,7 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
         }
         GraphicsMetrics.recordBufferUpload(uploadedBytes);
       } finally {
-        DirectBufferPool.release(bytes);
+        DirectBufferPool.MEDIUM.release(bytes);
         bytes = EMPTY_UPLOAD;
         offset = 0;
         replacement = false;

@@ -24,6 +24,7 @@
 
 package io.viki.momentum.sfx;
 
+import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.util.FloatSupplier;
 import org.jspecify.annotations.Nullable;
 
@@ -130,7 +131,9 @@ public interface Clip extends AutoCloseable {
    *
    * @param volume new gain multiplier; negative values are clamped to zero
    */
-  void setVolume(float volume);
+  default void setVolume(float volume) {
+    setVolume(FloatSupplier.constant(volume));
+  }
 
   /**
    * Obtains gain dynamically during playback rather than capturing its initial value.
@@ -155,7 +158,75 @@ public interface Clip extends AutoCloseable {
    *
    * @param pitch new playback speed multiplier; negative values are clamped to zero
    */
-  void setPitch(float pitch);
+  default void setPitch(float pitch) {
+    setPitch(FloatSupplier.constant(pitch));
+  }
+
+  /**
+   * Obtains playback speed dynamically from the supplied source.
+   *
+   * @param pitch supplies the playback speed multiplier
+   */
+  void setPitch(FloatSupplier pitch);
+
+  /**
+   * Sets this voice's world-space position for spatial playback.
+   *
+   * <p>Clips that do not support spatial playback may ignore this request.
+   * A position is applied before the next play request when the clip is not
+   * currently active.
+   *
+   * @param x spatial x
+   * @param y spatial y
+   * @param z spatial z
+   */
+  default void setSpatialPosition(float x, float y, float z) {
+    setSpatialPosition(FloatSupplier.constant(x), FloatSupplier.constant(y), FloatSupplier.constant(z));
+  }
+
+  /**
+   * Sets a dynamically evaluated world-space position.
+   *
+   * @param x supplies the source X coordinate
+   * @param y supplies the source Y coordinate
+   * @param z supplies the source Z coordinate
+   */
+  default void setSpatialPosition(FloatSupplier x, FloatSupplier y, FloatSupplier z) {
+  }
+
+  /**
+   * Enables or disables the mixer-owned distance law for this clip.
+   *
+   * <p>Local clips such as music leave this disabled. A positional sound
+   * created by {@link Sound#play(Mixer, FloatSupplier, FloatSupplier, FloatSupplier, FloatSupplier)}
+   * enables it automatically.
+   *
+   * @param enabled whether this clip should use the mixer's rolloff mode
+   */
+  default void setRolloffEnabled(boolean enabled) {
+  }
+
+  /**
+   * Returns whether this clip applies mixer-owned distance attenuation.
+   *
+   * @return whether rolloff is enabled
+   */
+  default boolean isRolloffEnabled() {
+    return false;
+  }
+
+  /**
+   * Replaces the optional effect applied to this clip.
+   *
+   * <p>Use {@link SfxEffect#get(String, Object...)} for optional backend extensions. An
+   * unavailable extension resolves to {@link SfxEffect#NONE}, which is safe to
+   * attach and has no audible effect. Backends without effect support may leave
+   * this operation as a no-op.
+   *
+   * @param effect effect to attach, normally {@link SfxEffect#NONE} to clear
+   */
+  default void setEffect(SfxEffect effect) {
+  }
 
   /**
    * Returns the current playback offset.

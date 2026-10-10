@@ -102,13 +102,7 @@ public final class Xoroshiro128Random implements RandomGenerator {
       throw new IllegalArgumentException("bound must be > 0");
     }
 
-    long mask = bound - 1L;
-    if ((bound & mask) == 0) {
-      return (int) (nextLong() >>> (64 - Long.numberOfTrailingZeros(bound)));
-    }
-
-    long r;
-    long threshold = Long.remainderUnsigned(-bound, bound);
+    long r, threshold = Long.remainderUnsigned(-(long) bound, bound);
     do {
       r = nextLong() >>> 1;
     } while (r < threshold);

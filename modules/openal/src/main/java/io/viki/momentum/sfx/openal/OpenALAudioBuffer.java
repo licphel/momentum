@@ -7,7 +7,8 @@ import io.viki.momentum.sfx.AudioFormat;
 import java.nio.ByteBuffer;
 
 import static org.lwjgl.openal.AL11.*;
-import static org.lwjgl.system.MemoryUtil.*;
+import static org.lwjgl.system.MemoryUtil.memAlloc;
+import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
  * Mixer-owned native samples. Borrow counts and native operations are audio-thread
@@ -15,8 +16,8 @@ import static org.lwjgl.system.MemoryUtil.*;
  */
 final class OpenALAudioBuffer implements AudioBuffer {
   final OpenALMixer mixer;
-  int id;
   private final AudioFormat format;
+  int id;
   private volatile boolean closed;
   private int borrowers;
 
@@ -49,6 +50,19 @@ final class OpenALAudioBuffer implements AudioBuffer {
     return format;
   }
 
+  @Override
+  public synchronized void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    mixer.submit(() -> {
+      if (borrowers == 0) {
+        delete();
+      }
+    });
+  }
+
   synchronized void borrow() {
     if (closed) {
       throw new IllegalStateException("Audio buffer is closed");
@@ -58,20 +72,15 @@ final class OpenALAudioBuffer implements AudioBuffer {
 
   void release() {
     borrowers--;
-    if (closed && borrowers == 0) delete();
-  }
-
-  @Override
-  public synchronized void close() {
-    if (closed) return;
-    closed = true;
-    mixer.submit(() -> {
-      if (borrowers == 0) delete();
-    });
+    if (closed && borrowers == 0) {
+      delete();
+    }
   }
 
   void delete() {
-    if (id == 0) return;
+    if (id == 0) {
+      return;
+    }
     alDeleteBuffers(id);
     id = 0;
     closed = true;

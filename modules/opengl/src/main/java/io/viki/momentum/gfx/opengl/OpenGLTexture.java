@@ -103,7 +103,8 @@ public final class OpenGLTexture implements Texture, Handle {
 
       ByteBuffer data = null;
       if (desc.initialBytes() != null) {
-        data = ImageUtil.pooledFlip(ByteBuffer.wrap(desc.initialBytes()), desc.width(), desc.height());
+        data = ImageUtil.pooledFlip(ByteBuffer.wrap(desc.initialBytes()), desc.width(), desc.height(),
+            DirectBufferPool.MEDIUM);
       }
 
       try {
@@ -116,7 +117,7 @@ public final class OpenGLTexture implements Texture, Handle {
         }
       } finally {
         if (data != null) {
-          DirectBufferPool.release(data);
+          DirectBufferPool.MEDIUM.release(data);
         }
       }
 
@@ -207,7 +208,7 @@ public final class OpenGLTexture implements Texture, Handle {
 
       // snapshot + flip on the calling thread: the caller may reuse or release its
       // buffer immediately; the GL work runs later on the render thread
-      ByteBuffer bb = ImageUtil.pooledFlip(bytes, w, h);
+      ByteBuffer bb = ImageUtil.pooledFlip(bytes, w, h, DirectBufferPool.MEDIUM);
       UploadCommand command = uploads.poll();
       if (command == null) {
         command = new UploadCommand(this);
@@ -368,7 +369,7 @@ public final class OpenGLTexture implements Texture, Handle {
         try {
           texture.ctx.cache.setTexture(0, texture.target, 0);
         } finally {
-          DirectBufferPool.release(bytes);
+          DirectBufferPool.MEDIUM.release(bytes);
           bytes = EMPTY_UPLOAD;
           x = y = z = width = height = depth = 0;
           replacement = false;

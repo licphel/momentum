@@ -50,10 +50,40 @@ public record Sound(AudioBuffer buffer, Range pitch, Range volume) {
   public Clip play(Mixer mixer, FloatSupplier baseVolume) {
     Clip clip = mixer.getClip();
     try {
-      clip.open(buffer);
-      clip.setPitch(pitch.sample());
       float gain = volume.sample();
+      clip.open(buffer);
+      clip.setPitch(FloatSupplier.constant(pitch.sample()));
       clip.setVolume(() -> gain * baseVolume.getAsFloat());
+      clip.play();
+      return clip;
+    } catch (RuntimeException exception) {
+      clip.close();
+      throw exception;
+    }
+  }
+
+  /**
+   * Starts one clip at a world-space position for spatial playback.
+   * Mono samples receive the mixer's equal-power spatial pre-gain; the value
+   * remains dynamic when the mixer spatialization switch is toggled. The clip
+   * also enables the mixer's shared distance rolloff law.
+   *
+   * @param mixer      mixer owning this sound's buffer
+   * @param baseVolume thread-safe dynamic volume source
+   * @param x          source position on the X axis
+   * @param y          source position on the Y axis
+   * @param z          source position on the Z axis
+   * @return caller-owned playback clip
+   */
+  public Clip play(Mixer mixer, FloatSupplier baseVolume, FloatSupplier x, FloatSupplier y, FloatSupplier z) {
+    Clip clip = mixer.getClip();
+    try {
+      float gain = volume.sample();
+      clip.open(buffer);
+      clip.setPitch(FloatSupplier.constant(pitch.sample()));
+      clip.setRolloffEnabled(true);
+      clip.setVolume(() -> gain * baseVolume.getAsFloat());
+      clip.setSpatialPosition(x, y, z);
       clip.play();
       return clip;
     } catch (RuntimeException exception) {

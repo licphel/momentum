@@ -26,9 +26,10 @@ package io.viki.momentum.sfx.openal;
 
 import io.viki.momentum.sfx.AudioException;
 import io.viki.momentum.sfx.AudioFormat;
+import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.sfx.StreamingClip;
-import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.sfx.io.AudioInputStream;
+import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
@@ -47,19 +48,14 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 public final class OpenALStreamingClip implements StreamingClip {
   private static final int BUFFER_COUNT = 4;
   private static final int BUFFER_BYTES = 64 * 1024;
-
-  volatile boolean autoClosure;
   private final OpenALMixer mixer;
+  private final OpenALClipState clipState;
   private final int[] buffers = new int[BUFFER_COUNT];
   private final int[] bufferSizes = new int[BUFFER_COUNT];
   private final byte[][] stagingBuffers = new byte[BUFFER_COUNT][];
-  private volatile int source;
+  public volatile boolean autoClosure;
   private volatile int state = AL_INITIAL;
   private volatile float position;
-  private volatile float pitch = 1.0F;
-  private volatile float volume = 1.0F;
-  private volatile @Nullable FloatSupplier volumeSource;
-  private float appliedVolume = -1;
   private volatile boolean open;
   private volatile boolean shouldClose;
   private @Nullable AudioFormat format;
@@ -74,17 +70,23 @@ public final class OpenALStreamingClip implements StreamingClip {
 
   OpenALStreamingClip(OpenALMixer mixer) {
     this.mixer = mixer;
+    clipState = new OpenALClipState(mixer, this);
     mixer.submit(() -> {
-      source = alGenSources();
+      int source = alGenSources();
+      clipState.source(source);
       if (source == 0) {
         throw new AudioException("Failed to generate OpenAL streaming source");
       }
+      clipState.applySpatialPosition();
+      clipState.attachEffect();
     });
   }
 
   @Override
   public void open(Supplier<? extends AudioInputStream> streamSupplier) {
-    if (closed) throw new IllegalStateException("Streaming clip is closed");
+    if (closed) {
+      throw new IllegalStateException("Streaming clip is closed");
+    }
     if (open) {
       throw new IllegalStateException("Streaming clip already open");
     }
@@ -114,156 +116,9 @@ public final class OpenALStreamingClip implements StreamingClip {
   }
 
   @Override
-  public boolean isOpen() {
-    return open;
-  }
-
-  @Override
-  public void play() {
-    if (started) {
-      if (terminal) {
-        throw new IllegalStateException("Streaming clip has already been consumed");
-      }
-      mixer.submit(() -> alSourcePlay(source));
-      return;
-    }
-    StreamingClip.super.play();
-  }
-
-  @Override
-  public void loop(int count) {
-    if (!open) {
-      throw new IllegalStateException("Streaming clip is not open");
-    }
-    if (count < 0) {
-      throw new IllegalArgumentException("Loop count must be >= 0");
-    }
-    if (terminal) {
-      throw new IllegalStateException("Streaming clip has already been consumed");
-    }
-    remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
-    mixer.submit(() -> {
-      started = true;
-      applyVolume();
-      alSourcePlay(source);
-      mixer.track(this);
-    });
-  }
-
-  @Override
-  public void pause() {
-    mixer.submit(() -> alSourcePause(source));
-  }
-
-  @Override
-  public void resume() {
-    if (!open || terminal) throw new IllegalStateException("Streaming clip cannot resume after completion");
-    mixer.submit(() -> {
-      started = true;
-      applyVolume();
-      alSourcePlay(source);
-      mixer.track(this);
-    });
-  }
-
-  @Override
-  public void stop() {
-    mixer.submit(() -> {
-      alSourceStop(source);
-      endOfStream = true;
-      terminal = true;
-      shouldClose = true;
-      closeStream();
-    });
-  }
-
-  @Override
-  public boolean isPlaying() {
-    return state == AL_PLAYING;
-  }
-
-  @Override
-  public boolean shouldClose() {
-    return shouldClose;
-  }
-
-  @Override
-  public float getVolume() {
-    FloatSupplier source = volumeSource;
-    return source == null ? volume : source.getAsFloat();
-  }
-
-  @Override
-  public void setVolume(float value) {
-    volumeSource = null;
-    volume = Math.max(value, 0.0F);
-    mixer.submit(this::applyVolume);
-  }
-
-  @Override
-  public void setVolume(FloatSupplier volume) {
-    volumeSource = volume;
-    mixer.submit(this::applyVolume);
-  }
-
-  private void applyVolume() {
-    float effective = Math.max(0, getVolume());
-    if (appliedVolume != effective) {
-      alSourcef(source, AL_GAIN, effective);
-      appliedVolume = effective;
-    }
-  }
-
-  @Override
-  public float getPitch() {
-    return pitch;
-  }
-
-  @Override
-  public void setPitch(float value) {
-    mixer.submit(() -> alSourcef(source, AL_PITCH, pitch = Math.max(value, 1E-5F)));
-  }
-
-  @Override
-  public float getPosition() {
-    return position;
-  }
-
-  @Override
-  public @Nullable AudioFormat format() {
-    return format;
-  }
-
-  @Override
-  public void close() {
-    if (closed) {
-      return;
-    }
-    closed = true;
-    open = false;
-
-    mixer.submit(() -> {
-      alSourceStop(source);
-      closeStream();
-      alDeleteSources(source);
-      for (int i = 0; i < BUFFER_COUNT; i++) {
-        if (buffers[i] != 0) {
-          alDeleteBuffers(buffers[i]);
-          buffers[i] = 0;
-        }
-      }
-      mixer.untrack(this);
-    });
-  }
-
-  @Override
-  public void __enableNativeAutoClosure() {
-    autoClosure = true;
-  }
-
-  @Override
   public void poll() {
-    applyVolume();
+    clipState.poll();
+    int source = clipState.source();
     int processed = alGetSourcei(source, AL_BUFFERS_PROCESSED);
     for (int i = 0; i < processed; i++) {
       int processedBuffer = alSourceUnqueueBuffers(source);
@@ -299,6 +154,203 @@ public final class OpenALStreamingClip implements StreamingClip {
       alSourcePlay(source);
       state = AL_PLAYING;
     }
+  }
+
+  @Override
+  public boolean isOpen() {
+    return open;
+  }
+
+  @Override
+  public void pause() {
+    mixer.submit(() -> alSourcePause(clipState.source()));
+  }
+
+  @Override
+  public void resume() {
+    if (!open || terminal) {
+      throw new IllegalStateException("Streaming clip cannot resume after completion");
+    }
+    mixer.submit(() -> {
+      started = true;
+      if (!clipState.shouldStart()) {
+        terminal = true;
+        shouldClose = true;
+        closeStream();
+        mixer.track(this);
+        return;
+      }
+      clipState.poll();
+      alSourcePlay(clipState.source());
+      mixer.track(this);
+    });
+  }
+
+  @Override
+  public void stop() {
+    mixer.submit(() -> {
+      alSourceStop(clipState.source());
+      clipState.detachEffect();
+      endOfStream = true;
+      terminal = true;
+      shouldClose = true;
+      closeStream();
+    });
+  }
+
+  @Override
+  public void loop(int count) {
+    if (!open) {
+      throw new IllegalStateException("Streaming clip is not open");
+    }
+    if (count < 0) {
+      throw new IllegalArgumentException("Loop count must be >= 0");
+    }
+    if (terminal) {
+      throw new IllegalStateException("Streaming clip has already been consumed");
+    }
+    remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
+    mixer.submit(() -> {
+      started = true;
+      if (!clipState.shouldStart()) {
+        terminal = true;
+        shouldClose = true;
+        closeStream();
+        mixer.track(this);
+        return;
+      }
+      clipState.poll();
+      alSourcePlay(clipState.source());
+      mixer.track(this);
+    });
+  }
+
+  @Override
+  public void play() {
+    if (started) {
+      if (terminal) {
+        throw new IllegalStateException("Streaming clip has already been consumed");
+      }
+      mixer.submit(() -> alSourcePlay(clipState.source()));
+      return;
+    }
+    StreamingClip.super.play();
+  }
+
+  @Override
+  public boolean isPlaying() {
+    return state == AL_PLAYING;
+  }
+
+  @Override
+  public boolean shouldClose() {
+    return shouldClose;
+  }
+
+  @Override
+  public float getVolume() {
+    return clipState.volume();
+  }
+
+  @Override
+  public void setVolume(FloatSupplier volume) {
+    clipState.setVolume(volume);
+  }
+
+  @Override
+  public float getPitch() {
+    return clipState.pitch();
+  }
+
+  @Override
+  public void setPitch(FloatSupplier value) {
+    clipState.setPitch(value);
+  }
+
+  @Override
+  public void setSpatialPosition(FloatSupplier x, FloatSupplier y, FloatSupplier z) {
+    clipState.setSpatialPosition(x, y, z);
+  }
+
+  @Override
+  public void setRolloffEnabled(boolean enabled) {
+    clipState.setRolloffEnabled(enabled);
+  }
+
+  @Override
+  public boolean isRolloffEnabled() {
+    return clipState.isRolloffEnabled();
+  }
+
+  @Override
+  public void setEffect(SfxEffect effect) {
+    clipState.setEffect(effect);
+  }
+
+  @Override
+  public float getPosition() {
+    return position;
+  }
+
+  @Override
+  public @Nullable AudioFormat format() {
+    return format;
+  }
+
+  @Override
+  public void close() {
+    if (closed) {
+      return;
+    }
+    closed = true;
+    open = false;
+
+    mixer.submit(() -> {
+      alSourceStop(clipState.source());
+      clipState.detachEffect();
+      closeStream();
+      alDeleteSources(clipState.source());
+      clipState.source(0);
+      for (int i = 0; i < BUFFER_COUNT; i++) {
+        if (buffers[i] != 0) {
+          alDeleteBuffers(buffers[i]);
+          buffers[i] = 0;
+        }
+      }
+      mixer.untrack(this);
+    });
+  }
+
+  @Override
+  public void __enableNativeAutoClosure() {
+    autoClosure = true;
+  }
+
+  /**
+   * Returns the current native source id for optional backend extensions.
+   *
+   * @return AL source id
+   */
+  public int source() {
+    return clipState.sourceId();
+  }
+
+  /**
+   * Returns the mixer that owns this clip.
+   *
+   * @return owning mixer
+   */
+  @InternalApi
+  public OpenALMixer mixer() {
+    return mixer;
+  }
+
+  void applySpatialPosition() {
+    clipState.applySpatialPosition();
+  }
+
+  void applyMixerEffects() {
+    clipState.applyMixerEffects();
   }
 
   private boolean fill(int index) {
@@ -340,7 +392,7 @@ public final class OpenALStreamingClip implements StreamingClip {
     try {
       nativeData.put(data, 0, length).flip();
       alBufferData(buffers[index], OpenALUtils.convertFormat(currentFormat), nativeData, currentFormat.sampleRate());
-      alSourceQueueBuffers(source, buffers[index]);
+      alSourceQueueBuffers(clipState.source(), buffers[index]);
       bufferSizes[index] = length;
       return true;
     } finally {
@@ -395,6 +447,7 @@ public final class OpenALStreamingClip implements StreamingClip {
         break;
       }
     }
+    int source = clipState.source();
     if (alGetSourcei(source, AL_BUFFERS_QUEUED) > 0) {
       alSourcePlay(source);
       state = AL_PLAYING;
@@ -421,4 +474,5 @@ public final class OpenALStreamingClip implements StreamingClip {
       // The playback resource is already terminal; no recovery is possible here.
     }
   }
+
 }

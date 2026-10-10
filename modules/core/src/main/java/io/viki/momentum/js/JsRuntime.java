@@ -25,11 +25,7 @@
 package io.viki.momentum.js;
 
 import io.viki.momentum.resource.Resource;
-import org.graalvm.polyglot.Context;
-import org.graalvm.polyglot.HostAccess;
-import org.graalvm.polyglot.PolyglotException;
-import org.graalvm.polyglot.Source;
-import org.graalvm.polyglot.Value;
+import org.graalvm.polyglot.*;
 import org.graalvm.polyglot.proxy.ProxyExecutable;
 
 import java.util.HashMap;
@@ -65,7 +61,7 @@ public final class JsRuntime implements AutoCloseable {
   /**
    * Exposes a host value to scripts under a name that can be resolved with {@code require}.
    *
-   * @param name the name scripts use to retrieve the value
+   * @param name  the name scripts use to retrieve the value
    * @param value the host value to expose
    * @return this runtime for chaining additional bindings
    */
@@ -89,7 +85,7 @@ public final class JsRuntime implements AutoCloseable {
   /**
    * Evaluates JavaScript source in this runtime.
    *
-   * @param name the source name used in diagnostics
+   * @param name   the source name used in diagnostics
    * @param source the JavaScript source to evaluate
    * @return the evaluated value, associated with this runtime
    * @throws PolyglotException if the source cannot be parsed or evaluation fails
@@ -102,9 +98,9 @@ public final class JsRuntime implements AutoCloseable {
    * Reads and evaluates JavaScript source from a resource.
    *
    * @param resources the provider that supplies the source
-   * @param path the provider-local path of the JavaScript source
+   * @param path      the provider-local path of the JavaScript source
    * @return the evaluated value, associated with this runtime
-   * @throws RuntimeException if the resource is missing or cannot be read
+   * @throws RuntimeException  if the resource is missing or cannot be read
    * @throws PolyglotException if the source cannot be parsed or evaluation fails
    */
   public Value eval(Resource resources, String path) {

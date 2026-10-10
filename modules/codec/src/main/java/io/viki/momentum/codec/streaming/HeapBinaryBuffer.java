@@ -25,21 +25,31 @@
 package io.viki.momentum.codec.streaming;
 
 import io.viki.momentum.util.InternalApi;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.ByteOrder;
 
 @InternalApi
 final class HeapBinaryBuffer extends BinaryBuffer {
+  private static final byte[] EMPTY = new byte[0];
   private byte[] data;
   private boolean bigEndian; // LE by default
+  private final @Nullable BinaryBufferPool owner;
+  private boolean released;
 
   public HeapBinaryBuffer(int capacity) {
+    this(capacity, null);
+  }
+
+  HeapBinaryBuffer(int capacity, @Nullable BinaryBufferPool owner) {
     data = new byte[capacity];
+    this.owner = owner;
   }
 
   public HeapBinaryBuffer(byte[] initial) {
     data = initial;
     writerIndex = data.length;
+    owner = null;
   }
 
   @Override
@@ -257,6 +267,35 @@ final class HeapBinaryBuffer extends BinaryBuffer {
 
   @Override
   public void close() {
-    data = new byte[0];
+    if (owner == null) {
+      data = EMPTY;
+      return;
+    }
+    recycle();
+  }
+
+  @Nullable BinaryBufferPool owner() {
+    return owner;
+  }
+
+  void reopen() {
+    readerIndex = 0;
+    writerIndex = 0;
+    bigEndian = false;
+    released = false;
+  }
+
+  void recycle() {
+    if (released) {
+      return;
+    }
+    released = true;
+    if (owner != null) {
+      owner.recycle(this);
+    }
+  }
+
+  void discard() {
+    data = EMPTY;
   }
 }

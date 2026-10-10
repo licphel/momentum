@@ -37,7 +37,6 @@ public final class MusicManager implements AutoCloseable {
   private static void activate(Track track) {
     track.fadeElapsed = 0;
     track.envelope = track.fade.inSeconds() > 0 ? 0 : 1;
-    track.applyVolume();
     if (track.delay > 0) {
       track.clip.pause();
     } else {
@@ -186,7 +185,6 @@ public final class MusicManager implements AutoCloseable {
       float consumed = Math.min(elapsedSeconds, duration - transitionElapsed);
       transitionElapsed += consumed;
       current.envelope = outgoingEnvelope * (1 - transitionElapsed / duration);
-      current.applyVolume();
       elapsedSeconds -= consumed;
       if (current.clip.shouldClose() || transitionElapsed >= duration) {
         finishTransition();
@@ -215,7 +213,6 @@ public final class MusicManager implements AutoCloseable {
       current.fadeElapsed = Math.min(current.fade.inSeconds(), current.fadeElapsed + elapsedSeconds);
       current.envelope = current.fadeElapsed / current.fade.inSeconds();
     }
-    current.applyVolume();
   }
 
   /**
@@ -319,7 +316,6 @@ public final class MusicManager implements AutoCloseable {
           Track previous = tracks.peek();
           previous.clip.pause();
           previous.envelope = 1;
-          previous.applyVolume();
         }
       }
       case NONE -> {
@@ -392,7 +388,7 @@ public final class MusicManager implements AutoCloseable {
     final Clip clip;
     final Fade fade;
     final FloatSupplier baseVol;
-    float envelope = 1;
+    volatile float envelope = 1;
     float fadeElapsed;
     float delay;
 
@@ -400,10 +396,11 @@ public final class MusicManager implements AutoCloseable {
       this.clip = clip;
       this.fade = fade;
       this.baseVol = baseVol;
+      clip.setVolume(this::gain);
     }
 
-    void applyVolume() {
-      clip.setVolume(baseVol.getAsFloat() * envelope);
+    private float gain() {
+      return baseVol.getAsFloat() * envelope;
     }
   }
 }

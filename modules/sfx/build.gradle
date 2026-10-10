@@ -4,6 +4,7 @@ plugins {
 
 dependencies {
   api project(':momentum-core')
+  api project(':momentum-math')
 
   implementation 'com.github.stephengold:j-ogg-vorbis:1.0.6'
 }

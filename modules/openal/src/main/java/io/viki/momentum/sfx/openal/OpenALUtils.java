@@ -24,8 +24,8 @@
 
 package io.viki.momentum.sfx.openal;
 
-import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.sfx.AudioEncoding;
+import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.util.InternalApi;
 
 import static org.lwjgl.openal.AL10.*;

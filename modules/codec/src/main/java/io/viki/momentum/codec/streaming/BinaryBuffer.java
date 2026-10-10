@@ -37,7 +37,7 @@ import java.util.UUID;
 /**
  * A cursor-based byte buffer for binary serialization and deserialization.
  *
- * <p>A {@code Buf} maintains independent read and write cursors over a backing
+ * <p>A {@code BinaryBuffer} maintains independent read and write cursors over a backing
  * byte store. Data is written at the write cursor and read from the read cursor;
  * the region between them holds bytes that have been written but not yet consumed.
  *
@@ -193,6 +193,21 @@ public abstract class BinaryBuffer implements AutoCloseable {
   }
 
   /**
+   * Ensures that this buffer can hold at least {@code minCapacity} bytes.
+   *
+   * <p>This is useful for file and socket readers which know the incoming
+   * record size before transferring it. It preserves the normal growth policy
+   * of the concrete buffer and does not change either cursor.
+   *
+   * @param minCapacity required total capacity
+   */
+  public final void ensureCapacity(int minCapacity) {
+    if (capacity() < minCapacity) {
+      grow(minCapacity);
+    }
+  }
+
+  /**
    * Returns the byte order used for multibyte reads and writes.
    *
    * @return the current byte order
@@ -264,6 +279,46 @@ public abstract class BinaryBuffer implements AutoCloseable {
    */
   public void writeFloat(float value) {
     writeInt(Float.floatToRawIntBits(value));
+  }
+
+  /**
+   * Writes a {@code float} as an IEEE 754 binary16 value.
+   *
+   * @param value the float to convert and write
+   * @throws IndexOutOfBoundsException if fewer than 2 bytes are writable
+   */
+  public void writeFloatAsFloat16(float value) {
+    writeShort(Float.floatToFloat16(value));
+  }
+
+  /**
+   * Converts a {@code double} to {@code float} and writes it as an IEEE 754 binary16 value.
+   *
+   * @param value the double to convert and write
+   * @throws IndexOutOfBoundsException if fewer than 2 bytes are writable
+   */
+  public void writeDoubleAsFloat16(double value) {
+    writeFloatAsFloat16((float) value);
+  }
+
+  /**
+   * Clamps a normalized float to {@code [0, 1]} and writes it as an unsigned 8-bit value.
+   *
+   * @param value the normalized value to clamp and write
+   * @throws IndexOutOfBoundsException if no byte is writable
+   */
+  public void writeNormFloatAsByte(float value) {
+    write((byte) Math.round(Math.clamp(value, 0F, 1F) * 255F));
+  }
+
+  /**
+   * Clamps a normalized double to {@code [0, 1]} and writes it as an unsigned 8-bit value.
+   *
+   * @param value the normalized value to clamp and write
+   * @throws IndexOutOfBoundsException if no byte is writable
+   */
+  public void writeNormDoubleAsByte(double value) {
+    write((byte) Math.round(Math.clamp(value, 0D, 1D) * 255D));
   }
 
   /**
@@ -479,6 +534,46 @@ public abstract class BinaryBuffer implements AutoCloseable {
    */
   public float readFloat() {
     return Float.intBitsToFloat(readInt());
+  }
+
+  /**
+   * Reads an IEEE 754 binary16 value and converts it to {@code float}.
+   *
+   * @return the decoded float value
+   * @throws IndexOutOfBoundsException if fewer than 2 bytes are readable
+   */
+  public float readFloatFromFloat16() {
+    return Float.float16ToFloat(readShort());
+  }
+
+  /**
+   * Reads an IEEE 754 binary16 value and converts it to {@code double}.
+   *
+   * @return the decoded double value
+   * @throws IndexOutOfBoundsException if fewer than 2 bytes are readable
+   */
+  public double readDoubleFromFloat16() {
+    return readFloatFromFloat16();
+  }
+
+  /**
+   * Reads an unsigned 8-bit value and normalizes it to {@code [0, 1]} as a float.
+   *
+   * @return the normalized value
+   * @throws IndexOutOfBoundsException if no byte is readable
+   */
+  public float readNormFloatAsByte() {
+    return (read() & 0xFF) / 255F;
+  }
+
+  /**
+   * Reads an unsigned 8-bit value and normalizes it to {@code [0, 1]} as a double.
+   *
+   * @return the normalized value
+   * @throws IndexOutOfBoundsException if no byte is readable
+   */
+  public double readNormDoubleAsByte() {
+    return (read() & 0xFF) / 255D;
   }
 
   /**

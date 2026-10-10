@@ -57,7 +57,7 @@ public final class QuickFmt {
    * Formats a template by sequentially replacing placeholders with arguments.
    *
    * @param template template containing placeholders; must not be {@code null}
-   * @param args arguments consumed from left to right; may be empty
+   * @param args     arguments consumed from left to right; may be empty
    * @return the formatted string
    */
   public static String format(String template, Object... args) {
@@ -157,23 +157,6 @@ public final class QuickFmt {
     private final JsRuntime runtime = new JsRuntime();
     private final Map<String, Value> functions = new HashMap<>();
 
-    private Value compile(String expression) {
-      int arrow = findArrow(expression, "->");
-      String source;
-      if (arrow >= 0) {
-        source = expression.substring(0, arrow) + "=>" + expression.substring(arrow + 2);
-      } else if (findArrow(expression, "=>") >= 0) {
-        source = expression;
-      } else {
-        source = "v => (" + expression + ")";
-      }
-      Value function = runtime.eval("quickfmt", "(" + source + ")");
-      if (!function.canExecute()) {
-        throw new IllegalArgumentException("QuickFmt expression is not executable: {" + expression + "}");
-      }
-      return function;
-    }
-
     private static int findArrow(String expression, String arrow) {
       char quote = 0;
       boolean escaped = false;
@@ -196,6 +179,23 @@ public final class QuickFmt {
         }
       }
       return -1;
+    }
+
+    private Value compile(String expression) {
+      int arrow = findArrow(expression, "->");
+      String source;
+      if (arrow >= 0) {
+        source = expression.substring(0, arrow) + "=>" + expression.substring(arrow + 2);
+      } else if (findArrow(expression, "=>") >= 0) {
+        source = expression;
+      } else {
+        source = "v => (" + expression + ")";
+      }
+      Value function = runtime.eval("quickfmt", "(" + source + ")");
+      if (!function.canExecute()) {
+        throw new IllegalArgumentException("QuickFmt expression is not executable: {" + expression + "}");
+      }
+      return function;
     }
   }
 }

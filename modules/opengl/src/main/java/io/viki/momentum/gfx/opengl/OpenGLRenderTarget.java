@@ -203,7 +203,7 @@ public final class OpenGLRenderTarget implements RenderTarget {
       int h = (int) region.height();
       // snapshot + flip on the calling thread (same convention as
       // OpenGLTexture.submit); the GL work runs later on the render thread
-      ByteBuffer flipped = ImageUtil.pooledFlip(data, w, h);
+      ByteBuffer flipped = ImageUtil.pooledFlip(data, w, h, DirectBufferPool.LARGE);
       OpenGLRenderTarget.this.ctx.submit(() -> {
         OpenGLCache c = OpenGLRenderTarget.this.ctx.cache;
         try {
@@ -214,7 +214,7 @@ public final class OpenGLRenderTarget implements RenderTarget {
           glTexSubImage2D(GL_TEXTURE_2D, 0, x, fboHeight - y - h, w, h, GL_RGBA,
               GL_UNSIGNED_BYTE, flipped);
         } finally {
-          DirectBufferPool.release(flipped);
+          DirectBufferPool.LARGE.release(flipped);
         }
         c.setTexture(0, GL_TEXTURE_2D, 0);
       });
@@ -222,7 +222,7 @@ public final class OpenGLRenderTarget implements RenderTarget {
 
     @Override
     public void replace(ByteBuffer data) {
-      ByteBuffer flipped = ImageUtil.pooledFlip(data, fboWidth, fboHeight);
+      ByteBuffer flipped = ImageUtil.pooledFlip(data, fboWidth, fboHeight, DirectBufferPool.LARGE);
       ctx.submit(() -> {
         OpenGLCache cache = ctx.cache;
         cache.setTexture(0, GL_TEXTURE_2D, colorTex);
@@ -230,7 +230,7 @@ public final class OpenGLRenderTarget implements RenderTarget {
           glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, fboWidth, fboHeight, 0,
               GL_RGBA, GL_UNSIGNED_BYTE, flipped);
         } finally {
-          DirectBufferPool.release(flipped);
+          DirectBufferPool.LARGE.release(flipped);
           cache.setTexture(0, GL_TEXTURE_2D, 0);
         }
       });

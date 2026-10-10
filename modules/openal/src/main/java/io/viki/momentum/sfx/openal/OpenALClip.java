@@ -27,6 +27,7 @@ package io.viki.momentum.sfx.openal;
 import io.viki.momentum.sfx.AudioBuffer;
 import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.sfx.Clip;
+import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.util.FloatSupplier;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
@@ -44,24 +45,21 @@ import static org.lwjgl.openal.AL11.*;
 @InternalApi
 public final class OpenALClip implements Clip {
   private final OpenALMixer mixer;
-  volatile int source;
-  volatile int state = AL_INITIAL;
-  volatile float offset = 0.0F;
-  volatile boolean shouldClose = false;
-  volatile int remainingLoops;
-  volatile boolean autoClosure;
+  private final OpenALClipState clipState;
+  public volatile int state = AL_INITIAL;
+  public volatile float offset = 0.0F;
+  public volatile boolean shouldClose = false;
+  public volatile int remainingLoops;
+  public volatile boolean autoClosure;
   private @Nullable OpenALAudioBuffer buffer;
   private boolean ownsBuffer;
   private @Nullable AudioFormat format;
   private boolean open = false;
   private boolean closed;
-  private volatile float pitch = 1.0F;
-  private volatile float volume = 1.0F;
-  private volatile @Nullable FloatSupplier volumeSource;
-  private float appliedVolume = -1;
 
   OpenALClip(OpenALMixer mixer) {
     this.mixer = mixer;
+    clipState = new OpenALClipState(mixer, this);
   }
 
   @Override
@@ -84,15 +82,14 @@ public final class OpenALClip implements Clip {
     open = true;
   }
 
-  private void checkUnopened() {
-    if (closed) throw new IllegalStateException("Clip is closed");
-    if (open) throw new IllegalStateException("Clip already open");
-  }
-
+  @SuppressWarnings("all")
   @Override
   public void poll() {
-    if (source == 0) return;
-    applyVolume();
+    int source = clipState.source();
+    if (source == 0) {
+      return;
+    }
+    clipState.poll();
     state = alGetSourcei(source, AL_SOURCE_STATE);
     offset = alGetSourcef(source, AL_SEC_OFFSET);
 
@@ -117,6 +114,7 @@ public final class OpenALClip implements Clip {
   @Override
   public void pause() {
     mixer.submit(() -> {
+      int source = clipState.source();
       if (source != 0) {
         alSourcePause(source);
         state = AL_PAUSED;
@@ -126,10 +124,15 @@ public final class OpenALClip implements Clip {
 
   @Override
   public void resume() {
-    if (!open || shouldClose) throw new IllegalStateException("Clip is not available for resumed playback");
+    if (!open || shouldClose) {
+      throw new IllegalStateException("Clip is not available for resumed playback");
+    }
     mixer.submit(() -> {
-      if (source == 0) return;
-      applyVolume();
+      int source = clipState.source();
+      if (source == 0) {
+        return;
+      }
+      clipState.poll();
       alSourcePlay(source);
       state = AL_PLAYING;
       mixer.track(this);
@@ -166,6 +169,12 @@ public final class OpenALClip implements Clip {
         throw new IllegalStateException("Audio buffer is null");
       }
       remainingLoops = count == LOOP_CONTINUOUSLY ? LOOP_CONTINUOUSLY : count - 1;
+      if (!clipState.shouldStart()) {
+        state = AL_STOPPED;
+        shouldClose = true;
+        mixer.track(this);
+        return;
+      }
       if (count == 0) {
         releaseSource();
         state = AL_STOPPED;
@@ -173,25 +182,24 @@ public final class OpenALClip implements Clip {
         mixer.track(this);
         return;
       }
-      if (source == 0) source = mixer.acquireSource();
-      if (source == 0) {
+      if (clipState.source() == 0) {
+        clipState.source(mixer.acquireSource());
+      }
+      if (clipState.source() == 0) {
         state = AL_STOPPED;
         shouldClose = true;
         mixer.track(this);
         return;
       }
+      int source = clipState.source();
       alSourceStop(source);
       alSourcei(source, AL_BUFFER, buffer.id);
       alSourcei(source, AL_LOOPING, count == LOOP_CONTINUOUSLY ? AL_TRUE : AL_FALSE);
-      alSourcei(source, AL_SOURCE_RELATIVE, AL_TRUE);
-      alSourcef(source, AL_ROLLOFF_FACTOR, 0);
-      alSource3f(source, AL_POSITION, 0, 0, 0);
-      alSource3f(source, AL_VELOCITY, 0, 0, 0);
-      alSourcef(source, AL_PITCH, Math.max(pitch, 1E-5F));
       alSourcef(source, AL_SEC_OFFSET, 0);
       offset = 0;
-      appliedVolume = -1;
-      applyVolume();
+      clipState.resetAppliedState();
+      clipState.poll();
+      clipState.attachEffect();
       alSourcePlay(source);
       state = AL_PLAYING;
       mixer.track(this); // track at last. This prevents the clip from being removed instantly.
@@ -210,43 +218,42 @@ public final class OpenALClip implements Clip {
 
   @Override
   public float getVolume() {
-    FloatSupplier source = volumeSource;
-    return source == null ? volume : source.getAsFloat();
-  }
-
-  @Override
-  public void setVolume(float value) {
-    volumeSource = null;
-    volume = Math.max(value, 0.0F);
-    mixer.submit(this::applyVolume);
+    return clipState.volume();
   }
 
   @Override
   public void setVolume(FloatSupplier volume) {
-    volumeSource = volume;
-    mixer.submit(this::applyVolume);
-  }
-
-  void applyVolume() {
-    if (source == 0) return;
-    float effective = Math.max(0, getVolume());
-    if (appliedVolume != effective) {
-      alSourcef(source, AL_GAIN, effective);
-      appliedVolume = effective;
-    }
+    clipState.setVolume(volume);
   }
 
   @Override
   public float getPitch() {
-    return pitch;
+    return clipState.pitch();
   }
 
   @Override
-  public void setPitch(float value) {
-    pitch = Math.max(value, 1E-5F);
-    mixer.submit(() -> {
-      if (source != 0) alSourcef(source, AL_PITCH, Math.max(pitch, 1E-5F));
-    });
+  public void setPitch(FloatSupplier value) {
+    clipState.setPitch(value);
+  }
+
+  @Override
+  public void setSpatialPosition(FloatSupplier x, FloatSupplier y, FloatSupplier z) {
+    clipState.setSpatialPosition(x, y, z);
+  }
+
+  @Override
+  public void setRolloffEnabled(boolean enabled) {
+    clipState.setRolloffEnabled(enabled);
+  }
+
+  @Override
+  public boolean isRolloffEnabled() {
+    return clipState.isRolloffEnabled();
+  }
+
+  @Override
+  public void setEffect(SfxEffect effect) {
+    clipState.setEffect(effect);
   }
 
   @Override
@@ -258,7 +265,10 @@ public final class OpenALClip implements Clip {
   public void setPosition(float value) {
     offset = Math.max(value, 0.0F);
     mixer.submit(() -> {
-      if (source != 0) alSourcef(source, AL_SEC_OFFSET, offset);
+      int source = clipState.source();
+      if (clipState.source() != 0) {
+        alSourcef(source, AL_SEC_OFFSET, offset);
+      }
     });
   }
 
@@ -281,7 +291,9 @@ public final class OpenALClip implements Clip {
       shouldClose = true;
       if (buffer != null) {
         buffer.release();
-        if (ownsBuffer) buffer.close();
+        if (ownsBuffer) {
+          buffer.close();
+        }
         buffer = null;
       }
 
@@ -289,14 +301,54 @@ public final class OpenALClip implements Clip {
     });
   }
 
-  private void releaseSource() {
-    if (source == 0) return;
-    mixer.releaseSource(source);
-    source = 0;
-  }
-
   @Override
   public void __enableNativeAutoClosure() {
     autoClosure = true;
+  }
+
+  /**
+   * Returns the current native source id for optional backend extensions.
+   *
+   * @return AL source id
+   */
+  public int source() {
+    return clipState.sourceId();
+  }
+
+  /**
+   * Returns the mixer that owns this clip.
+   *
+   * @return owning mixer
+   */
+  @InternalApi
+  public OpenALMixer mixer() {
+    return mixer;
+  }
+
+  void applySpatialPosition() {
+    clipState.applySpatialPosition();
+  }
+
+  void applyMixerEffects() {
+    clipState.applyMixerEffects();
+  }
+
+  private void checkUnopened() {
+    if (closed) {
+      throw new IllegalStateException("Clip is closed");
+    }
+    if (open) {
+      throw new IllegalStateException("Clip already open");
+    }
+  }
+
+  private void releaseSource() {
+    int source = clipState.source();
+    if (source == 0) {
+      return;
+    }
+    clipState.detachEffect();
+    mixer.releaseSource(source);
+    clipState.source(0);
   }
 }

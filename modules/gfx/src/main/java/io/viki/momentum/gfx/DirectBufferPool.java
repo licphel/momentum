@@ -10,99 +10,130 @@
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
  *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
  */
 
 package io.viki.momentum.gfx;
 
 import java.nio.ByteBuffer;
-import io.viki.momentum.util.Pool;
-import org.lwjgl.system.MemoryUtil;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.lwjgl.system.MemoryUtil.memAlloc;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * A thread-safe object pool for managing {@code DirectByteBuffer} instances.
+ * A tiered, thread-safe pool for direct byte buffers.
  *
- * <p>This pool serves as a recycling mechanism for off-heap memory to reduce the overhead
- * of frequent {@code malloc} and {@code free} calls in high-throughput environments.
- * It is designed to support multiple producer threads acquiring buffers and a single
- * (or multiple) consumer threads releasing them back into the pool.
+ * <p>Use {@link #SMALL}, {@link #MEDIUM}, or {@link #LARGE} according to the
+ * expected upload size. A request may exceed the tier's initial capacity; the
+ * buffer grows for that request and is discarded on release instead of being
+ * retained in a different tier.
  *
- * <p><b>Thread safety:</b>
- * This class is thread-safe.
+ * <p>The pool uses a lock-free queue and an atomic retained-buffer count. It
+ * does not make an acquired buffer thread-safe; ownership transfers to the
+ * caller until {@link #release(ByteBuffer)} is called exactly once.
  */
-public final class DirectBufferPool {
-  private static final Pool<ByteBuffer> pool = new Pool<>();
+public final class DirectBufferPool implements AutoCloseable {
+  /** Pool for matrices and other small staging uploads. */
+  public static final DirectBufferPool SMALL = new DirectBufferPool(4 * 1024, 32);
+  /** Pool for ordinary texture and buffer uploads. */
+  public static final DirectBufferPool MEDIUM = new DirectBufferPool(64 * 1024, 16);
+  /** Pool for light maps, render targets, and other large uploads. */
+  public static final DirectBufferPool LARGE = new DirectBufferPool(1024 * 1024, 8);
 
-  private DirectBufferPool() {
+  private final int initialCapacity;
+  private final int retainedCapacity;
+  private final int retainedLimit;
+  private final ConcurrentLinkedQueue<ByteBuffer> available = new ConcurrentLinkedQueue<>();
+  private final AtomicInteger availableCount = new AtomicInteger();
+
+  /**
+   * Creates an independent direct-buffer pool.
+   *
+   * @param initialCapacity capacity of newly allocated buffers
+   * @param retainedLimit maximum number of available buffers retained by this pool
+   */
+  public DirectBufferPool(int initialCapacity, int retainedLimit) {
+    if (initialCapacity <= 0 || retainedLimit <= 0) {
+      throw new IllegalArgumentException("Pool capacity and retention limit must be positive");
+    }
+    this.initialCapacity = initialCapacity;
+    this.retainedCapacity = initialCapacity;
+    this.retainedLimit = retainedLimit;
   }
 
   /**
-   * Retrieves a {@code DirectByteBuffer} from the pool with at least the required capacity.
+   * Acquires a cleared buffer with at least {@code neededSize} bytes.
    *
-   * <p>The returned buffer is always in a {@code clear()} state, meaning its
-   * {@code position} is set to 0 and its {@code limit} is set to its capacity,
-   * making it ready for immediate writes.
+   * <p>The requested size is the minimum required capacity, not a tier
+   * selection. Callers choose the tier through the pool instance and provide
+   * the exact size needed by the current operation.
    *
-   * @param neededSize the minimum required capacity in bytes (must be {@code > 0})
-   * @return a cleared, reusable {@code DirectByteBuffer} with capacity {@code >= neededSize}
-   * @throws IllegalArgumentException if {@code neededSize} is {@code <= 0}
+   * @param neededSize minimum required capacity, greater than zero
+   * @return an exclusively owned, cleared direct buffer
    */
-  public static ByteBuffer acquire(int neededSize) {
+  public ByteBuffer acquire(int neededSize) {
     if (neededSize <= 0) {
-      throw new IllegalArgumentException("Requested size must be positive.");
+      throw new IllegalArgumentException("Requested size must be positive");
     }
-
-    ByteBuffer buffer = pool.poll();
-
+    ByteBuffer buffer = available.poll();
+    if (buffer != null) {
+      availableCount.decrementAndGet();
+    }
     if (buffer == null || buffer.capacity() < neededSize) {
       if (buffer != null) {
-        memFree(buffer); // Dispose of the under-sized buffer
+        memFree(buffer);
       }
-      buffer = memAlloc(neededSize);
+      buffer = memAlloc(Math.max(initialCapacity, neededSize));
     }
-
     buffer.clear();
     return buffer;
   }
 
   /**
-   * Returns a previously acquired {@code DirectByteBuffer} back to the pool.
+   * Returns a buffer acquired from this pool.
    *
-   * <p>Once the data stored in the buffer has been fully consumed (e.g., passed to
-   * a native library or uploaded to the GPU), the buffer should be released to allow
-   * other threads to reuse its underlying off-heap memory.
+   * <p>Buffers larger than this tier's retained capacity are freed immediately,
+   * and the pool keeps at most its configured number of available buffers.
    *
-   * <p>Only buffers obtained from {@link #acquire(int)} may be released here.
-   * Release each buffer exactly once and do not access it afterward.
-   *
-   * @param buffer the acquired buffer whose use has finished
+   * @param buffer the finished buffer; release it exactly once
    */
-  public static void release(ByteBuffer buffer) {
-    pool.release(buffer);
+  public void release(ByteBuffer buffer) {
+    if (buffer.capacity() > retainedCapacity || !reserveSlot()) {
+      memFree(buffer);
+      return;
+    }
+    available.offer(buffer);
   }
 
-  /**
-   * Frees all {@code DirectByteBuffer} instances currently held in the pool.
-   *
-   * <p>This method should be invoked during application shutdown to explicitly release
-   * the off-heap memory resources back to the operating system.
-   *
-   * <p>After calling this method, the pool is empty. Attempts to {@link #acquire(int)}
-   * will result in newly allocated buffers.
-   */
-  public static void close() {
-    pool.clear(MemoryUtil::memFree);
+  /** Frees all available native buffers. Acquired buffers are unaffected. */
+  @Override
+  public void close() {
+    ByteBuffer buffer;
+    while ((buffer = available.poll()) != null) {
+      availableCount.decrementAndGet();
+      memFree(buffer);
+    }
+  }
+
+  private boolean reserveSlot() {
+    int current;
+    do {
+      current = availableCount.get();
+      if (current >= retainedLimit) {
+        return false;
+      }
+    } while (!availableCount.compareAndSet(current, current + 1));
+    return true;
   }
 }

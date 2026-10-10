@@ -35,8 +35,8 @@ import java.nio.ByteBuffer;
  *
  * <p>This class provides efficient, zero-allocation methods for packing matrix data
  * into buffers suitable for upload to GPU memory (e.g., Uniform Buffer Objects).
- * It leverages a global {@link DirectBufferPool} to eliminate temporary object
- * allocation overhead during high-frequency rendering loops.
+ * It uses the small direct-buffer tier to eliminate temporary native allocations
+ * during high-frequency rendering loops.
  */
 public final class MatrixUtil {
   private MatrixUtil() {
@@ -49,10 +49,10 @@ public final class MatrixUtil {
    * @param ubo the target Uniform Buffer Object to receive the matrix data
    */
   public static void store(Matrix4x4 vpm, BufferObject ubo) {
-    ByteBuffer out = DirectBufferPool.acquire(4 * 4 * Float.BYTES);
+    ByteBuffer out = DirectBufferPool.SMALL.acquire(4 * 4 * Float.BYTES);
     store(vpm, out);
     ubo.replace(out.flip());
-    DirectBufferPool.release(out);
+    DirectBufferPool.SMALL.release(out);
   }
 
   /**
