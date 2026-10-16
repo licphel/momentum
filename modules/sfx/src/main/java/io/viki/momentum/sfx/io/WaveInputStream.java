@@ -57,6 +57,7 @@ public final class WaveInputStream extends AudioInputStream {
   private final AudioFormat format;
   private final InputStream in;
   private long remaining;
+  private final float duration;
 
   /**
    * Creates a decoder for a WAVE audio stream.
@@ -71,6 +72,35 @@ public final class WaveInputStream extends AudioInputStream {
     in = buffered;
     format = header.format;
     remaining = header.dataSize;
+    duration = (float) (header.dataSize / (double) format.getByteRate());
+  }
+
+  @Override
+  public float getDuration() {
+    return duration;
+  }
+
+  /**
+   * Opens a WAVE decoder that owns the input.
+   * @param input WAVE container stream
+   * @return PCM decoder
+   * @throws IOException if the container header is invalid
+   */
+  public static WaveInputStream open(InputStream input) throws IOException {
+    return new WaveInputStream(input);
+  }
+
+  /**
+   * Reads WAVE duration from the header without decoding PCM or closing the input.
+   * @param input WAVE container stream positioned at its beginning
+   *
+   * @return total duration in seconds
+   * @throws IOException if the container header is invalid
+   */
+  public static float getDuration(InputStream input) throws IOException {
+    BufferedInputStream source = input instanceof BufferedInputStream buffered ? buffered : new BufferedInputStream(input);
+    Header header = parseHeader(source);
+    return (float) (header.dataSize / (double) header.format.getByteRate());
   }
 
   /**

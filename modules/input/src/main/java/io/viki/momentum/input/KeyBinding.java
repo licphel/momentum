@@ -16,7 +16,7 @@ import java.util.List;
  */
 public final class KeyBinding implements Transitable {
   private final String key;
-  private List<KeyMatch> matches;
+  private List<Transitable> matches;
 
   /**
    * Creates a named action with the supplied shortcuts.
@@ -25,7 +25,7 @@ public final class KeyBinding implements Transitable {
    * @param matches the shortcuts that activate the action
    * @throws IllegalArgumentException if {@code key} is blank
    */
-  public KeyBinding(String key, List<KeyMatch> matches) {
+  public KeyBinding(String key, List<? extends Transitable> matches) {
     if (key.isBlank()) {
       throw new IllegalArgumentException("Key binding key must not be blank");
     }
@@ -58,7 +58,7 @@ public final class KeyBinding implements Transitable {
    *
    * @return the current shortcuts
    */
-  public List<KeyMatch> matches() {
+  public List<Transitable> matches() {
     return matches;
   }
 
@@ -67,7 +67,7 @@ public final class KeyBinding implements Transitable {
    *
    * @param value the replacement shortcuts
    */
-  public void rebind(List<KeyMatch> value) {
+  public void rebind(List<? extends Transitable> value) {
     matches = List.copyOf(value);
   }
 
@@ -82,7 +82,7 @@ public final class KeyBinding implements Transitable {
 
   @Override
   public boolean isDown() {
-    for (KeyMatch match : matches) {
+    for (Transitable match : matches) {
       if (match.isDown()) {
         return true;
       }
@@ -92,7 +92,7 @@ public final class KeyBinding implements Transitable {
 
   @Override
   public boolean transitioned() {
-    for (KeyMatch match : matches) {
+    for (Transitable match : matches) {
       if (match.transitioned()) {
         return true;
       }
@@ -102,7 +102,7 @@ public final class KeyBinding implements Transitable {
 
   @Override
   public boolean transitionedOrRepeated() {
-    for (KeyMatch match : matches) {
+    for (Transitable match : matches) {
       if (match.transitionedOrRepeated()) {
         return true;
       }

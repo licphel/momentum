@@ -26,6 +26,7 @@ package io.viki.momentum.util;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.function.Supplier;
 
 /**
@@ -85,12 +86,12 @@ public class Lazy<T> {
    *
    * @return the value, which may be {@code null} depending on the supplier
    */
-  public @Nullable T get() {
+  public T get() {
     if (!initialized) {
       value = requireSupplier().get();
       initialized = true;
     }
-    return value;
+    return Objects.requireNonNull(value, "Lazy value is not initialized");
   }
 
   /**

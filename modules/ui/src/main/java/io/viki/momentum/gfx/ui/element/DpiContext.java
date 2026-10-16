@@ -71,9 +71,27 @@ public final class DpiContext implements AutoCloseable {
   public DpiContext(int framebufferWidth, int framebufferHeight, float logicalWidth,
                     float logicalHeight, boolean onlyIntegerScale,
                     TransformHandler transformHandler) {
+    this(framebufferWidth, framebufferHeight, logicalWidth, logicalHeight, onlyIntegerScale,
+        1.0F, transformHandler);
+  }
+
+  /**
+   * Creates a detached context with an explicit per-canvas logical scale.
+   *
+   * @param framebufferWidth  the initial framebuffer width
+   * @param framebufferHeight the initial framebuffer height
+   * @param logicalWidth      the base logical canvas width
+   * @param logicalHeight     the base logical canvas height
+   * @param onlyIntegerScale  whether automatic scaling must use an integer factor
+   * @param logicalScale      additional scale applied only to this canvas
+   * @param transformHandler  the backend coordinate conversion handler
+   */
+  public DpiContext(int framebufferWidth, int framebufferHeight, float logicalWidth,
+                    float logicalHeight, boolean onlyIntegerScale, float logicalScale,
+                    TransformHandler transformHandler) {
     this(null, new Vector2(framebufferWidth, framebufferHeight),
         Resolution.auto(framebufferWidth, framebufferHeight, logicalWidth, logicalHeight,
-            onlyIntegerScale, transformHandler), transformHandler);
+            onlyIntegerScale, logicalScale, transformHandler), transformHandler);
   }
 
   /**
@@ -98,9 +116,25 @@ public final class DpiContext implements AutoCloseable {
    */
   public DpiContext(View view, float logicalWidth, float logicalHeight,
                     boolean onlyIntegerScale, TransformHandler transformHandler) {
+    this(view, logicalWidth, logicalHeight, onlyIntegerScale, 1.0F, transformHandler);
+  }
+
+  /**
+   * Creates a view-backed context with an explicit per-canvas logical scale.
+   *
+   * @param view             the view whose dimensions and input size are followed
+   * @param logicalWidth     the base logical canvas width
+   * @param logicalHeight    the base logical canvas height
+   * @param onlyIntegerScale whether automatic scaling must use an integer factor
+   * @param logicalScale     additional scale applied only to this canvas
+   * @param transformHandler the backend coordinate conversion handler
+   */
+  public DpiContext(View view, float logicalWidth, float logicalHeight,
+                    boolean onlyIntegerScale, float logicalScale,
+                    TransformHandler transformHandler) {
     this(view, view.getInputSize(),
         Resolution.auto(view.getWidth(), view.getHeight(), logicalWidth, logicalHeight,
-            onlyIntegerScale, transformHandler), transformHandler);
+            onlyIntegerScale, logicalScale, transformHandler), transformHandler);
   }
 
   private DpiContext(@Nullable View view, Vector2 inputSize, Resolution resolution,
@@ -163,6 +197,15 @@ public final class DpiContext implements AutoCloseable {
    */
   public Resolution resolution() {
     return resolution;
+  }
+
+  /**
+   * Returns the per-canvas logical scale multiplier.
+   *
+   * @return logical scale configured for this context
+   */
+  public float getLogicalScale() {
+    return resolution.logicalScale();
   }
 
   /**

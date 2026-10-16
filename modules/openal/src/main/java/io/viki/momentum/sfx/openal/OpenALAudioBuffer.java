@@ -17,6 +17,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
 final class OpenALAudioBuffer implements AudioBuffer {
   final OpenALMixer mixer;
   private final AudioFormat format;
+  private final float duration;
   int id;
   private volatile boolean closed;
   private int borrowers;
@@ -28,6 +29,7 @@ final class OpenALAudioBuffer implements AudioBuffer {
     int nativeFormat = OpenALUtils.convertFormat(format);
     this.mixer = mixer;
     this.format = format;
+    duration = (float) format.bytesToSeconds(data.length);
     byte[] samples = data.clone();
     mixer.submit(() -> {
       id = alGenBuffers();
@@ -48,6 +50,11 @@ final class OpenALAudioBuffer implements AudioBuffer {
   @Override
   public AudioFormat format() {
     return format;
+  }
+
+  @Override
+  public float getDuration() {
+    return duration;
   }
 
   @Override

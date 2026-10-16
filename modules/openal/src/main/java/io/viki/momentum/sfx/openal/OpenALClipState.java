@@ -24,6 +24,7 @@
 
 package io.viki.momentum.sfx.openal;
 
+import io.viki.momentum.sfx.AudioFormat;
 import io.viki.momentum.sfx.Clip;
 import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.util.FloatSupplier;
@@ -130,6 +131,10 @@ public final class OpenALClipState {
     float effective = volume();
     if (rolloffEnabled && spatial) {
       effective *= mixer.getRolloffGain(spatialX, spatialY, spatialZ);
+      AudioFormat fmt = owner.format();
+      if (fmt != null) {
+        effective *= mixer.getSpatialGain(fmt);
+      }
     }
     if (!volumeApplied || Math.abs(effective - appliedVolume) > CONTROL_EPSILON) {
       alSourcef(source, AL_GAIN, effective);

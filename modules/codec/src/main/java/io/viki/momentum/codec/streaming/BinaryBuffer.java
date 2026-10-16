@@ -562,7 +562,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @return the normalized value
    * @throws IndexOutOfBoundsException if no byte is readable
    */
-  public float readNormFloatAsByte() {
+  public float readNormFloatFromByte() {
     return (read() & 0xFF) / 255F;
   }
 
@@ -572,7 +572,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @return the normalized value
    * @throws IndexOutOfBoundsException if no byte is readable
    */
-  public double readNormDoubleAsByte() {
+  public double readNormDoubleFromByte() {
     return (read() & 0xFF) / 255D;
   }
 

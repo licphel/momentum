@@ -121,7 +121,25 @@ public class Canvas extends Element implements AutoCloseable {
    */
   public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
                             float logicalHeight, boolean onlyIntegerScale) {
-    return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale, transformHandler));
+    return open(view, transformHandler, logicalWidth, logicalHeight, onlyIntegerScale,
+        1.0F);
+  }
+
+  /**
+   * Opens a canvas with an explicit logical scale multiplier.
+   *
+   * @param view             view providing framebuffer size and input events
+   * @param transformHandler handler used for input and graphics transforms
+   * @param logicalWidth     base logical canvas width
+   * @param logicalHeight    base logical canvas height
+   * @param onlyIntegerScale whether automatic scaling must use an integer factor
+   * @param logicalScale     additional scale applied only to this canvas
+   * @return a newly opened canvas
+   */
+  public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
+                            float logicalHeight, boolean onlyIntegerScale, float logicalScale) {
+    return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale,
+        logicalScale, transformHandler));
   }
 
   /**
@@ -138,7 +156,16 @@ public class Canvas extends Element implements AutoCloseable {
   public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
                             float logicalHeight, boolean onlyIntegerScale,
                             ElementTreeRenderer renderer) {
-    return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale, transformHandler), renderer);
+    return open(view, transformHandler, logicalWidth, logicalHeight, onlyIntegerScale,
+        1.0F, renderer);
+  }
+
+  /** Opens a canvas with an explicit logical scale and renderer dispatcher. */
+  public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
+                            float logicalHeight, boolean onlyIntegerScale, float logicalScale,
+                            ElementTreeRenderer renderer) {
+    return new Canvas(new DpiContext(view, logicalWidth, logicalHeight, onlyIntegerScale,
+        logicalScale, transformHandler), renderer);
   }
 
   private static boolean isEffectivelyVisible(Element element) {
@@ -173,6 +200,19 @@ public class Canvas extends Element implements AutoCloseable {
    */
   public Resolution resolution() {
     return context.resolution();
+  }
+
+  /**
+   * Returns the optional logical scale applied to this canvas.
+   *
+   * <p>The value is a multiplier on the automatic logical-to-framebuffer mapping. It does not
+   * alter the coordinate units used by the element tree; it only makes this canvas occupy more
+   * framebuffer pixels than an otherwise identical canvas.
+   *
+   * @return per-canvas logical scale
+   */
+  public float getLogicalScale() {
+    return context.getLogicalScale();
   }
 
   /**

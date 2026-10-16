@@ -37,9 +37,9 @@ import io.viki.momentum.math.Vector2;
  */
 public abstract class View implements AutoCloseable {
   /** Default display width in physical pixels. */
-  public static final int DEFAULT_WIDTH = 800;
+  public static final int DEFAULT_WIDTH = 960;
   /** Default display height in physical pixels. */
-  public static final int DEFAULT_HEIGHT = 450;
+  public static final int DEFAULT_HEIGHT = 540;
 
   private final EventBus eventBus = new EventBus();
   private final InputSnapshot snapshot = new InputSnapshot();
@@ -49,7 +49,7 @@ public abstract class View implements AutoCloseable {
   protected boolean initialized;
   protected boolean debug;
 
-  /** Creates a display with the default size of 800 by 450 physical pixels. */
+  /** Creates a display with the default size of 960 by 540 physical pixels. */
   protected View() {
   }
 

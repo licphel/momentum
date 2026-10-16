@@ -29,6 +29,7 @@ import io.viki.momentum.sfx.AudioFormat;
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 
 /**
  * Abstract base for decoded PCM audio streams.
@@ -42,6 +43,49 @@ import java.io.InputStream;
  * @see AudioFormat
  */
 public abstract class AudioInputStream extends InputStream {
+  private float duration = -1F;
+
+  /**
+   * Returns the full PCM duration, not the unread portion.
+   * @return duration in seconds, or {@code -1} for a source whose length is unknown
+   */
+  public float getDuration() {
+    return duration;
+  }
+
+  /**
+   * Opens a decoder with duration metadata obtained from a reopenable source.
+   * The returned decoder owns the input, as with {@link #open(InputStream)}.
+   *
+   * @param input encoded audio stream
+   * @param duration known duration in seconds, or {@code -1} if unknown
+   * @return PCM decoder
+   * @throws IOException if opening fails
+   */
+  public static AudioInputStream open(InputStream input, float duration) throws IOException {
+    AudioInputStream result = open(input);
+    result.duration = duration;
+    return result;
+  }
+
+  /**
+   * Reads finite WAVE/Vorbis duration metadata without decoding PCM. Consumes but does not close
+   * the input. WAVE reads its header; Ogg walks compressed page headers and skips payloads.
+   *
+   * @param input encoded source positioned at its beginning
+   * @return duration in seconds
+   * @throws IOException if the container is unsupported, truncated or contains multiple Ogg streams
+   */
+  public static float getDuration(InputStream input) throws IOException {
+    BufferedInputStream source = input instanceof BufferedInputStream buffered
+        ? buffered : new BufferedInputStream(input);
+    return switch (type(source)) {
+      case "RIFF" -> WaveInputStream.getDuration(source);
+      case "OggS" -> OggVorbisInputStream.getDuration(source);
+      default -> throw new AudioFormatException("Unsupported audio duration container");
+    };
+  }
+
   /**
    * Wraps raw PCM data as an audio input stream without copying it.
    *
@@ -60,26 +104,25 @@ public abstract class AudioInputStream extends InputStream {
   /**
    * Probes an input stream for a known audio container and returns a decoder for it.
    *
-   * @param in source stream, must support mark and reset
+   * @param in source stream, buffered internally when necessary
    * @return a decoder whose {@link #format()} reflects the detected layout
    * @throws IOException          if an I/O error occurs
    * @throws AudioFormatException if the container is not recognized or the header is malformed
    */
   public static AudioInputStream open(InputStream in) throws IOException, AudioFormatException {
     BufferedInputStream buffered = in instanceof BufferedInputStream b ? b : new BufferedInputStream(in);
-    buffered.mark(12);
-    byte[] header = buffered.readNBytes(12);
-    buffered.reset();
+    return switch (type(buffered)) {
+      case "RIFF" -> WaveInputStream.open(buffered);
+      case "OggS" -> OggVorbisInputStream.open(buffered);
+      default -> throw new AudioFormatException("Unsupported audio format");
+    };
+  }
 
-    if (header.length >= 12 && header[0] == 'R' && header[1] == 'I' && header[2] == 'F' && header[3] == 'F' && header[8] == 'W' && header[9] == 'A' && header[10] == 'V' && header[11] == 'E') {
-      return new WaveInputStream(buffered);
-    }
-    if (header.length >= 4 && header[0] == 'O' && header[1] == 'g'
-        && header[2] == 'g' && header[3] == 'S') {
-      return new OggVorbisInputStream(buffered);
-    }
-
-    throw new AudioFormatException("Unsupported audio format");
+  private static String type(BufferedInputStream source) throws IOException {
+    source.mark(4);
+    byte[] signature = source.readNBytes(4);
+    source.reset();
+    return new String(signature, StandardCharsets.US_ASCII);
   }
 
   /**

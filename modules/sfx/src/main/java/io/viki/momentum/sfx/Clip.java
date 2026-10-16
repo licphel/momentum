@@ -236,6 +236,23 @@ public interface Clip extends AutoCloseable {
   float getPosition();
 
   /**
+   * Returns the duration of one playback pass, independent of pitch and repetitions.
+   *
+   * @return duration in seconds, or {@code -1} before opening or while the source length is unknown
+   */
+  float getDuration();
+
+  /**
+   * Returns the remaining source time, including pending repetitions.
+   *
+   * @return seconds remaining, positive infinity for continuous looping, or {@code 0} if unknown
+   */
+  default float getRemainingDuration() {
+    float duration = getDuration();
+    return duration < 0 ? 0 : Math.max(0F, duration - getPosition());
+  }
+
+  /**
    * Sets the playback offset.
    *
    * @param position new offset in seconds; negative values are clamped to zero

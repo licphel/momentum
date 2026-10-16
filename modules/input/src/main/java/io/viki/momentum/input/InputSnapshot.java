@@ -51,8 +51,11 @@ public final class InputSnapshot {
   private final Map<KeyCode, Key> keys = new EnumMap<>(KeyCode.class);
   private double cursorX;
   private double cursorY;
-  private double scrollX;
-  private double scrollY;
+  private final ScrollState scroll = new ScrollState(false);
+  private final GamepadState gamepad = new GamepadState();
+
+  public Scroller scroll() { return scroll; }
+  public GamepadState gamepad() { return gamepad; }
   private int currentMods;
   /** Lock-key state (Caps Lock, Num Lock) from the most recent event. */
   private int lockMods;
@@ -134,7 +137,7 @@ public final class InputSnapshot {
    * @return the horizontal scroll delta
    */
   public double scrollDeltaX() {
-    return scrollX;
+    return scroll.deltaX();
   }
 
   /**
@@ -143,7 +146,7 @@ public final class InputSnapshot {
    * @return the vertical scroll delta
    */
   public double scrollDeltaY() {
-    return scrollY;
+    return scroll.deltaY();
   }
 
   /**
@@ -268,8 +271,7 @@ public final class InputSnapshot {
    * @param dy the vertical scroll delta
    */
   public void applyScroll(double dx, double dy) {
-    scrollX += dx;
-    scrollY += dy;
+    scroll.add(dx, dy);
   }
 
   /**
@@ -280,8 +282,8 @@ public final class InputSnapshot {
    * — held keys remain in their current state until the platform reports a release.
    */
   public void clearFrameState() {
-    scrollX = 0;
-    scrollY = 0;
+    scroll.clearFrameState();
+    gamepad.clearFrameState();
 
     for (Key key : keys.values()) {
       key.endFrame();
@@ -290,6 +292,8 @@ public final class InputSnapshot {
 
   /** Clears held input state, for example when the owning view loses focus. */
   public void clearInputState() {
+    scroll.reset();
+    gamepad.reset();
     keyStates.clear();
     keyMods.clear();
     currentMods = InputModifiers.NONE;

@@ -56,6 +56,7 @@ public final class OpenALStreamingClip implements StreamingClip {
   public volatile boolean autoClosure;
   private volatile int state = AL_INITIAL;
   private volatile float position;
+  private volatile float duration = -1F;
   private volatile boolean open;
   private volatile boolean shouldClose;
   private @Nullable AudioFormat format;
@@ -65,8 +66,9 @@ public final class OpenALStreamingClip implements StreamingClip {
   private volatile boolean started;
   private boolean terminal;
   private boolean closed;
-  private int remainingLoops;
+  private volatile int remainingLoops;
   private long processedBytes;
+  private long decodedBytes;
 
   OpenALStreamingClip(OpenALMixer mixer) {
     this.mixer = mixer;
@@ -96,6 +98,7 @@ public final class OpenALStreamingClip implements StreamingClip {
     AudioFormat streamFormat = stream.format();
     OpenALUtils.convertFormat(streamFormat);
     format = streamFormat;
+    duration = stream.getDuration();
     this.streamSupplier = streamSupplier;
     open = true;
 
@@ -298,6 +301,18 @@ public final class OpenALStreamingClip implements StreamingClip {
   }
 
   @Override
+  public float getDuration() {
+    return duration;
+  }
+
+  @Override
+  public float getRemainingDuration() {
+    if (remainingLoops == LOOP_CONTINUOUSLY) return Float.POSITIVE_INFINITY;
+    float length = duration;
+    return length < 0 ? -1F : Math.max(0F, length * (1L + remainingLoops) - position);
+  }
+
+  @Override
   public void close() {
     if (closed) {
       return;
@@ -380,6 +395,10 @@ public final class OpenALStreamingClip implements StreamingClip {
       return false;
     }
 
+    decodedBytes += length;
+    if (endOfStream && duration < 0) {
+      duration = (float) (decodedBytes / (double) currentFormat.getByteRate());
+    }
     if (length % currentFormat.frameSize() != 0) {
       fail(new AudioException("Streaming audio ended with an incomplete PCM frame"));
       return false;
@@ -438,6 +457,7 @@ public final class OpenALStreamingClip implements StreamingClip {
     stream = nextStream;
     endOfStream = false;
     processedBytes = 0L;
+    decodedBytes = 0L;
     position = 0.0F;
     if (remainingLoops != LOOP_CONTINUOUSLY) {
       remainingLoops--;

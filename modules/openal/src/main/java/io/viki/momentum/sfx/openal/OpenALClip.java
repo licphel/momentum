@@ -54,6 +54,7 @@ public final class OpenALClip implements Clip {
   private @Nullable OpenALAudioBuffer buffer;
   private boolean ownsBuffer;
   private @Nullable AudioFormat format;
+  private float duration = -1F;
   private boolean open = false;
   private boolean closed;
 
@@ -79,6 +80,7 @@ public final class OpenALClip implements Clip {
     uploaded.borrow();
     buffer = uploaded;
     format = uploaded.format();
+    duration = uploaded.getDuration();
     open = true;
   }
 
@@ -275,6 +277,17 @@ public final class OpenALClip implements Clip {
   @Override
   public @Nullable AudioFormat format() {
     return format;
+  }
+
+  @Override
+  public float getDuration() {
+    return duration;
+  }
+
+  @Override
+  public float getRemainingDuration() {
+    if (remainingLoops == LOOP_CONTINUOUSLY) return Float.POSITIVE_INFINITY;
+    return duration < 0 ? -1F : Math.max(0F, duration * (1L + remainingLoops) - offset);
   }
 
   @Override

@@ -16,6 +16,13 @@ public interface AudioBuffer extends AutoCloseable {
    */
   AudioFormat format();
 
+  /**
+   * Returns the immutable sample duration, independent of pitch or repetition.
+   *
+   * @return duration in seconds, including zero for an empty buffer
+   */
+  float getDuration();
+
   /** Releases the owner's interest in these samples; repeated closure is harmless. */
   @Override
   void close();

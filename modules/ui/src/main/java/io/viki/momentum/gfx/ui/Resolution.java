@@ -39,9 +39,9 @@ import io.viki.momentum.math.shape.Rectangle;
  */
 public final class Resolution {
   /** Default logical canvas width. */
-  public static final float DEFAULT_LOGICAL_WIDTH = 800.0F;
+  public static final float DEFAULT_LOGICAL_WIDTH = 480.0F;
   /** Default logical canvas height. */
-  public static final float DEFAULT_LOGICAL_HEIGHT = 450.0F;
+  public static final float DEFAULT_LOGICAL_HEIGHT = 270.0F;
   /** Initial scale used by automatic resolution selection. */
   public static final float SCALE_START = 0.5F;
   /** Scale increment used by automatic resolution selection. */
@@ -51,6 +51,7 @@ public final class Resolution {
   private final boolean automatic;
   private final boolean onlyInteger;
   private final float fixedScale;
+  private final float logicalScale;
   private final Camera2D camera;
   private float logicalWidth;
   private float logicalHeight;
@@ -62,7 +63,8 @@ public final class Resolution {
 
   /** Creates a resolution mapping with validated framebuffer and logical dimensions. */
   private Resolution(int width, int height, float logicalWidth, float logicalHeight,
-                     boolean automatic, boolean onlyInteger, float fixedScale, TransformHandler handler) {
+                     boolean automatic, boolean onlyInteger, float fixedScale,
+                     float logicalScale, TransformHandler handler) {
     if (width <= 0 || height <= 0) {
       throw new IllegalArgumentException("Framebuffer size must be positive: " + width + "x" + height);
     }
@@ -71,6 +73,9 @@ public final class Resolution {
     }
     if (fixedScale <= 0.0F) {
       throw new IllegalArgumentException("Resolution scale must be positive: " + fixedScale);
+    }
+    if (logicalScale <= 0.0F) {
+      throw new IllegalArgumentException("Logical scale must be positive: " + logicalScale);
     }
     this.width = width;
     this.height = height;
@@ -81,6 +86,7 @@ public final class Resolution {
     this.automatic = automatic;
     this.onlyInteger = onlyInteger;
     this.fixedScale = fixedScale;
+    this.logicalScale = logicalScale;
     this.camera = new Camera2D(logicalWidth, logicalHeight, handler);
     camera.setFlipY(true);
     recalculate();
@@ -112,7 +118,18 @@ public final class Resolution {
    */
   public static Resolution auto(int width, int height, float logicalWidth, float logicalHeight,
                                 boolean onlyInteger, TransformHandler handler) {
-    return new Resolution(width, height, logicalWidth, logicalHeight, true, onlyInteger, SCALE_START, handler);
+    return auto(width, height, logicalWidth, logicalHeight, onlyInteger, 1.0F, handler);
+  }
+
+  /**
+   * Creates an automatically scaled mapping with an additional per-canvas logical scale.
+   * A value of {@code 2} gives the canvas twice the logical pixel density while preserving its
+   * declared coordinate units.
+   */
+  public static Resolution auto(int width, int height, float logicalWidth, float logicalHeight,
+                                boolean onlyInteger, float logicalScale, TransformHandler handler) {
+    return new Resolution(width, height, logicalWidth, logicalHeight, true, onlyInteger,
+        SCALE_START, logicalScale, handler);
   }
 
   /**
@@ -141,7 +158,14 @@ public final class Resolution {
    */
   public static Resolution fixed(int width, int height, float logicalWidth, float logicalHeight,
                                  float scale, TransformHandler handler) {
-    return new Resolution(width, height, logicalWidth, logicalHeight, false, false, scale, handler);
+    return fixed(width, height, logicalWidth, logicalHeight, scale, 1.0F, handler);
+  }
+
+  /** Creates a fixed mapping with an additional per-canvas logical scale. */
+  public static Resolution fixed(int width, int height, float logicalWidth, float logicalHeight,
+                                 float scale, float logicalScale, TransformHandler handler) {
+    return new Resolution(width, height, logicalWidth, logicalHeight, false, false, scale,
+        logicalScale, handler);
   }
 
   private static float resolveScale(int width, int height, float logicalWidth, float logicalHeight, boolean onlyInteger) {
@@ -207,6 +231,15 @@ public final class Resolution {
    */
   public float scale() {
     return scale;
+  }
+
+  /**
+   * Returns the optional logical scale multiplier configured for this mapping.
+   *
+   * @return per-canvas logical scale
+   */
+  public float logicalScale() {
+    return logicalScale;
   }
 
   /**
@@ -393,9 +426,10 @@ public final class Resolution {
 
   private void recalculate() {
     if (automatic) {
-      scale = resolveScale(width, height, this.minimumLogicalWidth, this.minimumLogicalHeight, onlyInteger);
+      scale = resolveScale(width, height, this.minimumLogicalWidth, this.minimumLogicalHeight,
+          onlyInteger) * logicalScale;
     } else {
-      scale = fixedScale;
+      scale = fixedScale * logicalScale;
     }
     // The whole framebuffer is usable; aspect-ratio changes become layout changes.
     logicalWidth = width / scale;

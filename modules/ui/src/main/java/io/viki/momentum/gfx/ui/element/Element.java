@@ -48,7 +48,7 @@ import java.util.List;
  * drawing, tree mutation, and input callbacks must run on the owning view thread.
  */
 public abstract class Element implements InputListener {
-  private static final long DEFAULT_TOOLTIP_DELAY_MILLIS = 500L;
+  private static final long DEFAULT_TOOLTIP_DELAY_MILLIS = 0L;
   private final List<Element> children = new ArrayList<>();
   private final List<Element> parts = new ArrayList<>();
   private final List<Element> childrenView = Collections.unmodifiableList(children);

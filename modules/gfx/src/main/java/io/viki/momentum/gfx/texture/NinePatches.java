@@ -34,7 +34,7 @@ import io.viki.momentum.math.shape.Rectangle;
  * size, the four edges stretch or repeat along their axis, and the center fills the remaining area. This enables
  * resizable UI elements like panels, buttons, and borders from a single texture.
  *
- * <p>When {@link #fit} is {@code true}, edge and center tiles may shrink or expand slightly so
+ * <p>When {@link #overlapToFit} is {@code true}, edge and center tiles may shrink or expand slightly so
  * the drawn result exactly matches the destination size. Keep {@code fit} {@code false} when tiles are translucent and
  * overlap would be visible.
  *
@@ -59,7 +59,7 @@ public final class NinePatches implements Drawable2D {
   private final float tw;
 
   /** Whether tiles may overlap to fit the destination exactly. Keep {@code false} for translucent tiles. */
-  public boolean fit;
+  public boolean overlapToFit = true;
 
   /**
    * Creates a 9-patch from a texture with the given scale.
@@ -138,9 +138,9 @@ public final class NinePatches implements Drawable2D {
     float atw = tw * scale;
     float ath = th * scale;
 
-    if (fit) {
-      float lcw = w - atw * (nw - 2);
-      float lch = h - ath * (nh - 2);
+    if (overlapToFit) {
+      float lcw = w - atw * (nw - 1);
+      float lch = h - ath * (nh - 1);
 
       float rx = x + w - atw;
       float by = y + h - ath;

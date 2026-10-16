@@ -31,8 +31,12 @@ import io.viki.momentum.sfx.AudioEncoding;
 import io.viki.momentum.sfx.AudioFormat;
 import org.jspecify.annotations.Nullable;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 
 /**
@@ -41,6 +45,7 @@ import java.util.Collection;
 public final class OggVorbisInputStream extends AudioInputStream {
   private static final int DECODE_BUFFER_BYTES = 64 * 1024;
   private static final int MAX_EMPTY_DECODER_READS = 8;
+  private static final int VORBIS_SAMPLE_RATE_OFFSET = 12;
 
   private final PhysicalOggStream oggStream;
   private final VorbisStream decoder;
@@ -90,6 +95,59 @@ public final class OggVorbisInputStream extends AudioInputStream {
       closeAfterFailure(physical, exception);
       throw exception;
     }
+  }
+
+  /**
+   * Opens an Ogg/Vorbis decoder that owns the input.
+   *
+   * @param input Ogg container stream
+   * @return PCM decoder
+   * @throws IOException if the container cannot be decoded
+   */
+  public static OggVorbisInputStream open(InputStream input) throws IOException {
+    return new OggVorbisInputStream(input);
+  }
+
+  /**
+   * Reads one finite Vorbis stream's duration by scanning pages, without decoding PCM.
+   * Consumes but does not close the input; compressed audio payloads are skipped.
+   *
+   * @param input Ogg stream positioned at its beginning
+   * @return duration in seconds
+   * @throws IOException if the stream is truncated, unsupported or contains multiple logical streams
+   */
+  public static float getDuration(InputStream input) throws IOException {
+    BufferedInputStream source = input instanceof BufferedInputStream buffered ? buffered : new BufferedInputStream(input);
+    OggPage page = OggPage.create(source, false);
+    byte[] header = page.getData();
+    if (header.length < VORBIS_SAMPLE_RATE_OFFSET + Integer.BYTES || header[0] != 1
+        || !new String(header, 1, 6, StandardCharsets.US_ASCII).equals("vorbis")) {
+      throw new AudioFormatException("Ogg duration requires a Vorbis identification header");
+    }
+
+    int sampleRate = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN).getInt(VORBIS_SAMPLE_RATE_OFFSET);
+    if (sampleRate <= 0) {
+      throw new AudioFormatException("Invalid Vorbis sample rate: " + sampleRate);
+    }
+    int serial = page.getStreamSerialNumber();
+
+    while (!page.isEos()) {
+      page = OggPage.create(source, true);
+      if (page.getStreamSerialNumber() != serial) {
+        throw new AudioFormatException("Audio duration requires a single Ogg logical stream");
+      }
+      // j-ogg's skipData omits reading the payload but does not advance an InputStream past it.
+      int payloadBytes = 0;
+      for (int length : page.getSegmentLengths()) {
+        payloadBytes += length;
+      }
+      source.skipNBytes(payloadBytes);
+    }
+    long samples = page.getAbsoluteGranulePosition();
+    if (samples < 0) {
+      throw new AudioFormatException("Vorbis end page has no sample count");
+    }
+    return (float) (samples / (double) sampleRate);
   }
 
   private static int decodeBufferSize(int frameSize) {

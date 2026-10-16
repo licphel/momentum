@@ -35,6 +35,7 @@ public final class Loop {
   private static boolean runningSlowly;
 
   private static float delta;
+  private static float renderDelta;
   private static float partialTicks;
   private static float tickTime;
   private static float frameTime;
@@ -84,6 +85,7 @@ public final class Loop {
 
     Loop.maxTps = maxTps;
     Loop.delta = (float) (1.0 / maxTps);
+    renderDelta = 0F;
     stopped = false;
     tickTime = 0F;
     frameTime = 0F;
@@ -93,6 +95,7 @@ public final class Loop {
     long lastTickCountSnapshot = 0L;
     long lastStatsNanos = System.nanoTime();
     long previousFrameNanos = lastStatsNanos;
+    long previousRenderNanos = 0L;
 
     double nextTickNanos = System.nanoTime();
     double nextFrameNanos = nextTickNanos;
@@ -126,12 +129,16 @@ public final class Loop {
 
       // Interpolation between the previous and next tick.
       // Include time spent updating, rather than rendering with a stale frame-start timestamp.
-      double partial = (System.nanoTime() + tickLength - nextTickNanos) / tickLength;
+      long renderNanos = System.nanoTime();
+      double partial = (renderNanos + tickLength - nextTickNanos) / tickLength;
       partialTicks = (float) Math.max(0.0, Math.min(partial, 1.0));
 
       // Frame time for rendering: accumulated tick time plus the interpolated step.
       frameTime = (float) ((tickCount + (double) partialTicks) / maxTps);
 
+      renderDelta = previousRenderNanos == 0L ? 0F
+          : (float) ((renderNanos - previousRenderNanos) / 1_000_000_000.0);
+      previousRenderNanos = renderNanos;
       draw.run();
       frameCounter++;
 
@@ -213,6 +220,18 @@ public final class Loop {
    */
   public static float delta() {
     return delta;
+  }
+
+  /**
+   * Real seconds between consecutive render callbacks, including drawing, frame limiting,
+   * and logic updates. The first frame after launch returns zero. Unlike {@link #delta()},
+   * this value follows frame cadence and is not clamped or scaled by simulation time.
+   * Read from the owning render thread when advancing presentation animations.
+   *
+   * @return the elapsed render step in seconds
+   */
+  public static float renderDelta() {
+    return renderDelta;
   }
 
   /**

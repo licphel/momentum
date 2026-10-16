@@ -36,15 +36,22 @@ import java.io.ByteArrayInputStream;
 class WrappedAudioInputStream extends AudioInputStream {
   private final ByteArrayInputStream input;
   private final AudioFormat format;
+  private final float duration;
 
   public WrappedAudioInputStream(byte[] data, AudioFormat format) {
     this.format = format;
+    duration = (float) format.bytesToSeconds(data.length);
     input = new ByteArrayInputStream(data);
   }
 
   @Override
   public AudioFormat format() {
     return format;
+  }
+
+  @Override
+  public float getDuration() {
+    return duration;
   }
 
   @Override

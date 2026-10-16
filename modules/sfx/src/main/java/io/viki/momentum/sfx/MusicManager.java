@@ -71,8 +71,22 @@ public final class MusicManager implements AutoCloseable {
    * @throws IllegalArgumentException if the clip is already retained
    */
   public void switchTo(Clip clip, FloatSupplier baseVol, Fade fade) {
-    checkTransfer(clip);
-    begin(Transition.REPLACE, new Track(clip, baseVol, fade));
+    switchTo(clip, baseVol, fade, 0);
+  }
+
+  /**
+   * Replaces retained music after its fade-out, then waits before fading in the new clip.
+   * The delay starts when the outgoing transition finishes, not when this method is called.
+   *
+   * @param clip         open, unfinished clip whose ownership transfers immediately
+   * @param baseVol      dynamic local gain, multiplied by the fade envelope
+   * @param fade         new track's fade-in and subsequent fade-out durations
+   * @param delaySeconds nonnegative silence before the incoming clip starts
+   * @throws IllegalArgumentException if the delay is negative or the clip is already owned
+   * @throws IllegalStateException if the manager or clip is unavailable
+   */
+  public void switchTo(Clip clip, FloatSupplier baseVol, Fade fade, float delaySeconds) {
+    begin(Transition.REPLACE, prepare(clip, baseVol, fade, delaySeconds));
   }
 
   /**
@@ -102,8 +116,23 @@ public final class MusicManager implements AutoCloseable {
    * @throws IllegalArgumentException if the clip is already retained
    */
   public void insert(Clip clip, FloatSupplier baseVol, Fade fade) {
-    checkTransfer(clip);
-    begin(Transition.INSERT, new Track(clip, baseVol, fade));
+    insert(clip, baseVol, fade, 0);
+  }
+
+  /**
+   * Fades out and pauses the current track, waits, then fades in the inserted clip.
+   * Interrupted tracks retain playback progress and their independent fade settings.
+   * The delay advances only after the new track reaches the top of the stack.
+   *
+   * @param clip         open, unfinished clip whose ownership transfers immediately
+   * @param baseVol      dynamic local gain, multiplied by the fade envelope
+   * @param fade         inserted track's fade-in and subsequent fade-out durations
+   * @param delaySeconds nonnegative silence before the inserted clip starts
+   * @throws IllegalArgumentException if the delay is negative or the clip is already owned
+   * @throws IllegalStateException if the manager or clip is unavailable
+   */
+  public void insert(Clip clip, FloatSupplier baseVol, Fade fade, float delaySeconds) {
+    begin(Transition.INSERT, prepare(clip, baseVol, fade, delaySeconds));
   }
 
   /**
@@ -165,6 +194,7 @@ public final class MusicManager implements AutoCloseable {
    * @param elapsedSeconds nonnegative elapsed playback-control time, in seconds
    * @throws IllegalArgumentException if elapsed time is negative
    */
+  @SuppressWarnings("all")
   public void update(float elapsedSeconds) {
     if (elapsedSeconds < 0) {
       throw new IllegalArgumentException("Music update elapsed time must be nonnegative");
@@ -212,6 +242,11 @@ public final class MusicManager implements AutoCloseable {
     if (current.fade.inSeconds() > 0 && current.fadeElapsed < current.fade.inSeconds()) {
       current.fadeElapsed = Math.min(current.fade.inSeconds(), current.fadeElapsed + elapsedSeconds);
       current.envelope = current.fadeElapsed / current.fade.inSeconds();
+    }
+    // Natural completion must fade while samples still remain, not after shouldClose().
+    float remaining = current.clip.getRemainingDuration();
+    if (current.fade.outSeconds() > 0 && remaining >= 0 && remaining < current.fade.outSeconds()) {
+      current.envelope = Math.min(current.envelope, remaining / current.fade.outSeconds());
     }
   }
 
@@ -282,6 +317,16 @@ public final class MusicManager implements AutoCloseable {
     }
   }
 
+  private Track prepare(Clip clip, FloatSupplier baseVol, Fade fade, float delaySeconds) {
+    if (delaySeconds < 0) {
+      throw new IllegalArgumentException("Music delay must be nonnegative");
+    }
+    checkTransfer(clip);
+    Track next = new Track(clip, baseVol, fade);
+    next.delay = delaySeconds;
+    return next;
+  }
+
   @SuppressWarnings("all")
   private void begin(Transition requested, @Nullable Track next) {
     if (transition != Transition.NONE) {
@@ -293,7 +338,8 @@ public final class MusicManager implements AutoCloseable {
     incoming = next;
     transition = requested;
     transitionElapsed = 0;
-    if (!tracks.isEmpty() && !tracks.peek().clip.shouldClose() && tracks.peek().fade.outSeconds() > 0) {
+    if (!tracks.isEmpty() && !tracks.peek().clip.shouldClose()
+        && tracks.peek().envelope > 0 && tracks.peek().fade.outSeconds() > 0) {
       outgoingEnvelope = tracks.peek().envelope;
     } else {
       finishTransition();
@@ -361,7 +407,8 @@ public final class MusicManager implements AutoCloseable {
    * Independent gain transition durations for a retained clip.
    *
    * <p>Zero disables a fade. Fade-out applies to interruption or explicit removal; natural
-   * completion cannot fade samples that have already ended. Instances are thread-safe.
+   * completion fades in advance when the clip exposes its remaining duration. Unknown-length
+   * streams can only fade once their endpoint becomes known. Instances are thread-safe.
    *
    * @param inSeconds  fade-in duration when starting or resuming, in seconds
    * @param outSeconds fade-out duration before pausing or releasing, in seconds
