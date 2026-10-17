@@ -31,6 +31,7 @@ import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 import io.viki.momentum.input.event.*;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
@@ -44,12 +45,14 @@ import java.util.List;
 @InternalApi
 final class InputRouter implements AutoCloseable {
   private static final KeyCode[] KEY_CODES = KeyCode.values();
+  private static final MouseButton[] MOUSE_BUTTONS = MouseButton.values();
 
   private final Canvas canvas;
   private final DpiContext context;
   private final @Nullable View view;
   private final InputSnapshot snapshot;
   private final @Nullable Element[] keyCaptures = new Element[KEY_CODES.length];
+  private final @Nullable Element[] pointerCaptures = new Element[MOUSE_BUTTONS.length];
   private @Nullable Element hoveredElement;
   private float pointerX;
   private float pointerY;
@@ -70,11 +73,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private static void cancelCapture(Element target, KeyCode key) {
-    if (key.mouseId() >= 0) {
-      target.onPointerCancel(key);
-    } else {
-      target.onKeyCancel(key);
-    }
+    target.onKeyCancel(key);
   }
 
   InputSnapshot snapshot() {
@@ -85,7 +84,7 @@ final class InputRouter implements AutoCloseable {
     ensureOpen();
     canvas.updateLayout();
     if (view == null) {
-      snapshot.applyMouseMove(inputX, inputY);
+      snapshot.mouse().onMove(inputX, inputY);
     }
     updatePointer(inputX, inputY);
     purgeDetachedReferences();
@@ -100,38 +99,35 @@ final class InputRouter implements AutoCloseable {
     setHovered(routeMouseMove(canvas, pointerX, pointerY));
   }
 
-  boolean dispatchMouseButton(KeyCode button, KeyAction action, double inputX, double inputY,
+  boolean dispatchMouseButton(MouseButton button, KeyAction action, double inputX, double inputY,
                               int modifiers) {
     ensureOpen();
     canvas.updateLayout();
-    int mouseId = button.mouseId();
-    if (mouseId < 0) {
-      throw new IllegalArgumentException("Pointer callback requires a mouse button, got " + button);
-    }
     if (view == null) {
-      snapshot.applyMouseButton(button, action, inputX, inputY, modifiers);
+      snapshot.mouse().onMove(inputX, inputY);
+      snapshot.mouse().onButtonChange(button, action, modifiers);
     }
     updatePointer(inputX, inputY);
     purgeDetachedReferences();
 
     if (action == KeyAction.PRESS) {
       int captureIndex = button.ordinal();
-      Element previousCapture = keyCaptures[captureIndex];
+      Element previousCapture = pointerCaptures[captureIndex];
       if (previousCapture != null) {
-        cancelCapture(previousCapture, button);
+        previousCapture.onPointerCancel(button);
       }
       canvas.bringWindowToFrontAt(pointerX, pointerY);
       Element target = routeMouseButton(canvas, pointerX, pointerY, button, action, modifiers);
-      keyCaptures[captureIndex] = target;
+      pointerCaptures[captureIndex] = target;
       canvas.focusNearest(target);
       setHovered(routeMouseMove(canvas, pointerX, pointerY));
       return target != null;
     }
 
     int captureIndex = button.ordinal();
-    Element target = keyCaptures[captureIndex];
+    Element target = pointerCaptures[captureIndex];
     if (action == KeyAction.RELEASE) {
-      keyCaptures[captureIndex] = null;
+      pointerCaptures[captureIndex] = null;
     }
     if (target == null) {
       target = routeMouseButton(canvas, pointerX, pointerY, button, action, modifiers);
@@ -148,7 +144,7 @@ final class InputRouter implements AutoCloseable {
     ensureOpen();
     canvas.updateLayout();
     if (view == null) {
-      snapshot.applyScroll(deltaX, deltaY);
+      snapshot.mouse().onScroll(deltaX, deltaY);
     }
     updatePointer(inputX, inputY);
     purgeDetachedReferences();
@@ -158,7 +154,7 @@ final class InputRouter implements AutoCloseable {
   boolean dispatchKey(KeyCode key, KeyAction action, int modifiers) {
     ensureOpen();
     if (view == null) {
-      snapshot.applyKey(key, action, modifiers);
+      snapshot.keyboard().onKeyChange(key, action, modifiers);
     }
     int captureIndex = key.ordinal();
     Element target = keyCaptures[captureIndex];
@@ -355,7 +351,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButton(Element element, float x, float y,
-                                             KeyCode button, KeyAction action, int modifiers) {
+                                             MouseButton button, KeyAction action, int modifiers) {
     if (!element.visible()) {
       return null;
     }
@@ -367,7 +363,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonContent(Element element, float x, float y,
-                                                    KeyCode button, KeyAction action, int modifiers) {
+                                                    MouseButton button, KeyAction action, int modifiers) {
     if (!element.containsLocal(x, y)) {
       return null;
     }
@@ -379,7 +375,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonParts(Element element, float x, float y,
-                                                  KeyCode button, KeyAction action, int modifiers) {
+                                                  MouseButton button, KeyAction action, int modifiers) {
     Element target = routeMouseButton(element.parts(), x, y, button, action, modifiers);
     if (target != null) {
       return target;
@@ -396,7 +392,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButtonContent(List<Element> elements, float x, float y,
-                                                    KeyCode button, KeyAction action, int modifiers) {
+                                                    MouseButton button, KeyAction action, int modifiers) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       Element child = elements.get(i);
       Element target = routeMouseButtonContent(child,
@@ -409,7 +405,7 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element routeMouseButton(List<Element> elements, float x, float y,
-                                             KeyCode button, KeyAction action, int modifiers) {
+                                             MouseButton button, KeyAction action, int modifiers) {
     for (int i = elements.size() - 1; i >= 0; i--) {
       Element child = elements.get(i);
       Element target = routeMouseButton(child,
@@ -503,48 +499,45 @@ final class InputRouter implements AutoCloseable {
   }
 
   private @Nullable Element firstCapture() {
-    for (KeyCode key : KEY_CODES) {
-      if (key.mouseId() >= 0) {
-        Element capture = keyCaptures[key.ordinal()];
-        if (capture != null) {
-          return capture;
-        }
-      }
-    }
+    for (Element capture : pointerCaptures) if (capture != null) return capture;
     return null;
   }
 
   private void cancelCaptures() {
+    cancelPointerCaptures();
     for (KeyCode key : KEY_CODES) {
       Element capture = keyCaptures[key.ordinal()];
       if (capture != null) {
-        cancelCapture(capture, key);
+        capture.onKeyCancel(key);
         keyCaptures[key.ordinal()] = null;
       }
     }
   }
 
   private void cancelPointerCaptures() {
-    for (KeyCode key : KEY_CODES) {
-      if (key.mouseId() >= 0) {
-        Element capture = keyCaptures[key.ordinal()];
-        if (capture != null) {
-          cancelCapture(capture, key);
-          keyCaptures[key.ordinal()] = null;
-        }
+    for (MouseButton button : MOUSE_BUTTONS) {
+      Element capture = pointerCaptures[button.ordinal()];
+      if (capture != null) {
+        capture.onPointerCancel(button);
+        pointerCaptures[button.ordinal()] = null;
       }
     }
   }
 
   private void purgeDetachedReferences() {
-    if (hoveredElement != null && !canvas.isAttached(hoveredElement)) {
-      setHovered(null);
-    }
+    if (hoveredElement != null && !canvas.isAttached(hoveredElement)) setHovered(null);
     for (KeyCode key : KEY_CODES) {
       Element capture = keyCaptures[key.ordinal()];
       if (capture != null && !canvas.isAttached(capture)) {
-        cancelCapture(capture, key);
+        capture.onKeyCancel(key);
         keyCaptures[key.ordinal()] = null;
+      }
+    }
+    for (MouseButton button : MOUSE_BUTTONS) {
+      Element capture = pointerCaptures[button.ordinal()];
+      if (capture != null && !canvas.isAttached(capture)) {
+        capture.onPointerCancel(button);
+        pointerCaptures[button.ordinal()] = null;
       }
     }
   }

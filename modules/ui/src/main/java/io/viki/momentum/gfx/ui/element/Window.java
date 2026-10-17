@@ -28,7 +28,7 @@ import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoWindowRenderer;
 import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
@@ -408,14 +408,14 @@ public final class Window extends Element {
   }
 
   @Override
-  public boolean onMouseButton(float x, float y, KeyCode button, KeyAction action, int modifiers) {
-    if (action == KeyAction.PRESS && button.mouseId() >= 0) {
+  public boolean onMouseButton(float x, float y, MouseButton button, KeyAction action, int modifiers) {
+    if (action == KeyAction.PRESS) {
       Canvas canvas = owningCanvas();
       if (canvas != null) {
         canvas.bringWindowToFrontAt(absoluteBounds().minX() + x, absoluteBounds().minY() + y);
       }
     }
-    if (button != KeyCode.MOUSE_LEFT) {
+    if (button != MouseButton.LEFT) {
       return true;
     }
     if (action == KeyAction.PRESS && closable && inCloseButton(x, y)) {
@@ -467,7 +467,7 @@ public final class Window extends Element {
   }
 
   @Override
-  public void onPointerCancel(KeyCode button) {
+  public void onPointerCancel(MouseButton button) {
     dragging = false;
     closePressed = false;
     minimizePressed = false;

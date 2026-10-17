@@ -46,9 +46,9 @@ public final class Button extends Element {
   private boolean focused;
   private boolean pointerPressed;
   private boolean keyboardPressed;
-  private @Nullable KeyCode pointerKey;
+  private @Nullable MouseButton pointerKey;
   private @Nullable KeyCode keyboardKey;
-  private @Nullable KeyBinding activationBinding;
+  private @Nullable InputBinding activationBinding;
   private @Nullable Runnable onClick;
 
   /**
@@ -77,12 +77,12 @@ public final class Button extends Element {
    * @param snapshot the input snapshot used to build transition matches
    * @return a binding that recognizes the standard button activation keys
    */
-  public static KeyBinding makeConventionalActivationKeyBinding(InputSnapshot snapshot) {
-    return new KeyBinding("button.activate",
-        KeyMatch.of(snapshot.key(KeyCode.MOUSE_LEFT)),
-        KeyMatch.of(snapshot.key(KeyCode.ENTER)),
-        KeyMatch.of(snapshot.key(KeyCode.KP_ENTER)),
-        KeyMatch.of(snapshot.key(KeyCode.SPACE)));
+  public static InputBinding makeConventionalActivationBinding(InputSnapshot snapshot) {
+    return snapshot.binding("button.activate",
+        BindingDefinition.of("button.activate.mouse", "<Mouse>/leftButton"),
+        BindingDefinition.of("button.activate.enter", "<Keyboard>/enter"),
+        BindingDefinition.of("button.activate.keypad", "<Keyboard>/KP_ENTER"),
+        BindingDefinition.of("button.activate.space", "<Keyboard>/space"));
   }
 
   private static boolean isDefaultKeyboardActivation(KeyCode key) {
@@ -175,7 +175,7 @@ public final class Button extends Element {
    *
    * @param value the binding, or {@code null} to use default activation behavior
    */
-  public void setActivationBinding(@Nullable KeyBinding value) {
+  public void setActivationBinding(@Nullable InputBinding value) {
     activationBinding = value;
   }
 
@@ -185,14 +185,14 @@ public final class Button extends Element {
   }
 
   @Override
-  public boolean onMouseButton(float x, float y, KeyCode button, KeyAction action, int modifiers) {
-    if (!enabled || button.mouseId() < 0 || action == KeyAction.REPEAT) {
+  public boolean onMouseButton(float x, float y, MouseButton button, KeyAction action, int modifiers) {
+    if (!enabled || action == KeyAction.REPEAT) {
       return false;
     }
     if (action == KeyAction.PRESS) {
-      KeyBinding binding = activationBinding();
+      InputBinding binding = activationBinding();
       if (binding == null
-          ? button != KeyCode.MOUSE_LEFT
+          ? button != MouseButton.LEFT
           : !binding.transitioned()) {
         return false;
       }
@@ -218,7 +218,7 @@ public final class Button extends Element {
       return false;
     }
     if (action == KeyAction.PRESS) {
-      KeyBinding binding = activationBinding();
+      InputBinding binding = activationBinding();
       if (binding == null
           ? !isDefaultKeyboardActivation(key)
           : !binding.transitioned()) {
@@ -254,7 +254,7 @@ public final class Button extends Element {
   }
 
   @Override
-  public void onPointerCancel(KeyCode button) {
+  public void onPointerCancel(MouseButton button) {
     if (pointerKey == button) {
       pointerPressed = false;
       pointerKey = null;
@@ -295,7 +295,7 @@ public final class Button extends Element {
     }
   }
 
-  private @Nullable KeyBinding activationBinding() {
+  private @Nullable InputBinding activationBinding() {
     return activationBinding;
   }
 

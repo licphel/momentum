@@ -8,43 +8,35 @@ package io.viki.momentum.util;
  * {@link #partialTicks()} to interpolate between the previous and current
  * tick state.
  *
- * <p>This class is a process-wide singleton bound to the render thread.
+ * <p>Each instance owns an independent timeline bound to its driving thread.
  * It must only be driven from a single thread.
  */
 public final class Loop {
   /** Maximum number of catch-up ticks per frame before the loop is considered "slow". */
   private static final int MAX_CATCH_UP_TICKS = 5;
-
   /** Stats are recomputed at this interval, in nanoseconds. */
   private static final long STATS_INTERVAL_NANOS = 500_000_000L;
-
   /** Busy-wait is used only for sleeps shorter than this, to avoid OS scheduler jitter. */
   private static final long SPIN_THRESHOLD_NANOS = 100_000L;
-
   /** Leave scheduler headroom instead of sleeping all the way to the deadline. */
   private static final long SLEEP_HEADROOM_NANOS = 2_000_000L;
-
   /** Bound each sleep so a loaded scheduler cannot amplify a long sleep request. */
   private static final long MAX_SLEEP_NANOS = 5_000_000L;
 
-  private static volatile boolean stopped;
-  private static int maxTps;
+  private volatile boolean stopped;
 
-  private static long tickCount;
-  private static boolean hasTicked;
-  private static boolean runningSlowly;
+  private long tickCount;
+  private boolean hasTicked;
+  private boolean runningSlowly;
 
-  private static float delta;
-  private static float renderDelta;
-  private static float partialTicks;
-  private static float tickTime;
-  private static float frameTime;
-  private static float realFrameTime;
-  private static volatile int currentFps;
-  private static volatile int currentTps;
-
-  private Loop() {
-  }
+  private float delta;
+  private float renderDelta;
+  private float partialTicks;
+  private float tickTime;
+  private float frameTime;
+  private float realFrameTime;
+  private volatile int currentFps;
+  private volatile int currentTps;
 
   /**
    * Runs the main loop until {@link #stop()} is called, with no frame rate limit.
@@ -53,7 +45,7 @@ public final class Loop {
    * @param tick   the logic update, invoked once per tick step
    * @param draw   the render pass, invoked once per frame
    */
-  public static void launch(int maxTps, Runnable tick, Runnable draw) {
+  public void launch(int maxTps, Runnable tick, Runnable draw) {
     launch(maxTps, 0, tick, draw);
   }
 
@@ -72,7 +64,7 @@ public final class Loop {
    * @param tick   the logic update, invoked once per tick step
    * @param draw   the render pass, invoked once per frame
    */
-  public static void launch(int maxTps, int maxFps, Runnable tick, Runnable draw) {
+  public void launch(int maxTps, int maxFps, Runnable tick, Runnable draw) {
     if (maxTps <= 0) {
       throw new IllegalArgumentException("maxTps must be positive");
     }
@@ -83,13 +75,18 @@ public final class Loop {
     double tickLength = 1_000_000_000.0 / maxTps;
     double frameLength = maxFps > 0 ? 1_000_000_000.0 / maxFps : 0.0;
 
-    Loop.maxTps = maxTps;
-    Loop.delta = (float) (1.0 / maxTps);
+    this.delta = (float) (1.0 / maxTps);
     renderDelta = 0F;
     stopped = false;
     tickTime = 0F;
     frameTime = 0F;
     tickCount = 0L;
+    hasTicked = false;
+    runningSlowly = false;
+    partialTicks = 0F;
+    realFrameTime = 0F;
+    currentFps = 0;
+    currentTps = 0;
 
     long frameCounter = 0L;
     long lastTickCountSnapshot = 0L;
@@ -176,7 +173,7 @@ public final class Loop {
    * to avoid OS scheduler jitter and {@link Thread#sleep} for longer ones.
    */
   @SuppressWarnings("BusyWait")
-  private static void sleepPrecise(double nanos) {
+  private void sleepPrecise(double nanos) {
     long target = System.nanoTime() + (long) nanos;
     long remaining;
     // Like Starbound's Windows limiter, recheck the deadline between short
@@ -199,7 +196,7 @@ public final class Loop {
   }
 
   /** Stops the main loop after the current frame. */
-  public static void stop() {
+  public void stop() {
     stopped = true;
   }
 
@@ -208,7 +205,7 @@ public final class Loop {
    *
    * @return whether stop has been requested
    */
-  public static boolean stopped() {
+  public boolean stopped() {
     return stopped;
   }
 
@@ -218,7 +215,7 @@ public final class Loop {
    *
    * @return the fixed time step
    */
-  public static float delta() {
+  public float delta() {
     return delta;
   }
 
@@ -230,7 +227,7 @@ public final class Loop {
    *
    * @return the elapsed render step in seconds
    */
-  public static float renderDelta() {
+  public float renderDelta() {
     return renderDelta;
   }
 
@@ -240,7 +237,7 @@ public final class Loop {
    *
    * @return the render partial ticks
    */
-  public static float partialTicks() {
+  public float partialTicks() {
     return partialTicks;
   }
 
@@ -249,7 +246,7 @@ public final class Loop {
    *
    * @return the logic tick time in seconds
    */
-  public static float tickTime() {
+  public float tickTime() {
     return tickTime;
   }
 
@@ -259,7 +256,7 @@ public final class Loop {
    *
    * @return interpolated frame time in seconds
    */
-  public static float frameTime() {
+  public float frameTime() {
     return frameTime;
   }
 
@@ -269,7 +266,7 @@ public final class Loop {
    *
    * @return real frame time in seconds
    */
-  public static float realFrameTime() {
+  public float realFrameTime() {
     return realFrameTime;
   }
 
@@ -278,7 +275,7 @@ public final class Loop {
    *
    * @return the logic tick count
    */
-  public static long tickCount() {
+  public long tickCount() {
     return tickCount;
   }
 
@@ -287,7 +284,7 @@ public final class Loop {
    *
    * @return whether at least one tick ran before the current draw
    */
-  public static boolean hasTicked() {
+  public boolean hasTicked() {
     return hasTicked;
   }
 
@@ -298,7 +295,7 @@ public final class Loop {
    *
    * @return whether the loop is running slowly
    */
-  public static boolean isRunningSlowly() {
+  public boolean isRunningSlowly() {
     return runningSlowly;
   }
 
@@ -307,7 +304,7 @@ public final class Loop {
    *
    * @return the current FPS
    */
-  public static int fps() {
+  public int fps() {
     return currentFps;
   }
 
@@ -316,7 +313,7 @@ public final class Loop {
    *
    * @return the current TPS
    */
-  public static int tps() {
+  public int tps() {
     return currentTps;
   }
 
@@ -340,7 +337,7 @@ public final class Loop {
    * @param b the value at {@code t = 1}
    * @return {@code a + (b - a) * partialTicks()}
    */
-  public static float lerp(float a, float b) {
+  public float lerp(float a, float b) {
     return a + (b - a) * partialTicks;
   }
 }

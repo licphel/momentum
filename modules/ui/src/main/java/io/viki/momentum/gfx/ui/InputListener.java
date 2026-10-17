@@ -26,6 +26,7 @@ package io.viki.momentum.gfx.ui;
 
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 
 /**
  * Receives direct input callbacks for one UI element.
@@ -56,7 +57,7 @@ public interface InputListener {
    * @param modifiers the active keyboard modifier mask
    * @return whether the event was consumed
    */
-  default boolean onMouseButton(float x, float y, KeyCode button, KeyAction action, int modifiers) {
+  default boolean onMouseButton(float x, float y, MouseButton button, KeyAction action, int modifiers) {
     return false;
   }
 
@@ -108,7 +109,7 @@ public interface InputListener {
    *
    * @param button the button whose capture was canceled
    */
-  default void onPointerCancel(KeyCode button) {
+  default void onPointerCancel(MouseButton button) {
   }
 
   /**

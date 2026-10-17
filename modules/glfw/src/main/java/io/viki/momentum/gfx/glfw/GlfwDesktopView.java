@@ -27,6 +27,7 @@ package io.viki.momentum.gfx.glfw;
 import io.viki.momentum.event.Event;
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 import io.viki.momentum.input.event.*;
 import io.viki.momentum.gfx.io.ImageInfo;
 import io.viki.momentum.gfx.view.DesktopView;
@@ -73,6 +74,8 @@ public final class GlfwDesktopView extends DesktopView {
   private boolean hasContext;
   private long cursorHandle;
   private boolean closeRequested;
+  private final GlfwJoystickInput joystickInput = new GlfwJoystickInput();
+  private long lastInputPoll;
 
   /** Creates an uninitialized GLFW display. */
   public GlfwDesktopView() {
@@ -217,11 +220,16 @@ public final class GlfwDesktopView extends DesktopView {
   /** Polls pending GLFW events. */
   @Override
   protected void onPollEvents() {
+    long now = System.nanoTime();
+    float delta = lastInputPoll == 0L ? 0F : (now - lastInputPoll) * 1.0E-9F;
+    lastInputPoll = now;
     try {
       glfwPollEvents();
     } catch (Exception _) {
       // Ignored
     }
+    joystickInput.poll(snapshot(), focused);
+    snapshot().updateBindings(delta);
   }
 
   @Override
@@ -415,7 +423,7 @@ public final class GlfwDesktopView extends DesktopView {
       KeyCode code = GlfwKeyMapper.kc(key);
       if (code != null) {
         KeyEvent event = new KeyEvent(code, GlfwKeyMapper.ac(action), mods);
-        snapshot().applyKeyEvent(event);
+        snapshot().keyboard().onKeyChange(code, GlfwKeyMapper.ac(action), mods);
         eventBus().post((Event) event);
       }
     };
@@ -432,7 +440,7 @@ public final class GlfwDesktopView extends DesktopView {
     callbacks[CB_CURSOR_POS] = (GLFWCursorPosCallbackI) (win, cx, cy) -> {
       cursorX = cx;
       cursorY = cy;
-      snapshot().applyMouseMove(cx, cy);
+      snapshot().mouse().onMove(cx, cy);
       Event event = new MouseMoveEvent(cx, cy);
       eventBus().post(event);
     };
@@ -440,10 +448,10 @@ public final class GlfwDesktopView extends DesktopView {
 
     // Mouse button
     callbacks[CB_MOUSE_BUTTON] = (GLFWMouseButtonCallbackI) (win, button, action, mods) -> {
-      KeyCode mb = KeyCode.fromMouseId(button);
-      if (mb != null) {
+      if (button >= GLFW_MOUSE_BUTTON_1 && button <= GLFW_MOUSE_BUTTON_LAST) {
+        MouseButton mb = MouseButton.fromIndex(button);
         MouseButtonEvent event = new MouseButtonEvent(mb, GlfwKeyMapper.ac(action), cursorX, cursorY, mods);
-        snapshot().applyMouseButton(event);
+        snapshot().mouse().onButtonChange(mb, GlfwKeyMapper.ac(action), mods);
         eventBus().post((Event) event);
       }
     };
@@ -452,7 +460,7 @@ public final class GlfwDesktopView extends DesktopView {
     // Scroll
     callbacks[CB_SCROLL] = (GLFWScrollCallbackI) (win, xOffset, yOffset) -> {
       ScrollEvent event = new ScrollEvent(xOffset, yOffset, cursorX, cursorY);
-      snapshot().applyScroll(xOffset, yOffset);
+      snapshot().mouse().onScroll(xOffset, yOffset);
       eventBus().post((Event) event);
     };
     glfwSetScrollCallback(handle, (GLFWScrollCallbackI) callbacks[CB_SCROLL]);
@@ -472,6 +480,7 @@ public final class GlfwDesktopView extends DesktopView {
     // Window focus
     callbacks[CB_WINDOW_FOCUS] = (GLFWWindowFocusCallbackI) (win, focused) -> {
       this.focused = focused;
+      snapshot().onFocusChange(focused);
       Event event = new FocusEvent(focused);
       eventBus().post(event);
     };

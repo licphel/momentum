@@ -8,28 +8,101 @@ public final class ScrollState implements Scroller {
   private double deltaX;
   private double deltaY;
 
-  public ScrollState(boolean persistent) { this.persistent = persistent; }
-  @Override public double x() { return x; }
-  @Override public double y() { return y; }
-  @Override public double deltaX() { return deltaX; }
-  @Override public double deltaY() { return deltaY; }
-  @Override public boolean persistent() { return persistent; }
+  /**
+   * Creates a scroll or stick state.
+   *
+   * @param persistent whether changes update a retained position
+   */
+  public ScrollState(boolean persistent) {
+    this.persistent = persistent;
+  }
 
-  /** Accumulates a relative impulse; persistent sources also advance their positions. */
+  /**
+   * Returns the accumulated horizontal change for this frame.
+   *
+   * @return horizontal delta
+   */
+  @Override
+  public double deltaX() {
+    return deltaX;
+  }
+
+  /**
+   * Returns the accumulated vertical change for this frame.
+   *
+   * @return vertical delta
+   */
+  @Override
+  public double deltaY() {
+    return deltaY;
+  }
+
+  /**
+   * Returns the retained horizontal position.
+   *
+   * @return horizontal position
+   */
+  @Override
+  public double x() {
+    return x;
+  }
+
+  /**
+   * Returns the retained vertical position.
+   *
+   * @return vertical position
+   */
+  @Override
+  public double y() {
+    return y;
+  }
+
+  /**
+   * Reports whether this state retains positions between frames.
+   *
+   * @return whether positions persist
+   */
+  @Override
+  public boolean persistent() {
+    return persistent;
+  }
+
+  /**
+   * Accumulates a relative impulse; persistent sources also advance their positions.
+   *
+   * @param dx horizontal change
+   * @param dy vertical change
+   */
   public void add(double dx, double dy) {
     deltaX += dx;
     deltaY += dy;
-    if (persistent) { x += dx; y += dy; }
+    if (persistent) {
+      x += dx;
+      y += dy;
+    }
   }
 
-  /** Updates a persistent position, accumulating its actual change. */
+  /**
+   * Updates a persistent position, accumulating its actual change.
+   *
+   * @param x new horizontal position
+   * @param y new vertical position
+   * @throws IllegalStateException if this state is relative-only
+   */
   public void setPosition(double x, double y) {
-    if (!persistent) throw new IllegalStateException("A relative scroller has no retained position");
+    if (!persistent) {
+      throw new IllegalStateException("A relative scroller has no retained position");
+    }
     add(x - this.x, y - this.y);
   }
 
   /** Clears changes without discarding a held axis position. */
-  public void clearFrameState() { deltaX = deltaY = 0; }
+  public void clearFrameState() {
+    deltaX = deltaY = 0;
+  }
+
   /** Clears positions and changes, for focus loss or device removal. */
-  public void reset() { x = y = deltaX = deltaY = 0; }
+  public void reset() {
+    x = y = deltaX = deltaY = 0;
+  }
 }

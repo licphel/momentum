@@ -28,6 +28,7 @@ import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoScrollBarRenderer;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
@@ -247,8 +248,8 @@ public final class ScrollBar extends Element {
   }
 
   @Override
-  public boolean onMouseButton(float x, float y, KeyCode button, KeyAction action, int modifiers) {
-    if (button != KeyCode.MOUSE_LEFT || action == KeyAction.REPEAT) {
+  public boolean onMouseButton(float x, float y, MouseButton button, KeyAction action, int modifiers) {
+    if (button != MouseButton.LEFT || action == KeyAction.REPEAT) {
       return false;
     }
     float pointer = axis(x, y);
@@ -326,7 +327,7 @@ public final class ScrollBar extends Element {
   }
 
   @Override
-  public void onPointerCancel(KeyCode button) {
+  public void onPointerCancel(MouseButton button) {
     dragging = false;
   }
 

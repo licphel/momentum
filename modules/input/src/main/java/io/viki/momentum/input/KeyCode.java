@@ -27,14 +27,12 @@ package io.viki.momentum.input;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Platform-agnostic key codes based on the USB HID Usage Tables (Keyboard/Keypad Page 0x07), with mouse buttons mapped
- * to virtual codes starting at {@value #MOUSE_OFFSET}.
+ * Platform-agnostic keyboard codes based on the USB HID Usage Tables (Keyboard/Keypad Page 0x07).
  *
  * <p>Each backend maps its native key codes to these values. For example, a GLFW
  * backend maps {@code GLFW_KEY_A} → {@link #A}, an Android backend maps {@code KeyEvent.KEYCODE_A} → {@link #A}.
  *
- * <p>Use {@link #fromHidCode(int)} for reverse mapping from HID usage IDs,
- * and {@link #fromMouseId(int)} for mouse button IDs.
+ * <p>Use {@link #fromHidCode(int)} for reverse mapping from HID usage IDs.
  */
 public enum KeyCode {
   /** The A key. */ A(0x04),
@@ -167,30 +165,9 @@ public enum KeyCode {
   /** The right Control key. */ RIGHT_CONTROL(0xE4),
   /** The right Shift key. */ RIGHT_SHIFT(0xE5),
   /** The right Alt key. */ RIGHT_ALT(0xE6),
-  /** The right Super key. */ RIGHT_SUPER(0xE7),
-
-  /** Left mouse button. */
-  MOUSE_LEFT(480),
-  /** Right mouse button. */
-  MOUSE_RIGHT(481),
-  /** Middle mouse button (wheel click). */
-  MOUSE_MIDDLE(482),
-  /** Back thumb button. */
-  MOUSE_BACK(483),
-  /** Forward thumb button. */
-  MOUSE_FORWARD(484),
-  /** Extra mouse button 5. */
-  MOUSE_5(485),
-  /** Extra mouse button 6. */
-  MOUSE_6(486),
-  /** Extra mouse button 7. */
-  MOUSE_7(487);
-
-  /** First virtual code assigned to mouse buttons. */
-  public static final int MOUSE_OFFSET = 480;
+  /** The right Super key. */ RIGHT_SUPER(0xE7);
 
   private static final KeyCode[] LOOKUP;
-  private static final KeyCode[] MOUSE_LOOKUP = new KeyCode[8];
 
   static {
     int max = 0;
@@ -201,7 +178,6 @@ public enum KeyCode {
     for (KeyCode k : values()) {
       LOOKUP[k.code] = k;
     }
-    System.arraycopy(LOOKUP, 480, MOUSE_LOOKUP, 0, 8);
   }
 
   private final int code;
@@ -221,32 +197,11 @@ public enum KeyCode {
   }
 
   /**
-   * Returns the {@code KeyCode} for the given standard mouse button ID ({@code 0} = left, {@code 1} = right, …,
-   * {@code 7} = button 7).
-   *
-   * @param mouseId the mouse button ID in {@code [0, 7]}
-   * @return the matching key code, or {@code null} if out of range
-   */
-  public static @Nullable KeyCode fromMouseId(int mouseId) {
-    return (mouseId >= 0 && mouseId < MOUSE_LOOKUP.length) ? MOUSE_LOOKUP[mouseId] : null;
-  }
-
-  /**
-   * Returns the USB HID usage ID for keyboard keys, or the virtual code for mouse buttons.
+   * Returns the USB HID usage ID.
    *
    * @return the numeric code
    */
   public int hidCode() {
     return code;
-  }
-
-  /**
-   * Returns the standard mouse button ID ({@code 0} = left, …, {@code 7} = button 7), or {@code -1} if this is not a
-   * mouse button.
-   *
-   * @return the mouse button ID, or {@code -1}
-   */
-  public int mouseId() {
-    return (code >= MOUSE_OFFSET && code < MOUSE_OFFSET + 8) ? code - MOUSE_OFFSET : -1;
   }
 }

@@ -28,7 +28,7 @@ package io.viki.momentum.input;
  * Modifier key bitmask constants aligned with GLFW modifier flags.
  *
  * <p>Combine with bitwise OR: {@code InputModifiers.SHIFT | InputModifiers.CONTROL}.
- * Pass {@link #ANY} to {@code Key.transitioned(int)} to match regardless of modifier state.
+ * Use {@link #ANY} in a binding definition to match regardless of modifier state.
  */
 public final class InputModifiers {
   /** Sentinel value that matches any modifier combination. */

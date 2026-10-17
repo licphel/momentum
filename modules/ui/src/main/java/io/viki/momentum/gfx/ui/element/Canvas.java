@@ -32,6 +32,7 @@ import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.input.InputSnapshot;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -160,7 +161,18 @@ public class Canvas extends Element implements AutoCloseable {
         1.0F, renderer);
   }
 
-  /** Opens a canvas with an explicit logical scale and renderer dispatcher. */
+  /**
+   * Opens a canvas with an explicit logical scale and renderer dispatcher.
+   *
+   * @param view             view providing framebuffer size and input events
+   * @param transformHandler handler used for input and graphics transforms
+   * @param logicalWidth     logical canvas width
+   * @param logicalHeight    logical canvas height
+   * @param onlyIntegerScale whether scaling must use an integer factor
+   * @param logicalScale     the logical scale, the resolution
+   * @param renderer         dispatcher used to render the element tree
+   * @return a newly opened canvas
+   */
   public static Canvas open(View view, TransformHandler transformHandler, float logicalWidth,
                             float logicalHeight, boolean onlyIntegerScale, float logicalScale,
                             ElementTreeRenderer renderer) {
@@ -251,7 +263,7 @@ public class Canvas extends Element implements AutoCloseable {
    * @return {@code true} when an element consumed the event
    * @throws IllegalStateException if the canvas has been closed
    */
-  public boolean dispatchMouseButton(KeyCode button, KeyAction action, double inputX,
+  public boolean dispatchMouseButton(MouseButton button, KeyAction action, double inputX,
                                      double inputY, int modifiers) {
     return inputRouter.dispatchMouseButton(button, action, inputX, inputY, modifiers);
   }

@@ -26,16 +26,17 @@ package io.viki.momentum.input.event;
 
 import io.viki.momentum.event.Event;
 import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.MouseButton;
 
 /**
  * A mouse button was pressed or released.
  *
- * @param button    the mouse button as a {@link KeyCode}
+ * @param button    the mouse button as a {@link MouseButton}
  * @param action    {@link KeyAction#PRESS} or {@link KeyAction#RELEASE}
  * @param x         cursor X at the time of the event
  * @param y         cursor Y at the time of the event
  * @param modifiers a bitmask of modifier keys active at the time of the event
  */
-public record MouseButtonEvent(KeyCode button, KeyAction action, double x, double y, int modifiers) implements Event {
+public record MouseButtonEvent(MouseButton button, KeyAction action, double x, double y,
+                               int modifiers) implements Event {
 }

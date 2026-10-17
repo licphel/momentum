@@ -31,4 +31,13 @@ public interface Transitable {
    * @return {@code true} if the input transitioned to held or repeated
    */
   boolean transitionedOrRepeated();
+
+  /**
+   * Reports a transition to released; stateless input views may leave this unsupported.
+   *
+   * @return {@code true} if the input transitioned to released
+   */
+  default boolean released() {
+    return false;
+  }
 }

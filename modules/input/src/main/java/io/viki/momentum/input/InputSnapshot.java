@@ -1,305 +1,320 @@
-/*
- * MIT License
- *
- * Copyright (c) 2026 Licphel
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 package io.viki.momentum.input;
 
-import io.viki.momentum.input.event.KeyEvent;
-import io.viki.momentum.input.event.MouseButtonEvent;
-
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Per-frame pollable input state for game-fmt queries.
+ * Instance-owned devices and logical bindings.
  *
- * <p>{@code InputSnapshot} accumulates keyboard, mouse, and scroll state as the platform integration
- * receives input. Key press state persists across frames — a held key
- * remains {@link KeyAction#PRESS} until the platform reports a release.
- *
- * <p>For higher-level key binding support, use {@link #key(KeyCode)} to create
- * a {@link Key} instance with persistent press tracking, transition detection, and modifier-aware queries.
- *
- * <p>This class is not thread-safe. All methods must be called from the rendering
- * thread.
+ * <p>All access belongs to the owning input thread.
  */
 public final class InputSnapshot {
-  /** Lock-key bits, tracked from event modifier bitmasks as they are toggles rather than held keys. */
-  private static final int LOCK_MODS = InputModifiers.CAPS_LOCK | InputModifiers.NUM_LOCK;
+  /** Number of raw joystick slots maintained by this snapshot. */
+  public static final int JOYSTICK_SLOTS = 16;
+  private final JoystickState[] joysticks = new JoystickState[JOYSTICK_SLOTS];
+  private final JoystickState emptyJoystick = new JoystickState();
+  private final Map<String, InputBinding> actions = new LinkedHashMap<>();
+  private final List<InputBinding> bindings = new ArrayList<>();
+  private final Set<String> disabledGroups = new HashSet<>();
+  private InputProfile profile = InputProfile.EMPTY;
+  private int selectedJoystick = -1;
+  private int activeJoystick = -1;
+  private boolean resetting;
+  private final KeyboardState keyboard = new KeyboardState(this::deviceChanged);
+  private final MouseState mouse = new MouseState(keyboard, this::deviceChanged);
+  private final GamepadState gamepad = new GamepadState(this::deviceChanged);
 
-  private final EnumMap<KeyCode, KeyAction> keyStates = new EnumMap<>(KeyCode.class);
-  private final EnumMap<KeyCode, Integer> keyMods = new EnumMap<>(KeyCode.class);
-  private final Map<KeyCode, Key> keys = new EnumMap<>(KeyCode.class);
-  private double cursorX;
-  private double cursorY;
-  private final ScrollState scroll = new ScrollState(false);
-  private final GamepadState gamepad = new GamepadState();
+  /** Creates an input snapshot with empty device state and no bindings. */
+  public InputSnapshot() {
+    for (int i = 0; i < joysticks.length; i++) {
+      joysticks[i] = new JoystickState(this::deviceChanged);
+    }
+  }
 
-  public Scroller scroll() { return scroll; }
-  public GamepadState gamepad() { return gamepad; }
-  private int currentMods;
-  /** Lock-key state (Caps Lock, Num Lock) from the most recent event. */
-  private int lockMods;
-
-  /**
-   * Returns the current action state of the given key.
-   *
-   * <p>State persists across frames: a held key returns {@link KeyAction#PRESS}
-   * or {@link KeyAction#REPEAT} until the platform reports a release.
-   *
-   * @param code the key to query
-   * @return the action state; defaults to {@link KeyAction#RELEASE} if the key has not been recorded
-   */
-  public KeyAction get(KeyCode code) {
-    return keyStates.getOrDefault(code, KeyAction.RELEASE);
+  private static void checkJoystickSlot(int slot) {
+    if (slot < -1 || slot >= JOYSTICK_SLOTS) {
+      throw new IllegalArgumentException("Joystick slot out of range: " + slot);
+    }
   }
 
   /**
-   * Returns whether the given key is currently held down.
+   * Returns the keyboard state.
    *
-   * <p>This is a convenience for {@code get(code) != KeyAction.RELEASE}.
-   *
-   * @param code the key to query
-   * @return {@code true} if the key is pressed or repeating
+   * @return keyboard state owned by this snapshot
    */
-  public boolean isDown(KeyCode code) {
-    return keyStates.getOrDefault(code, KeyAction.RELEASE) != KeyAction.RELEASE;
+  public KeyboardState keyboard() {
+    return keyboard;
   }
 
   /**
-   * Returns the modifier bitmask last recorded for the given key.
+   * Returns the mouse state.
    *
-   * <p>This reflects the modifiers at the moment of the key's own event. For
-   * the modifiers currently held down, use {@link #mods()}.
-   *
-   * @param code the key to query
-   * @return the modifier bitmask, or {@code 0} if not recorded
+   * @return mouse state owned by this snapshot
    */
-  public int getMods(KeyCode code) {
-    return keyMods.getOrDefault(code, 0);
+  public MouseState mouse() {
+    return mouse;
   }
 
   /**
-   * Returns the modifier bitmask of the modifier keys currently held down,
-   * including the Caps Lock and Num Lock toggle states.
+   * Returns the mapped gamepad state.
    *
-   * <p>Held modifiers are derived from the held state of the modifier keys
-   * themselves, so a modifier pressed after another key is reflected here
-   * immediately, regardless of when that other key was pressed. The lock-key
-   * bits are taken from the most recent event's modifier bitmask.
-   *
-   * @return the currently held modifier bitmask
+   * @return gamepad state owned by this snapshot
    */
-  public int mods() {
-    return currentMods;
+  public GamepadState gamepad() {
+    return gamepad;
   }
 
   /**
-   * Returns the current cursor X position in screen coordinates.
+   * Returns a raw joystick slot.
    *
-   * @return the cursor X position
+   * @param slot joystick slot from {@code 0} through {@link #JOYSTICK_SLOTS} exclusive
+   * @return joystick state for the slot
    */
-  public double cursorX() {
-    return cursorX;
+  public JoystickState joystick(int slot) {
+    return joysticks[slot];
   }
 
   /**
-   * Returns the current cursor Y position in screen coordinates.
+   * Returns the selected active joystick, or an empty state when none is active.
    *
-   * @return the cursor Y position
+   * @return active joystick state
    */
-  public double cursorY() {
-    return cursorY;
+  public JoystickState joystick() {
+    return activeJoystick < 0 ? emptyJoystick : joysticks[activeJoystick];
   }
 
   /**
-   * Returns the accumulated horizontal scroll delta since the last frame.
+   * Creates or retrieves a logical input binding.
    *
-   * @return the horizontal scroll delta
+   * @param id logical action identifier
+   * @param sources default physical alternatives for the action
+   * @return existing or newly created binding
+   * @throws IllegalArgumentException if the identifier or definitions conflict with existing bindings
    */
-  public double scrollDeltaX() {
-    return scroll.deltaX();
-  }
-
-  /**
-   * Returns the accumulated vertical scroll delta since the last frame.
-   *
-   * @return the vertical scroll delta
-   */
-  public double scrollDeltaY() {
-    return scroll.deltaY();
-  }
-
-  /**
-   * Creates a new {@link Key} bound to the given physical key code and registers it for per-frame updates.
-   *
-   * <p>Each call returns a new instance — multiple keys may bind to the same
-   * physical key simultaneously.
-   *
-   * @param code the physical key code to bind
-   * @return a newly created {@code Key}
-   */
-  public Key key(KeyCode code) {
-    return keys.computeIfAbsent(code, k -> new Key(k, this));
-  }
-
-  /**
-   * Updates the keyboard state from a key event.
-   *
-   * <p>Platform integrations call this method when a key event is received. It records the key
-   * action and modifier bitmask for subsequent polling, then forwards the event to every registered
-   * {@link Key} whose bound code matches the event.
-   *
-   * @param event the key event to apply
-   */
-  public void applyKeyEvent(KeyEvent event) {
-    applyKey(event.code(), event.action(), event.modifiers());
-  }
-
-  /**
-   * Updates the keyboard state without constructing an input event object.
-   *
-   * @param code the physical key whose state changed
-   * @param action the key action to record
-   * @param modifiers the modifier bitmask reported with the action
-   */
-  public void applyKey(KeyCode code, KeyAction action, int modifiers) {
-    applyKeyState(code, action, modifiers);
-  }
-
-  /**
-   * Updates the cursor position from a mouse move.
-   *
-   * <p>Platform integrations call this method when a cursor-move notification is received so the
-   * position can be queried through {@link #cursorX()} and {@link #cursorY()}.
-   *
-   * @param x the cursor X position in screen coordinates
-   * @param y the cursor Y position in screen coordinates
-   */
-  public void applyMouseMove(double x, double y) {
-    cursorX = x;
-    cursorY = y;
-  }
-
-  /**
-   * Updates the mouse button state from a mouse button event.
-   *
-   * <p>Platform integrations call this method when a mouse-button notification is received. It
-   * records the button action and cursor position, then forwards the event to every registered
-   * {@link Key} whose bound code matches the event.
-   *
-   * @param event the mouse button event to apply
-   */
-  public void applyMouseButton(MouseButtonEvent event) {
-    applyMouseButton(event.button(), event.action(), event.x(), event.y(), event.modifiers());
-  }
-
-  /**
-   * Updates mouse-button state without constructing an input event object.
-   *
-   * @param button the mouse button whose state changed
-   * @param action the button action to record
-   * @param x the cursor X position in screen coordinates
-   * @param y the cursor Y position in screen coordinates
-   * @param modifiers the modifier bitmask reported with the action
-   */
-  public void applyMouseButton(KeyCode button, KeyAction action, double x, double y,
-                               int modifiers) {
-    cursorX = x;
-    cursorY = y;
-    applyKeyState(button, action, modifiers);
-  }
-
-  private void applyKeyState(KeyCode code, KeyAction action, int modifiers) {
-    keyStates.put(code, action);
-    keyMods.put(code, modifiers);
-    for (Key key : keys.values()) {
-      if (key.code() == code) {
-        key.apply(action, modifiers);
+  public InputBinding binding(String id, BindingDefinition... sources) {
+    InputBinding existing = actions.get(id);
+    List<BindingDefinition> definitions = List.of(sources);
+    if (existing != null) {
+      if (!existing.defaultBindings().equals(definitions)) {
+        throw new IllegalArgumentException("Conflicting input binding: " + id);
+      }
+      return existing;
+    }
+    var ids = new HashSet<String>();
+    for (BindingDefinition definition : definitions) {
+      if (!ids.add(definition.id())) {
+        throw new IllegalArgumentException("Duplicate binding definition: " + definition.id());
       }
     }
-    lockMods = modifiers & LOCK_MODS;
-    updateMods();
+    InputBinding binding = new InputBinding(this, id, definitions);
+    binding.compile(profile);
+    actions.put(id, binding);
+    bindings.add(binding);
+    return binding;
   }
 
   /**
-   * Recomputes the held modifier mask from the states of the modifier keys.
+   * Tests whether an action group is enabled.
+   *
+   * @param group group identifier
+   * @return whether the group contributes input
    */
-  private void updateMods() {
-    int m = 0;
-    if (isDown(KeyCode.LEFT_SHIFT) || isDown(KeyCode.RIGHT_SHIFT)) {
-      m |= InputModifiers.SHIFT;
-    }
-    if (isDown(KeyCode.LEFT_CONTROL) || isDown(KeyCode.RIGHT_CONTROL)) {
-      m |= InputModifiers.CONTROL;
-    }
-    if (isDown(KeyCode.LEFT_ALT) || isDown(KeyCode.RIGHT_ALT)) {
-      m |= InputModifiers.ALT;
-    }
-    if (isDown(KeyCode.LEFT_SUPER) || isDown(KeyCode.RIGHT_SUPER)) {
-      m |= InputModifiers.SUPER;
-    }
-    currentMods = m | lockMods;
+  public boolean isGroupEnabled(String group) {
+    return !disabledGroups.contains(group);
   }
 
   /**
-   * Accumulates scroll deltas from a scroll event.
+   * Enables or disables an action group.
    *
-   * <p>Platform integrations call this method when a scroll notification is received. It
-   * accumulates deltas for subsequent polling via {@link #scrollDeltaX()} and {@link #scrollDeltaY()}.
-   *
-   * @param dx the horizontal scroll delta
-   * @param dy the vertical scroll delta
+   * @param group group identifier
+   * @param enabled whether the group should contribute input
    */
-  public void applyScroll(double dx, double dy) {
-    scroll.add(dx, dy);
+  public void setGroupEnabled(String group, boolean enabled) {
+    if (enabled) {
+      disabledGroups.remove(group);
+    } else {
+      disabledGroups.add(group);
+    }
+    updateBindings(0);
   }
 
   /**
-   * Resets transient per-frame state.
+   * Returns the currently applied profile.
    *
-   * <p>Call at the end of each frame. Resets scroll accumulators to zero and
-   * clears per-frame transition flags on all registered {@link Key} instances. Key press state is <em>not</em> modified
-   * — held keys remain in their current state until the platform reports a release.
+   * @return active input profile
    */
-  public void clearFrameState() {
-    scroll.clearFrameState();
-    gamepad.clearFrameState();
+  public InputProfile profile() {
+    return profile;
+  }
 
-    for (Key key : keys.values()) {
-      key.endFrame();
+  /**
+   * Applies a profile to all registered bindings.
+   *
+   * @param profile profile to apply
+   */
+  public void applyProfile(InputProfile profile) {
+    this.profile = profile;
+    for (InputBinding binding : bindings) {
+      binding.compile(profile);
+    }
+    updateBindings(0);
+  }
+
+  /**
+   * Replaces all physical alternatives of a registered action.
+   * An empty list unbinds the action; using its defaults removes the override.
+   *
+   * @param id registered action identifier
+   * @param sources replacement physical alternatives
+   */
+  public void rebind(String id, BindingDefinition... sources) {
+    InputBinding action = actions.get(id);
+    if (action == null) throw new IllegalArgumentException("Unknown input action: " + id);
+    List<BindingDefinition> definitions = List.of(sources);
+    Map<String, List<BindingDefinition>> overrides = new LinkedHashMap<>(profile.bindings());
+    if (action.defaultBindings().equals(definitions)) overrides.remove(id);
+    else overrides.put(id, definitions);
+    applyProfile(new InputProfile(overrides));
+  }
+
+  /**
+   * Removes a profile override for a binding identifier.
+   *
+   * @param id binding identifier
+   */
+  public void resetBinding(String id) {
+    Map<String, List<BindingDefinition>> overrides = new LinkedHashMap<>(profile.bindings());
+    overrides.remove(id);
+    applyProfile(new InputProfile(overrides));
+  }
+
+  /**
+   * Loads and applies profile overrides from a file.
+   *
+   * @param file profile file
+   * @throws IOException if the profile cannot be read or parsed
+   */
+  public void loadBindings(Path file) throws IOException {
+    applyProfile(InputProfile.load(file));
+  }
+
+  /**
+   * Saves the current profile to a file.
+   *
+   * @param file profile file
+   * @throws IOException if the profile cannot be written
+   */
+  public void saveBindings(Path file) throws IOException {
+    profile.save(file);
+  }
+
+  /**
+   * Advances logical bindings and repeat timing without allocating.
+   *
+   * <p>Runs in {@code O(bindings + chord controls)} time.
+   *
+   * @param deltaSeconds elapsed time since the previous update
+   * @throws IllegalArgumentException if {@code deltaSeconds} is negative
+   */
+  public void updateBindings(double deltaSeconds) {
+    if (deltaSeconds < 0) {
+      throw new IllegalArgumentException("Input delta must not be negative");
+    }
+    for (InputBinding binding : bindings) {
+      binding.update(deltaSeconds);
     }
   }
 
-  /** Clears held input state, for example when the owning view loses focus. */
-  public void clearInputState() {
-    scroll.reset();
+  private void deviceChanged() {
+    if (!resetting) {
+      updateBindings(0);
+    }
+  }
+
+  /**
+   * Selects the raw joystick slot for future use.
+   *
+   * @param slot slot, or {@code -1} to select no slot
+   * @throws IllegalArgumentException if the slot is outside the valid range
+   */
+  public void selectJoystick(int slot) {
+    checkJoystickSlot(slot);
+    selectedJoystick = slot;
+  }
+
+  /**
+   * Returns the selected raw joystick slot.
+   *
+   * @return selected slot, or {@code -1} when none is selected
+   */
+  public int selectedJoystick() {
+    return selectedJoystick;
+  }
+
+  /**
+   * Returns the raw joystick slot currently used by bindings.
+   *
+   * @return active slot, or {@code -1} when no raw joystick is active
+   */
+  public int activeJoystick() {
+    return activeJoystick;
+  }
+
+  /**
+   * Sets the raw joystick slot used by bindings.
+   *
+   * @param slot slot, or {@code -1} to disable raw joystick input
+   * @throws IllegalArgumentException if the slot is outside the valid range
+   */
+  public void setActiveJoystick(int slot) {
+    checkJoystickSlot(slot);
+    if (activeJoystick == slot) {
+      return;
+    }
+    activeJoystick = slot;
     gamepad.reset();
-    keyStates.clear();
-    keyMods.clear();
-    currentMods = InputModifiers.NONE;
-    lockMods = InputModifiers.NONE;
-    for (Key key : keys.values()) {
-      key.apply(KeyAction.RELEASE, InputModifiers.NONE);
+    deviceChanged();
+  }
+
+  /** Clears transient press, release, and repeat state for the next frame. */
+  public void clearFrameState() {
+    for (InputBinding binding : bindings) {
+      binding.endFrame();
+    }
+    keyboard.clearFrameState();
+    mouse.clearFrameState();
+    gamepad.clearFrameState();
+    for (JoystickState joystick : joysticks) {
+      joystick.clearFrameState();
+    }
+  }
+
+  /** Clears all device state and disables the active raw joystick. */
+  public void clearInputState() {
+    resetting = true;
+    try {
+      keyboard.reset();
+      mouse.reset();
+      gamepad.reset();
+      for (JoystickState joystick : joysticks) {
+        joystick.reset();
+      }
+      activeJoystick = -1;
+    } finally {
+      resetting = false;
+    }
+    deviceChanged();
+  }
+
+  /**
+   * Clears input state when the owning window loses focus.
+   *
+   * @param focused whether the input window is focused
+   */
+  public void onFocusChange(boolean focused) {
+    if (!focused) {
+      clearInputState();
     }
   }
 }
