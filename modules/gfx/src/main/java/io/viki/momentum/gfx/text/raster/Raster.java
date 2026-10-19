@@ -37,12 +37,12 @@ import java.util.Locale;
  * The rasterized output of a text layout pass, ready for rendering.
  *
  * <p>Contains per-glyph render entries, decoration strokes, bounding box, and
- * hit-test data for cursor positioning. All coordinates are in visual space with the origin at the top-left of the
- * rendered area.
+ * hit-test data for cursor positioning. Entries and hit-test runs retain pen/layout coordinates.
+ * Vertical bounds cover complete line boxes, independent of which glyph bitmaps occur in the text.
  *
  * @param entries       the per-glyph render entries
  * @param strokes       the decoration strokes (underline and strikethrough)
- * @param bounds        the bounding box in visual space
+ * @param bounds        the horizontal ink extent and vertical layout-line extent
  * @param lastLineWidth the width of the last line, in pixels
  * @param flipY         whether the Y-axis is flipped
  * @param runs          the layout runs used for hit-testing

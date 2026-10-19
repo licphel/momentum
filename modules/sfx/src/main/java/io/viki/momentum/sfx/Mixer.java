@@ -26,6 +26,9 @@ package io.viki.momentum.sfx;
 
 import io.viki.momentum.math.Quaternion;
 import io.viki.momentum.sfx.ext.SfxEffect;
+import io.viki.momentum.util.Result;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
 /**
  * Represents an audio output device.
@@ -41,6 +44,61 @@ import io.viki.momentum.sfx.ext.SfxEffect;
  * @see Clip
  */
 public interface Mixer extends AutoCloseable {
+  /** Device selection meaning that output follows the operating system's default playback endpoint. */
+  String DEFAULT_DEVICE = "";
+
+  /**
+   * Returns an immutable snapshot of selectable playback device names.
+   *
+   * <p>Safe to call from any thread. Names are opaque backend values, not stable hardware IDs;
+   * pass them unchanged to {@link #setDevice(String)}. The list may be empty during initialization
+   * or when enumeration is unsupported. The OpenAL backend refreshes it approximately once per second.
+   * The system-default choice is represented separately by {@link #DEFAULT_DEVICE}.
+   *
+   * @return the latest available playback names, without the default-choice sentinel
+   */
+  List<String> getDeviceNames();
+
+  /**
+   * Returns the actual playback endpoint name from the latest backend snapshot.
+   *
+   * <p>Safe to call from any thread. An empty value means the mixer has not initialized or has
+   * shut down; it does not indicate the selection policy. Use {@link #isFollowingDefaultDevice()}
+   * to distinguish automatic routing from an explicitly selected device.
+   *
+   * @return the current endpoint name, or an empty string when unavailable
+   */
+  String getDeviceName();
+
+  /**
+   * Returns whether output follows changes to the operating system's default playback endpoint.
+   *
+   * <p>Mixers start in this mode. Successful explicit selection disables it; successful selection
+   * of {@link #DEFAULT_DEVICE} restores it. Failed selections do not change the policy.
+   *
+   * @return whether automatic default-device routing is selected
+   */
+  boolean isFollowingDefaultDevice();
+
+  /**
+   * Requests an output change without blocking for native device initialization.
+   *
+   * <p>Callable from any thread, including the audio thread. An empty name selects
+   * {@link #DEFAULT_DEVICE}; other values must be names supplied by the backend. Completion means
+   * the backend has attempted the change, not merely queued it. Device switching must preserve
+   * existing clips, buffers, effects and playback positions rather than silently recreating them.
+   * A backend that cannot do this reports failure and leaves the previous selection intact.
+   *
+   * <p>Failures, including an unavailable endpoint, unsupported switching, a closed mixer or a
+   * saturated command queue, are returned as {@link Result} values. Automatic routing requires
+   * backend support and may lag a system-default change by its monitoring interval. It does not
+   * choose newly plugged-in headphones unless the operating system makes them the default.
+   *
+   * @param name the exact playback device name, or {@link #DEFAULT_DEVICE}
+   * @return the asynchronous switching outcome; callbacks may execute on the audio thread
+   */
+  CompletableFuture<Result<Void>> setDevice(String name);
+
   /**
    * Returns the distance law used by clips that enable rolloff.
    *

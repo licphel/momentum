@@ -2,8 +2,7 @@ package io.viki.momentum.sfx;
 
 import io.viki.momentum.util.FloatSupplier;
 
-import java.util.concurrent.ThreadLocalRandom;
-import java.util.random.RandomGenerator;
+import io.viki.momentum.math.random.RandomGenerator;
 
 /**
  * Shared samples and independently sampled pitch/gain multipliers for each play request.
@@ -121,7 +120,7 @@ public record Sound(AudioBuffer buffer, Range pitch, Range volume) {
      * @return sampled multiplier
      */
     public float sample() {
-      return sample(ThreadLocalRandom.current());
+      return sample(RandomGenerator.Global.get());
     }
 
     /**

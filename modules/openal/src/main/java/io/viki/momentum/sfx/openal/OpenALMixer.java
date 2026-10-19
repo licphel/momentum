@@ -32,10 +32,8 @@ import io.viki.momentum.sfx.*;
 import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.sfx.openal.ext.OpenALEffects;
 import io.viki.momentum.util.InternalApi;
-import org.lwjgl.openal.AL;
-import org.lwjgl.openal.ALC;
-import org.lwjgl.openal.ALC10;
-import org.lwjgl.openal.EXTEfx;
+import io.viki.momentum.util.Result;
+import org.lwjgl.openal.*;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
@@ -44,7 +42,9 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static org.lwjgl.openal.AL11.*;
@@ -73,6 +73,11 @@ public final class OpenALMixer implements Mixer {
   public static final int MIXER_EFFECT_SENDS = 2;
   private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
+  /** Device discovery is off the caller thread and deliberately limited to one query per second. */
+  private static final long DEVICE_CHECK_INTERVAL_NANOS = TimeUnit.SECONDS.toNanos(1);
+  private static final Result<Void> DEVICE_CLOSED = Result.failure("Audio mixer is closed or failed to initialize");
+  private static final Result<Void> DEVICE_BUSY = Result.failure("Audio command queue is full; retry device selection");
+  private static final Result<Void> DEVICE_UNSUPPORTED = Result.failure("Audio backend does not support preserving playback while switching devices");
 
   static {
     new OpenALEffects();
@@ -92,6 +97,17 @@ public final class OpenALMixer implements Mixer {
   private final SfxEffect[] mixerEffects = {
       SfxEffect.NONE, SfxEffect.NONE
   };
+  private volatile List<String> deviceNames = List.of();
+  private volatile String deviceName = DEFAULT_DEVICE;
+  private volatile boolean followingDefaultDevice = true;
+  // Native device metadata below is owned exclusively by the audio thread.
+  private long outputDevice;
+  private boolean enumerateAll;
+  private boolean enumerateDevices;
+  private boolean reopenSupported;
+  private boolean disconnectSupported;
+  private int[] outputAttributes = {0};
+  private long nextDeviceCheck;
   private int availableCount;
   private long lastCheckErrorMs;
   private boolean debug = false;
@@ -129,33 +145,45 @@ public final class OpenALMixer implements Mixer {
     audioThread.start();
   }
 
-  /**
-   * Sets whether to get debug outputs.
-   *
-   * @param debug debug flag
-   * @return this for chaining
-   */
-  public OpenALMixer setDebug(boolean debug) {
-    this.debug = debug;
-    return this;
+  private static void clearAuxiliarySend(int source, int send) {
+    if (AL.getCapabilities().ALC_EXT_EFX) {
+      alSource3i(source, EXTEfx.AL_AUXILIARY_SEND_FILTER,
+          EXTEfx.AL_EFFECTSLOT_NULL, send, EXTEfx.AL_FILTER_NULL);
+    }
   }
 
   @Override
-  public boolean isSpatialAudioEnabled() {
-    return spatialAudioEnabled;
+  public List<String> getDeviceNames() {
+    return deviceNames;
   }
 
   @Override
-  public void setSpatialAudioEnabled(boolean enabled) {
-    spatialAudioEnabled = enabled;
-    submit(() -> {
-      for (OpenALClip clip : trackingList) {
-        clip.applySpatialPosition();
+  public String getDeviceName() {
+    return deviceName;
+  }
+
+  @Override
+  public boolean isFollowingDefaultDevice() {
+    return followingDefaultDevice;
+  }
+
+  @Override
+  public CompletableFuture<Result<Void>> setDevice(String name) {
+    CompletableFuture<Result<Void>> result = new CompletableFuture<>();
+    DeviceChange change = new DeviceChange(name, result);
+    if (Thread.currentThread() == audioThread) {
+      change.run();
+    } else {
+      // Serialize admission with shutdown; never block the UI behind a full audio queue.
+      synchronized (queue) {
+        if (!running.get()) {
+          result.complete(DEVICE_CLOSED);
+        } else if (!queue.offer(change)) {
+          result.complete(DEVICE_BUSY);
+        }
       }
-      for (OpenALStreamingClip clip : streamingTrackingList) {
-        clip.applySpatialPosition();
-      }
-    });
+    }
+    return result;
   }
 
   @Override
@@ -174,6 +202,24 @@ public final class OpenALMixer implements Mixer {
     float dy = y - listenerY;
     float dz = z - listenerZ;
     return rolloffMode.gain((float) Math.sqrt(dx * dx + dy * dy + dz * dz));
+  }
+
+  @Override
+  public boolean isSpatialAudioEnabled() {
+    return spatialAudioEnabled;
+  }
+
+  @Override
+  public void setSpatialAudioEnabled(boolean enabled) {
+    spatialAudioEnabled = enabled;
+    submit(() -> {
+      for (OpenALClip clip : trackingList) {
+        clip.applySpatialPosition();
+      }
+      for (OpenALStreamingClip clip : streamingTrackingList) {
+        clip.applySpatialPosition();
+      }
+    });
   }
 
   @Override
@@ -315,8 +361,72 @@ public final class OpenALMixer implements Mixer {
    */
   @Override
   public void close() {
-    running.set(false);
+    synchronized (queue) {
+      running.set(false);
+    }
     audioThread.interrupt();
+  }
+
+  /** Audio-thread-only switch. Native reopen retains the context and all of its playback objects. */
+  private Result<Void> changeDevice(String name) {
+    if (!running.get() || outputDevice == 0) {
+      return DEVICE_CLOSED;
+    }
+    if (!reopenSupported) {
+      return DEVICE_UNSUPPORTED;
+    }
+    // Clear old ALC errors so a failed request reports its own native failure.
+    alcGetError(outputDevice);
+    if (!SOFTReopenDevice.alcReopenDeviceSOFT(outputDevice, name.isEmpty() ? null : name, outputAttributes)) {
+      int error = alcGetError(outputDevice);
+      return Result.failure("Cannot switch audio output to " + (name.isEmpty() ? "system default" : name)
+          + " (ALC error 0x" + Integer.toHexString(error) + ')');
+    }
+    followingDefaultDevice = name.isEmpty();
+    deviceName = currentDeviceName();
+    return Result.OK;
+  }
+
+  /** Reads the native device's current endpoint name on its owning thread. */
+  private String currentDeviceName() {
+    String name = alcGetString(outputDevice, enumerateAll ? ALC11.ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER);
+    return name == null ? DEFAULT_DEVICE : name;
+  }
+
+  /** Polling also runs while playback is idle; failed recovery is retried at the same bounded rate. */
+  private void refreshDevices() {
+    long now = System.nanoTime();
+    if (now - nextDeviceCheck < 0) {
+      return;
+    }
+    nextDeviceCheck = now + DEVICE_CHECK_INTERVAL_NANOS;
+    if (enumerateDevices) {
+      List<String> names = ALUtil.getStringList(0, enumerateAll ? ALC11.ALC_ALL_DEVICES_SPECIFIER : ALC_DEVICE_SPECIFIER);
+      deviceNames = names == null ? List.of() : List.copyOf(names);
+    }
+    deviceName = currentDeviceName();
+    if (!followingDefaultDevice || !reopenSupported) {
+      return;
+    }
+    String systemDefault = alcGetString(0, enumerateAll ? ALC11.ALC_DEFAULT_ALL_DEVICES_SPECIFIER : ALC_DEFAULT_DEVICE_SPECIFIER);
+    boolean disconnected = disconnectSupported && alcGetInteger(outputDevice, EXTDisconnect.ALC_CONNECTED) == ALC_FALSE;
+    if (disconnected || systemDefault != null && !systemDefault.equals(deviceName)) {
+      Result<Void> result = changeDevice(DEFAULT_DEVICE);
+      if (!result.isOk() && debug) {
+        LOGGER.warn("{}", result.reason());
+      }
+    }
+  }
+
+  /**
+   * Sets whether to get debug outputs.
+   *
+   * @param debug debug flag
+   * @return this for chaining
+   */
+  public OpenALMixer setDebug(boolean debug) {
+    this.debug = debug;
+    return this;
   }
 
   int acquireSource() {
@@ -350,7 +460,7 @@ public final class OpenALMixer implements Mixer {
   /**
    * Updates a shared direct filter on the OpenAL thread; slot is a native auxiliary slot handle.
    *
-   * @param slot  slot id
+   * @param slot   slot id
    * @param filter filter id
    */
   public void setGlobalDirectFilter(int slot, int filter) {
@@ -388,13 +498,6 @@ public final class OpenALMixer implements Mixer {
   void clearDirectFilter(int source) {
     if (AL.getCapabilities().ALC_EXT_EFX) {
       alSourcei(source, EXTEfx.AL_DIRECT_FILTER, EXTEfx.AL_FILTER_NULL);
-    }
-  }
-
-  private static void clearAuxiliarySend(int source, int send) {
-    if (AL.getCapabilities().ALC_EXT_EFX) {
-      alSource3i(source, EXTEfx.AL_AUXILIARY_SEND_FILTER,
-          EXTEfx.AL_EFFECTSLOT_NULL, send, EXTEfx.AL_FILTER_NULL);
     }
   }
 
@@ -451,6 +554,25 @@ public final class OpenALMixer implements Mixer {
   }
 
   void run() {
+    try {
+      runDevice();
+    } finally {
+      synchronized (queue) {
+        running.set(false);
+        Runnable pending;
+        while ((pending = queue.poll()) != null) {
+          if (pending instanceof DeviceChange change) {
+            change.result.complete(DEVICE_CLOSED);
+          }
+        }
+      }
+      deviceNames = List.of();
+      deviceName = DEFAULT_DEVICE;
+    }
+  }
+
+  /** Initializes and disposes native audio objects only on their owning thread. */
+  private void runDevice() {
     /*
      * Initialize OpenAL.
      * This process should be done on this thread so that OpenAL context can bind to it.
@@ -459,6 +581,7 @@ public final class OpenALMixer implements Mixer {
     if (device == 0L) {
       throw new IllegalStateException("OpenAL failed to open device");
     }
+    outputDevice = device;
 
     boolean efxRequested = alcIsExtensionPresent(device, "ALC_EXT_EFX");
     IntBuffer attrs = memAllocInt(efxRequested ? 3 : 1);
@@ -475,7 +598,14 @@ public final class OpenALMixer implements Mixer {
     }
 
     alcMakeContextCurrent(context);
-    AL.createCapabilities(ALC.createCapabilities(device));
+    ALCCapabilities capabilities = ALC.createCapabilities(device);
+    AL.createCapabilities(capabilities);
+    enumerateAll = capabilities.ALC_ENUMERATE_ALL_EXT;
+    enumerateDevices = enumerateAll || capabilities.ALC_ENUMERATION_EXT;
+    reopenSupported = capabilities.ALC_SOFT_reopen_device;
+    disconnectSupported = capabilities.ALC_EXT_disconnect;
+    outputAttributes = efxRequested ? new int[] {EXTEfx.ALC_MAX_AUXILIARY_SENDS, AUXILIARY_SEND_CAPACITY, 0} : new int[] {0};
+    refreshDevices();
     if (AL.getCapabilities().ALC_EXT_EFX) {
       for (int send = 0; send < effectSlots.length; send++) {
         effectSlots[send] = EXTEfx.alGenAuxiliaryEffectSlots();
@@ -497,11 +627,15 @@ public final class OpenALMixer implements Mixer {
       try {
         // Block until work arrives, then drain any accumulated batch
         List<Runnable> batch = new ArrayList<>();
-        batch.add(queue.take());
+        Runnable first = queue.poll(1, TimeUnit.SECONDS);
+        if (first != null) {
+          batch.add(first);
+        }
         queue.drainTo(batch);
         for (Runnable task : batch) {
           consume(task);
         }
+        refreshDevices();
       } catch (InterruptedException e) {
         Thread.currentThread().interrupt();
         break;
@@ -538,6 +672,7 @@ public final class OpenALMixer implements Mixer {
     }
     alcDestroyContext(context);
     alcCloseDevice(device);
+    outputDevice = 0;
   }
 
   private void consume(Runnable task) {
@@ -578,5 +713,28 @@ public final class OpenALMixer implements Mixer {
 
   void applyMixerEffects(int source) {
     attachGlobalEffects(source);
+  }
+
+  /** Queued changes complete even if initialization fails or shutdown rejects pending work. */
+  private final class DeviceChange implements Runnable {
+    private final String name;
+    private final CompletableFuture<Result<Void>> result;
+
+    private DeviceChange(String name, CompletableFuture<Result<Void>> result) {
+      this.name = name;
+      this.result = result;
+    }
+
+    @Override
+    public void run() {
+      if (result.isDone()) {
+        return;
+      }
+      try {
+        result.complete(changeDevice(name));
+      } catch (RuntimeException exception) {
+        result.completeExceptionally(exception);
+      }
+    }
   }
 }

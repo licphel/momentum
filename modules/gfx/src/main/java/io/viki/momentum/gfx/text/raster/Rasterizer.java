@@ -380,9 +380,7 @@ public final class Rasterizer {
     // All coordinates are in pen space (x from 0 per line, y from 0 top).
     // Entry.bounds, Raster.bounds, and hitTest all live in this same space.
     float bMinX = Float.MAX_VALUE;
-    float bMinY = Float.MAX_VALUE;
     float bMaxX = -Float.MAX_VALUE;
-    float bMaxY = -Float.MAX_VALUE;
 
     List<GlyphBound> layoutBounds = new ArrayList<>();
 
@@ -417,28 +415,23 @@ public final class Rasterizer {
         }
         if (gw > 0 && gh > 0) {
           bMinX = Math.min(bMinX, gx);
-          bMinY = Math.min(bMinY, gy);
           bMaxX = Math.max(bMaxX, gx + gw);
-          bMaxY = Math.max(bMaxY, gy + gh);
         }
         layoutBounds.add(GlyphBound.of(gx, gy, gw, gh));
       }
     }
 
-    Rectangle bounds;
-    if (bMinX == Float.MAX_VALUE) {
-      float totalH = 0;
-      for (LayoutRun run : layoutRuns) {
-        if (flipY) {
-          totalH = Math.max(totalH, run.lineTop() + run.lineHeight());
-        } else {
-          totalH = Math.max(totalH, Math.abs(run.lineTop()));
-        }
-      }
-      bounds = Rectangle.of(0, 0, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, totalH));
-    } else {
-      bounds = Rectangle.of(bMinX, bMinY, bMaxX - bMinX, Math.max(1, bMaxY - bMinY));
+    // Vertical bounds are the line boxes, not the ink: e, el and eg share a baseline.
+    // Do not shift entries or runs; hitTest and caret placement use these same pen coordinates.
+    float lineMinY = Float.MAX_VALUE;
+    float lineMaxY = -Float.MAX_VALUE;
+    for (LayoutRun run : layoutRuns) {
+      lineMinY = Math.min(lineMinY, run.lineTop());
+      lineMaxY = Math.max(lineMaxY, run.lineTop() + run.lineHeight());
     }
+    Rectangle bounds = bMinX == Float.MAX_VALUE
+        ? Rectangle.of(0, lineMinY, maxWidth == Float.MAX_VALUE ? 1 : maxWidth, Math.max(1, lineMaxY - lineMinY))
+        : Rectangle.of(bMinX, lineMinY, bMaxX - bMinX, Math.max(1, lineMaxY - lineMinY));
 
     // Entry bounds stay in pen/layout space — no global shift applied.
     // Caller (Graphics.drawText) adds the draw origin when rendering.

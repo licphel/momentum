@@ -41,8 +41,7 @@ import java.util.Map;
  * read from one owning UI thread.
  */
 public class Look {
-  private static final TooltipRenderer AUTO_TOOLTIP_RENDERER =
-      AutoTooltipRenderer::render;
+  private static final TooltipRenderer AUTO_TOOLTIP_RENDERER = AutoTooltipRenderer::render;
   private final Map<Class<?>, ElementRenderer> renderers = new HashMap<>();
   private @Nullable TooltipRenderer tooltipRenderer;
 

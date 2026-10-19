@@ -883,8 +883,7 @@ public class VertexBuilder2D extends VertexBuilder {
       case 1 -> ty -= rasterBd.height();
     }
 
-    // Normalize entry coordinates: rasterBd.minY() is the pen-space origin offset.
-    // Subtract it so that the text block's visual top aligns with (tx, ty).
+    // Align the logical line box, never the glyph ink. Runs keep their pen-space coordinates.
     float originY = rasterBd.minY();
 
     Gradient originalColor = gradient();

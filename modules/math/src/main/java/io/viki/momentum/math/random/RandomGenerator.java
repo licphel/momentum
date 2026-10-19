@@ -36,6 +36,23 @@ import java.util.List;
  * generator suitable for most scenarios.
  */
 public interface RandomGenerator {
+  /** Per-thread random sources. Mutable generator state is never shared between threads. */
+  final class Global {
+    private static final ThreadLocal<RandomGenerator> INSTANCES = ThreadLocal.withInitial(Xoroshiro128Random::new);
+
+    private Global() {
+    }
+
+    /**
+     * Returns the current thread's reusable generator; callers must not share it across threads.
+     *
+     * @return the thread-local random singleton
+     */
+    public static RandomGenerator get() {
+      return INSTANCES.get();
+    }
+  }
+
   /**
    * Global default instance (Xoroshiro128+).
    *
@@ -43,6 +60,29 @@ public interface RandomGenerator {
    * use from multiple threads. For multithreaded scenarios, create separate instances per thread.
    */
   RandomGenerator DEFAULT = new Xoroshiro128Random();
+
+  /**
+   * Returns a random {@code float} in {@code [0, 1)}.
+   *
+   * <p>The returned value is uniformly distributed in the half-open interval.
+   * The upper bound (1.0F) is exclusive.
+   *
+   * @return a random float between 0 (inclusive) and 1 (exclusive)
+   */
+  default float nextFloat() {
+    return (float) (nextInt(1 << 24) * 0x1.0P-24);
+  }
+
+  /**
+   * Returns a random float in [min, max).
+   *
+   * @param min lower bound (inclusive)
+   * @param max upper bound (exclusive); must be greater than {@code min}
+   * @return a random double in the specified range
+   */
+  default float nextFloat(float min, float max) {
+    return Math.min(min + nextFloat() * (max - min), Math.nextDown(max));
+  }
 
   /**
    * Returns a random {@code double} in {@code [0, 1)}.
@@ -80,7 +120,7 @@ public interface RandomGenerator {
    * @return a random double in the specified range
    */
   default double nextDouble(double min, double max) {
-    return min + nextDouble() * (max - min);
+    return Math.min(min + nextDouble() * (max - min), Math.nextDown(max));
   }
 
   /**
