@@ -30,19 +30,20 @@ import io.viki.momentum.resource.Resource;
 import java.io.IOException;
 
 /**
- * Processes one resolved asset using the resource provider that owns it.
+ * Plans loading for one resolved asset. Invoked only on the queue's owner thread.
  */
 @FunctionalInterface
 public interface AssetProcessor {
   /**
-   * Processes an asset.
+   * Schedules the asset's stages using run() or prepare(); do not perform I/O here.
    *
    * <p>The processor owns any stream it opens from {@code resources} and must
    * close that stream when processing is complete.
    *
    * @param id        the resolved asset identifier
    * @param resources the provider-local resource source
+   * @param queue     the task queue that can be modified reversely
    * @throws IOException if the resource cannot be read
    */
-  void process(Identifier id, Resource resources) throws IOException;
+  void process(Identifier id, Resource resources, TaskQueue.Plan queue) throws IOException;
 }

@@ -24,8 +24,8 @@
 
 package io.viki.momentum.asset;
 
-import io.viki.momentum.util.Identifier;
 import io.viki.momentum.resource.Resource;
+import io.viki.momentum.util.Identifier;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -88,26 +88,26 @@ public final class LoadingDispatcher {
    *
    * @param id        the resolved asset identifier
    * @param resources the provider-local resource source
-   * @return failures raised by individual dispatchers
+   * @param queue     the task queue that can be modified reversely
    */
-  public List<Throwable> process(Identifier id, Resource resources) {
-    List<Throwable> failures = new ArrayList<>();
+  public void process(Identifier id, Resource resources, TaskQueue.Plan queue) {
     for (Entry entry : entries) {
       if (!entry.filter.test(id.path())) {
         continue;
       }
       try {
-        entry.processor.process(id, resources);
+        entry.processor.process(id, resources, queue);
       } catch (IOException | RuntimeException e) {
-        failures.add(e);
+        queue.run(() -> {
+          throw new AssetException("Cannot plan asset " + id, e);
+        });
       }
     }
-    return List.copyOf(failures);
   }
 
   /**
    * A dispatcher that handles how a resource will be loaded with a relative path filter.
-   * 
+   *
    * @param filter    the filter
    * @param processor the processor
    */

@@ -142,7 +142,20 @@ public final class Loader {
     }
     Identifier id = namespace.resolve(path);
     loadedFiles.put(id, path);
-    submit(priority, () -> process(id));
+    totalTasks++;
+    pendingTasks++;
+    taskQueue.enqueue(priority, plan -> processors.process(id, resources, plan), errors -> {
+      try {
+        for (Throwable failure : errors) {
+          failures.add(failure);
+          LOGGER.warn("Failed to load asset '{}': {}", id, failure);
+        }
+      } finally {
+        completedTasks++;
+        pendingTasks--;
+        started = true;
+      }
+    });
   }
 
   /**
@@ -271,18 +284,9 @@ public final class Loader {
       } finally {
         completedTasks++;
         pendingTasks--;
+        started = true;
       }
     });
   }
 
-  private void process(Identifier id) {
-    if (!processors.matches(id.path())) {
-      LOGGER.debug("No processor for: {}", id);
-      return;
-    }
-    for (Throwable failure : processors.process(id, resources)) {
-      failures.add(failure);
-      LOGGER.warn("Failed to load asset '{}': {}", id, failure);
-    }
-  }
 }

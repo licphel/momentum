@@ -176,7 +176,7 @@ public final class Loop {
   private void sleepPrecise(double nanos) {
     long target = System.nanoTime() + (long) nanos;
     long remaining;
-    // Like Starbound's Windows limiter, recheck the deadline between short
+    // Windows limiter that rechecks the deadline between short
     // sleeps and yield near it. Only the final tiny tail actively spins.
     while (!stopped && (remaining = target - System.nanoTime()) > 0) {
       if (remaining <= SPIN_THRESHOLD_NANOS) {

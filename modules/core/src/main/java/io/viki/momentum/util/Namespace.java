@@ -78,7 +78,7 @@ public final class Namespace {
   /**
    * Returns {@code true} if the given string is a valid namespace name.
    *
-   * <p>Valid characters are ASCII alphanumerics and {@code :_/$.-}.
+   * <p>Valid characters are ASCII alphanumerics and {@code :_/$.-}, whitespace included.
    *
    * @param name the candidate name
    * @return {@code true} if valid
@@ -95,7 +95,7 @@ public final class Namespace {
       if (ch >= 'A' && ch <= 'Z') {
         continue;
       }
-      if (":_/$.-".indexOf(ch) >= 0) {
+      if (":_/$.- ".indexOf(ch) >= 0) {
         continue;
       }
       return false;
