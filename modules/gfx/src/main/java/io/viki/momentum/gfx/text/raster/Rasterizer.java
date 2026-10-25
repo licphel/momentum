@@ -25,16 +25,13 @@
 package io.viki.momentum.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
-import io.viki.momentum.gfx.text.Font;
-import io.viki.momentum.gfx.text.FontMetrics;
-import io.viki.momentum.gfx.text.Literal;
+import io.viki.momentum.gfx.text.*;
 import io.viki.momentum.gfx.text.harfbuzz.HarfbuzzShaper;
 import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.shape.Rectangle;
+import io.viki.momentum.util.Pool;
 
 import java.util.*;
-import io.viki.momentum.util.Pool;
-import io.viki.momentum.gfx.text.FontInsta;
 
 /**
  * Rasterizes a list of text literals into a {@link Raster} for rendering.
@@ -81,7 +78,7 @@ public final class Rasterizer {
       }
       int start = 0;
       FontInsta selected = font.resolve(literal.text().codePointAt(0));
-      for (int offset = 0; offset < literal.text().length();) {
+      for (int offset = 0; offset < literal.text().length(); ) {
         int codepoint = literal.text().codePointAt(offset);
         FontInsta next = font.resolve(codepoint);
         if (selected != next) {
@@ -196,7 +193,7 @@ public final class Rasterizer {
   private static String buildMergedText(List<Literal> literals) {
     StringBuilder sb = new StringBuilder();
     for (Literal lit : literals) {
-      sb.append(lit.text());
+      sb.append(layoutText(lit));
     }
     return sb.toString();
   }
@@ -206,9 +203,14 @@ public final class Rasterizer {
     int off = 0;
     for (int i = 0; i < literals.size(); i++) {
       offsets[i] = off;
-      off += literals.get(i).text().length();
+      off += layoutText(literals.get(i)).length();
     }
     return offsets;
+  }
+
+  @SuppressWarnings("all")
+  private static String layoutText(Literal literal) {
+    return literal.text().isEmpty() && Icon.find(literal.meta()) != null ? "\uFFFC" : literal.text();
   }
 
   private static List<Raster.Stroke> buildStrokes(List<LayoutRun> runs, List<Literal> literals, boolean flipY) {
@@ -239,7 +241,8 @@ public final class Rasterizer {
 
         Literal lit = literals.get(lg.ownerIndex());
         int flags = lit.format().fontStyle();
-        boolean wantsDecoration = (flags & Font.UNDERLINE) != 0 || (flags & Font.STRIKETHROUGH) != 0;
+        boolean wantsDecoration = lg.glyphId() >= 0
+                                  && ((flags & Font.UNDERLINE) != 0 || (flags & Font.STRIKETHROUGH) != 0);
 
         if (!wantsDecoration) {
           if (inRun) {
@@ -320,11 +323,20 @@ public final class Rasterizer {
     String mergedText = buildMergedText(literals);
     int[] litCharOffset = buildCharOffsets(literals);
     int textLen = mergedText.length();
+    boolean hasDrawable = false;
 
     // Shape each literal -> ShapeGlyph[] with start/end absolute in mergedText.
     List<ShapeGlyph> list = new ArrayList<>(mergedText.length());
     for (int si = 0; si < literals.size(); si++) {
       Literal lit = literals.get(si);
+      Icon drawable = Icon.find(lit.meta());
+      if (drawable != null) {
+        hasDrawable = true;
+        int offset = litCharOffset[si];
+        list.add(new ShapeGlyph(offset, offset + 1, -1,
+            drawable.layoutWidth(maxWidth) / lit.format().font().size(), 0, 0, si));
+        continue;
+      }
       if (lit.text().isEmpty()) {
         continue;
       }
@@ -356,6 +368,7 @@ public final class Rasterizer {
     if (list.isEmpty()) {
       return empty();
     }
+    SourceIndices source = hasDrawable ? SourceIndices.of(literals, textLen) : null;
 
     ShapeGlyph[] shapeGlyphs = list.toArray(new ShapeGlyph[0]);
     int totalGlyphs = shapeGlyphs.length;
@@ -388,14 +401,21 @@ public final class Rasterizer {
       for (LayoutGlyph lg : run.glyphs()) {
         Literal lit = literals.get(lg.ownerIndex());
         float scale = lg.scale();
-        Glyph g = lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
+        Icon drawable = lg.glyphId() < 0 ? Icon.find(lit.meta()) : null;
+        Glyph g = drawable == null
+            ? lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle()) : null;
         float penX = lg.x() + lg.xOffset();
         float penY = lg.y() + lg.yOffset();
         float gx;
         float gy;
         float gw;
         float gh;
-        if (g != null) {
+        if (drawable != null) {
+          gx = penX;
+          gy = flipY ? penY - drawable.baseline() : penY + drawable.baseline() - drawable.height();
+          gw = lg.w();
+          gh = drawable.height();
+        } else if (g != null) {
           gx = penX + g.bearingX() * scale;
           gw = g.texPart().width() * scale;
           gh = g.texPart().height() * scale;
@@ -440,25 +460,30 @@ public final class Rasterizer {
     for (LayoutRun run : layoutRuns) {
       for (LayoutGlyph lg : run.glyphs()) {
         Literal lit = literals.get(lg.ownerIndex());
-        Glyph g = lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
+        Glyph g = lg.glyphId() < 0 ? null
+            : lit.format().font().font().rasterizeGlyph(lg.glyphId(), lit.format().fontStyle());
         GlyphBound gb = layoutBounds.get(gbIdx++);
         Rectangle vb = Rectangle.of(gb.gx, gb.gy, gb.gw, gb.gh);
         // charIndex: absolute index in mergedText
         int absCharIndex = run.textStart() + lg.start();
+        if (source != null) {
+          absCharIndex = source.offsets()[absCharIndex];
+        }
         entries.add(new Raster.Entry(g, lit.format().tint(), vb, lg.scale(), lit.meta(), absCharIndex));
       }
     }
 
     // LayoutRun[] for hitTest: pen-space coordinates (no x shift, no y shift needed
     // since pen-space already starts at 0). Convert to array directly.
-    LayoutRun[] runArr = layoutRuns.toArray(new LayoutRun[0]);
+    LayoutRun[] runArr = source == null ? layoutRuns.toArray(new LayoutRun[0])
+        : layoutRuns.stream().map(source::restore).toArray(LayoutRun[]::new);
 
     float lastLineWidth = computeLastLineWidth(layoutRuns);
 
     List<Raster.Stroke> strokes = buildStrokes(layoutRuns, literals, flipY);
 
     return new Raster(entries.toArray(new Raster.Entry[0]), strokes.toArray(new Raster.Stroke[0]), bounds,
-        lastLineWidth, flipY, runArr, mergedText);
+        lastLineWidth, flipY, runArr, source == null ? mergedText : source.text());
   }
 
   private List<LayoutRun> buildLayoutRuns(String mergedText, ShapeGlyph[] glyphs, float[] charAdvances,
@@ -489,19 +514,29 @@ public final class Rasterizer {
 
       float lineHeight = 0;
       float maxAscender = 0;
+      float maxDescender = 0;
       for (int g = lineGlyphStart; g < lineGlyphEnd; g++) {
         Literal lit = literals.get(glyphs[g].ownerIndex());
-        FontMetrics m = lit.format().font().font().metrics();
-        float fs = lit.format().font().size();
-        float lh = m.lineHeight() * fs * lineSpacing;
-        float asc = m.ascender() * fs;
+        Icon drawable = glyphs[g].glyphId() < 0 ? Icon.find(lit.meta()) : null;
+        float lh, asc;
+        if (drawable != null) {
+          lh = drawable.height() * lineSpacing;
+          asc = drawable.baseline();
+        } else {
+          FontMetrics m = lit.format().font().font().metrics();
+          float fs = lit.format().font().size();
+          lh = m.lineHeight() * fs * lineSpacing;
+          asc = m.ascender() * fs;
+        }
         if (lh > lineHeight) {
           lineHeight = lh;
         }
         if (asc > maxAscender) {
           maxAscender = asc;
         }
+        maxDescender = Math.max(maxDescender, lh - asc);
       }
+      lineHeight = Math.max(lineHeight, maxAscender + maxDescender);
       if (lineHeight <= 0 && lineGlyphEnd > lineGlyphStart) {
         Literal lit = literals.get(glyphs[lineGlyphStart].ownerIndex());
         lineHeight = lit.format().font().size() * lineSpacing;
@@ -555,7 +590,7 @@ public final class Rasterizer {
 
         Literal lit = literals.get(sg.ownerIndex());
         float fs = lit.format().font().size();
-        float scale = fs / lit.format().font().font().resolution();
+        float scale = sg.glyphId() < 0 ? 1 : fs / lit.format().font().font().resolution();
         float adv = sg.xAdvance() * fs;
         if (sg.start() < textLen && mergedText.charAt(sg.start()) == ' ') {
           adv += extra;
@@ -592,6 +627,37 @@ public final class Rasterizer {
 
   private Raster empty() {
     return new Raster(new Raster.Entry[0], new Raster.Stroke[0], Rectangle.ZERO, 0, flipY, new LayoutRun[0], "");
+  }
+
+  /** Maps internal inline-object slots back to the unchanged UTF-16 source text. */
+  private record SourceIndices(String text, int[] offsets) {
+    static SourceIndices of(List<Literal> literals, int layoutLength) {
+      int[] offsets = new int[layoutLength + 1];
+      StringBuilder text = new StringBuilder();
+      int cursor = 0;
+      for (Literal literal : literals) {
+        for (int i = 0; i < layoutText(literal).length(); i++) {
+          offsets[cursor++] = text.length() + (literal.text().isEmpty() ? 0 : i);
+        }
+        text.append(literal.text());
+      }
+      offsets[cursor] = text.length();
+      return new SourceIndices(text.toString(), offsets);
+    }
+
+    LayoutRun restore(LayoutRun run) {
+      int start = offsets[run.textStart()];
+      int end = offsets[run.textStart() + run.text().length()];
+      LayoutGlyph[] glyphs = new LayoutGlyph[run.glyphs().length];
+      for (int i = 0; i < glyphs.length; i++) {
+        LayoutGlyph glyph = run.glyphs()[i];
+        glyphs[i] = new LayoutGlyph(offsets[run.textStart() + glyph.start()] - start,
+            offsets[run.textStart() + glyph.end()] - start, glyph.x(), glyph.y(), glyph.w(),
+            glyph.xOffset(), glyph.yOffset(), glyph.fontSize(), glyph.scale(), glyph.glyphId(),
+            glyph.gradient(), glyph.ownerIndex());
+      }
+      return new LayoutRun(text.substring(start, end), start, glyphs, run.lineTop(), run.lineHeight(), run.lineY());
+    }
   }
 
   private static final class GlyphBound {

@@ -1,12 +1,13 @@
 package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.tint.Gradient;
+import org.jspecify.annotations.Nullable;
 
 /**
- * Provides fluent mutation of the formatting attributes for a text component.
+ * Provides immutable formatting operations for a text component.
  *
- * <p>Implementations are confined to their owning UI thread and are not thread-safe. Each
- * mutator returns the concrete component type so several formatting changes can be chained.
+ * <p>Each operation returns a formatted value without modifying its receiver. Rendering follows
+ * the fonts' threading requirements.
  *
  * @param <T> the concrete component type returned by fluent methods
  */
@@ -15,7 +16,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the font used to render this component.
    *
    * @param font the replacement font
-   * @return this component after updating its font
+   * @return a component with its font
    */
   T font(FontInsta font);
 
@@ -23,7 +24,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the gradient used to tint this component.
    *
    * @param gradient the replacement text gradient
-   * @return this component after updating its tint
+   * @return a component with its tint
    */
   T tint(Gradient gradient);
 
@@ -31,7 +32,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the font size used to render this component.
    *
    * @param size the replacement font size in logical drawing units
-   * @return this component after updating its size
+   * @return a component with its size
    */
   T size(float size);
 
@@ -39,7 +40,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the font style flags used to render this component.
    *
    * @param flags the replacement style flags from {@link Font}
-   * @return this component after updating its style
+   * @return a component with its style
    */
   T style(int flags);
 
@@ -47,7 +48,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the component font.
    *
    * @param font the replacement font
-   * @return this component after updating its font
+   * @return a component with its font
    */
   default T with(FontInsta font) {
     return font(font);
@@ -57,7 +58,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the component tint gradient.
    *
    * @param gradient the replacement text gradient
-   * @return this component after updating its tint
+   * @return a component with its tint
    */
   default T with(Gradient gradient) {
     return tint(gradient);
@@ -67,7 +68,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Replaces the component font size.
    *
    * @param size the replacement font size in logical drawing units
-   * @return this component after updating its size
+   * @return a component with its size
    */
   default T with(float size) {
     return size(size);
@@ -77,22 +78,28 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * Adds style flags to the component's current style bitmask.
    *
    * @param flags the style flags to add from {@link Font}
-   * @return this component after updating its style
+   * @return a component with its style
    */
   default T with(int flags) {
     return style(format().fontStyle() | flags);
   }
 
   /**
+   * Adds a series of metas to the component.
+   *
+   * @param values the metas to add
+   * @return a component with new metas
+   */
+  T with(Meta @Nullable ... values);
+
+  /**
    * Copies all formatting attributes from a fixed template into this component.
    *
    * @param template the format whose attributes should be copied
-   * @return this component after updating its formatting
+   * @return a component with its formatting
    */
   default T with(TextFormat template) {
-    font(template.font());
-    tint(template.tint());
-    return style(template.fontStyle());
+    return font(template.font()).tint(template.tint()).style(template.fontStyle());
   }
 
   /**

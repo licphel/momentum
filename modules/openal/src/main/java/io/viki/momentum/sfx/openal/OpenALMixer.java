@@ -31,6 +31,7 @@ import io.viki.momentum.math.Vector3;
 import io.viki.momentum.sfx.*;
 import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.sfx.openal.ext.OpenALEffects;
+import io.viki.momentum.util.multithread.ExecutionMode;
 import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.util.Result;
 import org.lwjgl.openal.*;
@@ -53,15 +54,13 @@ import static org.lwjgl.system.MemoryUtil.memAllocInt;
 import static org.lwjgl.system.MemoryUtil.memFree;
 
 /**
- * OpenAL-backed {@link Mixer} that serializes all OpenAL calls onto a single dedicated audio thread.
+ * OpenAL-backed {@link Mixer} that serializes native calls onto one owning thread.
  *
- * <p>OpenAL contexts are not thread-safe; every AL/ALC call must happen on
- * the thread that called {@code alcMakeContextCurrent}. This class enforces that invariant by routing all work through
- * a bounded {@link BlockingQueue} consumed by one private daemon thread.
- *
- * <p>The audio thread is started immediately in the constructor. It
- * initializes the OpenAL device and context, then blocks on the queue until {@link #close()} interrupts it, at which
- * point it destroys the context and device before exiting.
+ * <p>{@link ExecutionMode#DEDICATED_THREAD} owns a daemon audio thread. In
+ * {@link ExecutionMode#BOUND_THREAD}, construction, {@link #pollEvents()}, and {@link #close()}
+ * belong to the creating thread (normally the main thread); submissions on that thread execute
+ * immediately, while other threads enqueue commands. The owner must poll regularly to service
+ * cross-thread work and streaming playback. Other public commands may be submitted concurrently.
  */
 @InternalApi
 public final class OpenALMixer implements Mixer {
@@ -71,6 +70,7 @@ public final class OpenALMixer implements Mixer {
   public static final int AUXILIARY_SEND_CAPACITY = 4;
   /** Sends reserved for mixer-owned environmental effects. */
   public static final int MIXER_EFFECT_SENDS = 2;
+  private static final double BOUND_THREAD_PRESSURE = 0.75;
   private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
   /** Device discovery is off the caller thread and deliberately limited to one query per second. */
@@ -89,6 +89,7 @@ public final class OpenALMixer implements Mixer {
   private final BlockingQueue<Runnable> queue = new LinkedBlockingQueue<>(QUEUE_CAPACITY);
   private final AtomicBoolean running = new AtomicBoolean(true);
   private final Thread audioThread;
+  private final ExecutionMode executionMode;
   private final int[] sources;
   private final int[] availableSources;
   private final int[] effectSlots = new int[AUXILIARY_SEND_CAPACITY];
@@ -102,6 +103,8 @@ public final class OpenALMixer implements Mixer {
   private volatile boolean followingDefaultDevice = true;
   // Native device metadata below is owned exclusively by the audio thread.
   private long outputDevice;
+  private long outputContext;
+  private boolean consumingCommands;
   private boolean enumerateAll;
   private boolean enumerateDevices;
   private boolean reopenSupported;
@@ -116,13 +119,10 @@ public final class OpenALMixer implements Mixer {
   private volatile float listenerX;
   private volatile float listenerY;
   private volatile float listenerZ;
-
   /**
-   * Creates a new mixer, opens the default OpenAL device and context, and starts the audio thread.
+   * Creates a mixer using budget-based automatic thread ownership.
    *
-   * <p>Construction returns immediately; the device/context initialization
-   * happens asynchronously on the audio thread. If device or context creation fails, the audio thread throws
-   * {@link IllegalStateException}.
+   * <p>Bound mode initializes on the caller; dedicated mode initializes asynchronously.
    */
   public OpenALMixer() {
     this(DEFAULT_SOURCE_CAPACITY);
@@ -135,20 +135,66 @@ public final class OpenALMixer implements Mixer {
    * @param sourceCapacity maximum simultaneous effect sources, greater than zero
    */
   public OpenALMixer(int sourceCapacity) {
+    this(sourceCapacity, ExecutionMode.auto());
+  }
+
+  /**
+   * Creates a mixer with explicit execution ownership or budget-based automatic selection.
+   *
+   * @param mode           the execution mode
+   */
+  public OpenALMixer(ExecutionMode mode) {
+    this(DEFAULT_SOURCE_CAPACITY, mode);
+  }
+
+  /**
+   * Bound mode initializes synchronously and must subsequently be polled/closed on this thread.
+   *
+   * @param sourceCapacity maximum simultaneous effect sources, greater than zero
+   * @param mode           the execution mode
+   */
+  public OpenALMixer(int sourceCapacity, ExecutionMode mode) {
     if (sourceCapacity <= 0) {
       throw new IllegalArgumentException("Source capacity must be positive: " + sourceCapacity);
     }
     sources = new int[sourceCapacity];
     availableSources = new int[sourceCapacity];
-    audioThread = new Thread(this::run, "OpenAL-Mixer");
-    audioThread.setDaemon(true);
-    audioThread.start();
+    executionMode = mode;
+    if (executionMode == ExecutionMode.BOUND_THREAD) {
+      audioThread = Thread.currentThread();
+      try {
+        initializeDevice();
+      } catch (RuntimeException | Error exception) {
+        running.set(false);
+        disposeDevice();
+        throw exception;
+      }
+    } else {
+      audioThread = new Thread(this::run, "OpenAL-Mixer");
+      audioThread.setDaemon(true);
+      audioThread.start();
+    }
   }
 
   private static void clearAuxiliarySend(int source, int send) {
     if (AL.getCapabilities().ALC_EXT_EFX) {
       alSource3i(source, EXTEfx.AL_AUXILIARY_SEND_FILTER,
           EXTEfx.AL_EFFECTSLOT_NULL, send, EXTEfx.AL_FILTER_NULL);
+    }
+  }
+
+  /**
+   * Returns the resolved mode.
+   *
+   * @return the resolved execution mode
+   */
+  public ExecutionMode executionMode() {
+    return executionMode;
+  }
+
+  private void requireOwnerThread() {
+    if (Thread.currentThread() != audioThread) {
+      throw new IllegalStateException("Bound OpenAL mixer must be polled and closed on its creating thread");
     }
   }
 
@@ -172,7 +218,7 @@ public final class OpenALMixer implements Mixer {
     CompletableFuture<Result<Void>> result = new CompletableFuture<>();
     DeviceChange change = new DeviceChange(name, result);
     if (Thread.currentThread() == audioThread) {
-      change.run();
+      submit(change);
     } else {
       // Serialize admission with shutdown; never block the UI behind a full audio queue.
       synchronized (queue) {
@@ -267,6 +313,14 @@ public final class OpenALMixer implements Mixer {
   }
 
   public void pollEvents() {
+    if (!running.get()) {
+      return;
+    }
+    if (executionMode == ExecutionMode.BOUND_THREAD) {
+      requireOwnerThread();
+      drainCommands();
+      refreshDevices();
+    }
     if (debug) {
       long ms = System.currentTimeMillis();
 
@@ -342,11 +396,27 @@ public final class OpenALMixer implements Mixer {
   @Override
   public void submit(Runnable work) {
     if (Thread.currentThread() == audioThread) {
-      work.run();
+      if (executionMode == ExecutionMode.BOUND_THREAD && !consumingCommands) {
+        drainCommands();
+      }
+      if (outputDevice == 0) {
+        return;
+      }
+      boolean previous = consumingCommands;
+      consumingCommands = true;
+      try {
+        work.run();
+      } finally {
+        consumingCommands = previous;
+      }
       return;
     }
     try {
-      queue.put(work);
+      while (running.get()) {
+        if (queue.offer(work, 100, TimeUnit.MILLISECONDS)) {
+          return;
+        }
+      }
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
     }
@@ -361,10 +431,22 @@ public final class OpenALMixer implements Mixer {
    */
   @Override
   public void close() {
+    if (!running.get()) {
+      return;
+    }
+    if (executionMode == ExecutionMode.BOUND_THREAD) {
+      requireOwnerThread();
+    }
     synchronized (queue) {
       running.set(false);
     }
-    audioThread.interrupt();
+    if (executionMode == ExecutionMode.BOUND_THREAD) {
+      disposeDevice();
+      deviceNames = List.of();
+      deviceName = DEFAULT_DEVICE;
+    } else {
+      audioThread.interrupt();
+    }
   }
 
   /** Audio-thread-only switch. Native reopen retains the context and all of its playback objects. */
@@ -380,7 +462,7 @@ public final class OpenALMixer implements Mixer {
     if (!SOFTReopenDevice.alcReopenDeviceSOFT(outputDevice, name.isEmpty() ? null : name, outputAttributes)) {
       int error = alcGetError(outputDevice);
       return Result.failure("Cannot switch audio output to " + (name.isEmpty() ? "system default" : name)
-          + " (ALC error 0x" + Integer.toHexString(error) + ')');
+                            + " (ALC error 0x" + Integer.toHexString(error) + ')');
     }
     followingDefaultDevice = name.isEmpty();
     deviceName = currentDeviceName();
@@ -573,6 +655,34 @@ public final class OpenALMixer implements Mixer {
 
   /** Initializes and disposes native audio objects only on their owning thread. */
   private void runDevice() {
+    try {
+      initializeDevice();
+      while (running.get()) {
+        try {
+          Runnable first = queue.poll(1, TimeUnit.SECONDS);
+          if (first != null) {
+            consume(first);
+          }
+          drainCommands();
+          refreshDevices();
+        } catch (InterruptedException exception) {
+          Thread.currentThread().interrupt();
+          break;
+        }
+      }
+    } finally {
+      disposeDevice();
+    }
+  }
+
+  private void drainCommands() {
+    Runnable pending;
+    while ((pending = queue.poll()) != null) {
+      consume(pending);
+    }
+  }
+
+  private void initializeDevice() {
     /*
      * Initialize OpenAL.
      * This process should be done on this thread so that OpenAL context can bind to it.
@@ -593,9 +703,9 @@ public final class OpenALMixer implements Mixer {
     memFree(attrs);
 
     if (context == 0L) {
-      alcCloseDevice(device);
       throw new IllegalStateException("OpenAL failed to create context");
     }
+    outputContext = context;
 
     alcMakeContextCurrent(context);
     ALCCapabilities capabilities = ALC.createCapabilities(device);
@@ -621,34 +731,25 @@ public final class OpenALMixer implements Mixer {
       }
       availableSources[availableCount++] = sources[i];
     }
+  }
 
-    // Blocks and waits for consuming tasks.
-    while (running.get()) {
-      try {
-        // Block until work arrives, then drain any accumulated batch
-        List<Runnable> batch = new ArrayList<>();
-        Runnable first = queue.poll(1, TimeUnit.SECONDS);
-        if (first != null) {
-          batch.add(first);
-        }
-        queue.drainTo(batch);
-        for (Runnable task : batch) {
-          consume(task);
-        }
-        refreshDevices();
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-        break;
-      }
+  private void disposeDevice() {
+    if (outputDevice == 0) {
+      return;
+    }
+    if (outputContext == 0) {
+      alcCloseDevice(outputDevice);
+      outputDevice = 0;
+      return;
     }
 
     // Clip owners queue cleanup before stopping the mixer; release streams
     // and native objects while their context still exists.
-    Runnable pending;
-    while ((pending = queue.poll()) != null) {
-      consume(pending);
-    }
+    drainCommands();
     for (int source : sources) {
+      if (source == 0) {
+        continue;
+      }
       alSourceStop(source);
       alSourcei(source, AL_BUFFER, 0);
       alDeleteSources(source);
@@ -670,16 +771,22 @@ public final class OpenALMixer implements Mixer {
         effectSlots[send] = 0;
       }
     }
-    alcDestroyContext(context);
-    alcCloseDevice(device);
+    alcMakeContextCurrent(0);
+    alcDestroyContext(outputContext);
+    alcCloseDevice(outputDevice);
+    outputContext = 0;
     outputDevice = 0;
   }
 
   private void consume(Runnable task) {
+    boolean previous = consumingCommands;
+    consumingCommands = true;
     try {
       task.run();
     } catch (Exception exception) {
       LOGGER.warn("OpenAL consumer fault", exception);
+    } finally {
+      consumingCommands = previous;
     }
   }
 

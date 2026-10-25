@@ -24,102 +24,141 @@
 
 package io.viki.momentum.gfx.text;
 
+import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.tint.Gradient;
 import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Objects;
 
 /**
- * A single span of uniformly styled text.
- *
- * <p>A {@code Literal} is the leaf node of a text component tree. It carries
- * a fixed text string, a {@link TextFormat}, and optional {@link Meta}
- * attachments such as hyperlinks. Layout parameters are inherited from the
- * enclosing {@link MutableText}.
- *
- * <p>Instances are created via {@link #of(String)} for static text.
- * Style and metadata are set fluently with
- * {@link #with(TextFormat)} and {@link #with(Meta...)}.
+ * Immutable styled span. Formatting methods return new values; metadata arrays are copied.
+ * Content is shareable; raster memoization follows the fonts' rendering-thread requirements.
  */
 public final class Literal implements FormattableText<Literal> {
   private final String text;
-  private FontInsta font = FallbackFont.acquire();
-  private Gradient tint = Color.WHITE;
-  private int fontStyle = Font.REGULAR;
-  private @Nullable TextFormat fmt;
-  private long version;
-  private Meta @Nullable [] meta;
+  private final TextFormat format;
+  private final Meta @Nullable [] meta;
+  private int hash;
+  private volatile boolean hashed;
+  private @Nullable Raster cached;
+  private long cachedGeneration = -1;
 
-  /**
-   * Creates a literal with optional format arguments.
-   *
-   * @param text the text
-   */
-  private Literal(String text) {
+  private Literal(String text, TextFormat format, Meta @Nullable [] meta) {
     this.text = text;
+    this.format = format;
+    this.meta = meta;
   }
 
   /**
-   * Creates a literal with optional format arguments.
+   * Creates a literal.
    *
-   * @param text the text
-   * @return a new literal
+   * @param text the raw text
+   * @return a new literal instance
    */
   public static Literal of(String text) {
-    return new Literal(text);
+    return new Literal(text, TextFormat.of(), null);
+  }
+
+  // Arbitrary gradients and metadata may be stateful: their borrowed identities are stable keys.
+  private static int gradientHash(Gradient value) {
+    return value instanceof Color ? value.hashCode() : System.identityHashCode(value);
+  }
+
+  private static boolean sameFormat(TextFormat a, TextFormat b) {
+    return a.font().equals(b.font()) && a.fontStyle() == b.fontStyle()
+           && (a.tint() == b.tint() || a.tint() instanceof Color && a.tint().equals(b.tint()));
+  }
+
+  private static int metadataHash(Meta value) {
+    if (value instanceof Href) {
+      return value.hashCode();
+    }
+    if (value instanceof Icon(
+        float width, float height, float baseline, io.viki.momentum.gfx.texture.Drawable2D drawable
+    )) {
+      return 31 * (31 * (31 * Float.hashCode(width) + Float.hashCode(height))
+                   + Float.hashCode(baseline)) + System.identityHashCode(drawable);
+    }
+    return System.identityHashCode(value);
+  }
+
+  private static boolean sameMetadata(Meta @Nullable [] a, Meta @Nullable [] b) {
+    if (a == b) {
+      return true;
+    }
+    if (a == null || b == null || a.length != b.length) {
+      return false;
+    }
+    for (int i = 0; i < a.length; i++) {
+      if (a[i] == b[i]) {
+        continue;
+      }
+      if (a[i] instanceof Href href && href.equals(b[i])) {
+        continue;
+      }
+      if (a[i] instanceof Icon(
+          float width1, float height1, float baseline1, io.viki.momentum.gfx.texture.Drawable2D drawable1
+      ) && b[i] instanceof Icon(
+          float width, float height, float baseline, io.viki.momentum.gfx.texture.Drawable2D drawable
+      )
+          && Float.compare(width1, width) == 0 && Float.compare(height1, height) == 0
+          && Float.compare(baseline1, baseline) == 0 && drawable1 == drawable) {
+        continue;
+      }
+      return false;
+    }
+    return true;
   }
 
   @Override
   public Literal font(FontInsta value) {
-    font = value;
-    changed();
-    return this;
+    return with(format.font(value));
   }
 
   @Override
   public Literal tint(Gradient value) {
-    tint = value;
-    changed();
-    return this;
+    return with(format.tint(value));
   }
 
   @Override
   public Literal size(float value) {
-    font = font.resized(value);
-    changed();
-    return this;
+    return with(format.size(value));
   }
 
   @Override
   public Literal style(int value) {
-    fontStyle = value;
-    changed();
-    return this;
-  }
-
-  private void changed() {
-    fmt = null;
-    version++;
+    return with(format.style(value));
   }
 
   @Override
-  public long version() {
-    return version;
+  public Literal with(TextFormat value) {
+    return sameFormat(format, value) ? this : new Literal(text, value, meta);
+  }
+
+  @Override
+  public TextFormat format() {
+    return format;
+  }
+
+  @Override
+  public Literal with(Meta @Nullable ... values) {
+    if (!text.isEmpty() && Icon.find(values) != null) {
+      throw new IllegalArgumentException("Drawable metadata requires an empty literal");
+    }
+    return new Literal(text, format, values == null || values.length == 0 ? null : values.clone());
   }
 
   /**
-   * Returns a copy of this literal with the given inline metadata.
+   * Returns the metas contained in this literal text.
    *
-   * @param meta the metadata attachments
-   * @return this literal
+   * @return the meta array
    */
-  public Literal with(Meta @Nullable ... meta) {
-    this.meta = meta;
-    version++;
-    return this;
+  public Meta @Nullable [] meta() {
+    return meta == null ? null : meta.clone();
   }
 
   @Override
@@ -128,78 +167,64 @@ public final class Literal implements FormattableText<Literal> {
   }
 
   @Override
+  public List<Literal> spans() {
+    return List.of(this);
+  }
+
+  @Override
   public Literal cut(int begin, int length) {
     Objects.checkFromIndexSize(begin, length, text.length());
-    Literal result = Literal.of(text.substring(begin, begin + length)).with(format());
-    result.meta = meta == null ? null : meta.clone();
-    return result;
+    return new Literal(text.substring(begin, begin + length), format, meta);
   }
 
   @Override
   public Meta @Nullable [] getMeta(int index) {
-    return index >= 0 && index < text.length() ? meta : null;
-  }
-
-  @Override
-  public MutableText append(Text component) {
-    return new MutableText().append(this).append(component);
+    return index >= 0 && (index < text.length() || index == 0 && Icon.find(meta) != null) ? meta() : null;
   }
 
   @Override
   public Raster raster() {
-    return new MutableText().append(this).raster();
+    long generation = TextRasterCache.generation();
+    if (cached != null && cachedGeneration == generation) {
+      GraphicsMetrics.TextInstanceCacheHits.increment();
+      return cached;
+    }
+    cached = TextRasterCache.get(this);
+    cachedGeneration = generation;
+    return cached;
   }
 
   @Override
   public TextFormat forwadingStyle() {
-    return format();
-  }
-
-  /**
-   * Returns the text style of this literal.
-   *
-   * @return the text style
-   */
-  public TextFormat format() {
-    if (fmt == null) {
-      fmt = new TextFormat(font, tint, fontStyle);
-    }
-    return fmt;
-  }
-
-  /**
-   * Returns the inline metadata attached to this literal.
-   *
-   * @return the metadata array, or {@code null} if none
-   */
-  public Meta @Nullable [] meta() {
-    return meta;
+    return format;
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(text, format(), Arrays.hashCode(meta));
+    if (!hashed) {
+      int styleHash = 31 * (31 * format.font().hashCode() + format.fontStyle())
+                      + gradientHash(format.tint());
+      int metadataHash = 0;
+      if (meta != null) {
+        metadataHash = 1;
+        for (Meta value : meta) {
+          metadataHash = 31 * metadataHash + metadataHash(value);
+        }
+      }
+      hash = 31 * (31 * text.hashCode() + styleHash) + metadataHash;
+      hashed = true;
+    }
+    return hash;
   }
 
   @Override
-  public boolean equals(Object obj) {
-    if (obj == this) {
-      return true;
-    }
-    if (obj == null || obj.getClass() != this.getClass()) {
-      return false;
-    }
-    Literal that = (Literal) obj;
-    return Objects.equals(this.text, that.text) &&
-        Objects.equals(this.format(), that.format()) &&
-        Arrays.equals(this.meta, that.meta);
+  public boolean equals(@Nullable Object other) {
+    return this == other || other instanceof Literal that && hashCode() == that.hashCode()
+                            && text.equals(that.text) && sameFormat(format, that.format) && sameMetadata(meta, that.meta);
   }
 
   @Override
   public String toString() {
-    return "Literal[" +
-        "text=" + text + ", " +
-        "fmt=" + format() + ", " +
-        "meta=" + Arrays.toString(meta) + ']';
+    return "Literal[text=" + text + ", format=" + format + ", meta=" + Arrays.toString(meta) + ']';
   }
 }

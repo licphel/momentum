@@ -50,7 +50,6 @@ public final class Mesh implements AutoCloseable {
   private final List<Section> readonlySections;
   private boolean isEmpty;
 
-
   /**
    * Creates a new {@code Mesh} with the given uniform buffer and sections.
    *
@@ -176,6 +175,6 @@ public final class Mesh implements AutoCloseable {
   @Override
   public String toString() {
     return "Mesh[" +
-        "sections=" + sections + ']';
+           "sections=" + sections + ']';
   }
 }

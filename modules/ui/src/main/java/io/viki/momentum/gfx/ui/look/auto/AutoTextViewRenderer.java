@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
-import io.viki.momentum.gfx.text.MutableText;
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.TextView;
@@ -43,7 +43,7 @@ public final class AutoTextViewRenderer implements ElementRenderer {
   @Override
   public void render(Graphics graphics, Element element, Rectangle area) {
     TextView view = (TextView) element;
-    MutableText component = view.layoutForRender(area.width());
+    Text component = view.layoutForRender(area.width());
     graphics.pushScissor(area);
     try {
       graphics.drawText(component, area.minX(), area.minY());

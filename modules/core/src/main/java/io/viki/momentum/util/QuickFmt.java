@@ -24,178 +24,262 @@
 
 package io.viki.momentum.util;
 
-import io.viki.momentum.js.JsRuntime;
-import org.graalvm.polyglot.Value;
+import org.apache.commons.jexl3.*;
+import org.apache.commons.jexl3.introspection.JexlPermissions;
 import org.jspecify.annotations.Nullable;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * A lightweight formatter with sequential JavaScript mapping expressions.
+ * Formats brace-delimited text with reusable compiled templates.
  *
- * <p>{@code {}} consumes the next argument and appends it unchanged. An arrow
- * expression such as {@code {v -> v > 1 ? "apples" : "apple"}} consumes the
- * next argument and appends the expression result. Both {@code ->} and the
- * JavaScript spelling {@code =>} are accepted. Any other non-empty expression
- * is evaluated as the body of {@code v => (body)}. A backslash before a brace
- * emits that brace literally; invalid expressions produce {@code [Bad Expr]}.
+ * <p>Each placeholder consumes one argument in order, exposed to its expression as {@code v}.
+ * Compiled templates are cached and can be reused concurrently. Formatting with no arguments
+ * preserves placeholders as literal text while unescaping escaped braces.
  *
- * <p>Expression functions are compiled once per thread and kept in that
- * thread's JavaScript runtime. The formatter is safe to call concurrently;
- * each thread owns its runtime and compiled values. Expressions are executable
- * code and should therefore come from trusted templates.
+ * <p>This class is thread-safe.
  */
 public final class QuickFmt {
-  private static final String BAD_EXPRESSION = "[Bad Expr]";
-  private static final ThreadLocal<_TheJS> JSS = ThreadLocal.withInitial(_TheJS::new);
+  /** Reuses compiled templates keyed by their source text. */
+  private static final ConcurrentHashMap<String, Template> CACHE = new ConcurrentHashMap<>();
 
   private QuickFmt() {
   }
 
   /**
-   * Formats a template by sequentially replacing placeholders with arguments.
+   * Formats source text using the supplied arguments.
    *
-   * @param template template containing placeholders; must not be {@code null}
-   * @param args     arguments consumed from left to right; may be empty
-   * @return the formatted string
+   * <p>Arguments are assigned to placeholders in order. Placeholders without a corresponding
+   * argument remain unchanged; additional arguments are ignored.
+   *
+   * @param source text containing literal text and optional placeholders
+   * @param args values assigned to placeholders
+   * @return formatted text, with expression evaluation failures rendered as {@code [Bad Expr]}
+   * @throws IllegalArgumentException if a placeholder expression is invalid and arguments are supplied
    */
-  public static String format(String template, Object... args) {
-    int estimatedLength = template.length() + args.length * 8;
-    StringBuilder result = new StringBuilder(estimatedLength);
+  public static String format(String source, Object... args) {
+    if (args.length == 0) {
+      return source.replace("\\{", "{").replace("\\}", "}");
+    }
+    return compile(source).format(args);
+  }
+
+  /**
+   * Compiles source text into a reusable formatting template.
+   *
+   * @param source text containing literal text and optional placeholders
+   * @return the cached or newly compiled template
+   * @throws IllegalArgumentException if a placeholder contains an invalid expression
+   */
+  public static Template compile(String source) {
+    return CACHE.computeIfAbsent(source, QuickFmt::parse);
+  }
+
+  /**
+   * Parses source text into literal sections and argument placeholders.
+   *
+   * @param source template source
+   * @return the parsed template
+   * @throws IllegalArgumentException if a delimited placeholder contains an invalid expression
+   */
+  private static Template parse(String source) {
+    var parts = new ArrayList<Part>();
+    var literal = new StringBuilder();
     int argument = 0;
-    for (int index = 0; index < template.length(); index++) {
-      char current = template.charAt(index);
-      if (current == '\\' && index + 1 < template.length()) {
-        char escaped = template.charAt(index + 1);
-        if (escaped == '{' || escaped == '}') {
-          result.append(escaped);
-          index++;
-          continue;
-        }
-      }
-      if (current != '{') {
-        result.append(current);
+    for (int i = 0; i < source.length(); i++) {
+      char ch = source.charAt(i);
+      if (ch == '\\' && i + 1 < source.length()
+          && (source.charAt(i + 1) == '{' || source.charAt(i + 1) == '}')) {
+        literal.append(source.charAt(++i));
         continue;
       }
-
-      int end = findEnd(template, index);
+      int end = ch == '{' ? expressionEnd(source, i + 1) : -1;
       if (end < 0) {
-        result.append('{');
+        literal.append(ch);
         continue;
       }
-      String expression = template.substring(index + 1, end).trim();
-      if (expression.isEmpty()) {
-        if (argument < args.length) {
-          result.append(args[argument++]);
-        } else {
-          result.append("{}");
-        }
-      } else {
-        if (argument < args.length) {
-          result.append(evaluate(expression, args[argument++]));
-        } else {
-          result.append(template, index, end + 1);
-        }
+      if (!literal.isEmpty()) {
+        parts.add(new Part(literal.toString(), -1, null));
+        literal.setLength(0);
       }
-      index = end;
+      String expression = source.substring(i + 1, end).trim();
+      try {
+        parts.add(new Part(source.substring(i, end + 1), argument++,
+            expression.isEmpty() ? null : Engine.INSTANCE.createExpression(expression)));
+      } catch (JexlException exception) {
+        throw new IllegalArgumentException("Invalid format expression in: " + source, exception);
+      }
+      i = end;
     }
-    return result.toString();
+    if (!literal.isEmpty()) {
+      parts.add(new Part(literal.toString(), -1, null));
+    }
+    return new Template(parts.toArray(Part[]::new));
   }
 
-  private static @Nullable String evaluate(String expression, Object argument) {
-    try {
-      _TheJS state = JSS.get();
-      Value function = state.functions.computeIfAbsent(expression, state::compile);
-      Value value = function.execute(argument);
-      return value.isNull() ? null : toJavaString(value);
-    } catch (RuntimeException exception) {
-      return BAD_EXPRESSION;
-    }
-  }
-
-  private static String toJavaString(Value value) {
-    if (value.isString()) {
-      return value.asString();
-    }
-    if (value.isBoolean()) {
-      return Boolean.toString(value.asBoolean());
-    }
-    return value.toString();
-  }
-
-  private static int findEnd(String template, int start) {
-    int nestedBraces = 0;
+  /**
+   * Finds the closing brace for an expression beginning at the supplied source index.
+   *
+   * @param source complete template source
+   * @param start index immediately after the opening brace
+   * @return the matching closing-brace index, or {@code -1} if none exists
+   */
+  private static int expressionEnd(String source, int start) {
     char quote = 0;
-    boolean escaped = false;
-    for (int index = start + 1; index < template.length(); index++) {
-      char current = template.charAt(index);
+    int depth = 0;
+    for (int i = start; i < source.length(); i++) {
+      char ch = source.charAt(i);
       if (quote != 0) {
-        if (escaped) {
-          escaped = false;
-        } else if (current == '\\') {
-          escaped = true;
-        } else if (current == quote) {
+        if (ch == '\\') {
+          i++;
+        } else if (ch == quote) {
           quote = 0;
         }
-        continue;
-      }
-      if (current == '\'' || current == '"' || current == '`') {
-        quote = current;
-      } else if (current == '\\' && index + 1 < template.length()) {
-        index++;
-      } else if (current == '{') {
-        nestedBraces++;
-      } else if (current == '}' && nestedBraces-- == 0) {
-        return index;
+      } else if (ch == '\'' || ch == '"' || ch == '`') {
+        quote = ch;
+      } else if (ch == '{') {
+        depth++;
+      } else if (ch == '}' && depth-- == 0) {
+        return i;
       }
     }
     return -1;
   }
 
-  static class _TheJS {
-    private final JsRuntime runtime = new JsRuntime();
-    private final Map<String, Value> functions = new HashMap<>();
+  /**
+   * Immutable compiled formatting template.
+   *
+   * <p>Each call evaluates placeholders with its own argument context, so a template can be shared
+   * safely between concurrent callers.
+   */
+  public static final class Template {
+    private final Part[] parts;
 
-    private static int findArrow(String expression, String arrow) {
-      char quote = 0;
-      boolean escaped = false;
-      for (int index = 0; index <= expression.length() - arrow.length(); index++) {
-        char current = expression.charAt(index);
-        if (quote != 0) {
-          if (escaped) {
-            escaped = false;
-          } else if (current == '\\') {
-            escaped = true;
-          } else if (current == quote) {
-            quote = 0;
-          }
-          continue;
-        }
-        if (current == '\'' || current == '"' || current == '`') {
-          quote = current;
-        } else if (expression.startsWith(arrow, index)) {
-          return index;
-        }
-      }
-      return -1;
+    private Template(Part[] parts) {
+      this.parts = parts;
     }
 
-    private Value compile(String expression) {
-      int arrow = findArrow(expression, "->");
-      String source;
-      if (arrow >= 0) {
-        source = expression.substring(0, arrow) + "=>" + expression.substring(arrow + 2);
-      } else if (findArrow(expression, "=>") >= 0) {
-        source = expression;
-      } else {
-        source = "v => (" + expression + ")";
+    /**
+     * Formats this template with the supplied arguments.
+     *
+     * <p>Each placeholder consumes one argument in order. Missing arguments leave their
+     * placeholders unchanged, extra arguments are ignored, and expression evaluation failures
+     * are rendered as {@code [Bad Expr]}.
+     *
+     * @param args values assigned to placeholders
+     * @return formatted text
+     */
+    public String format(Object... args) {
+      var result = new StringBuilder();
+      ArgumentContext context = null;
+      for (Part part : parts) {
+        if (part.argument < 0 || part.argument >= args.length) {
+          result.append(part.text);
+        } else if (part.expression == null) {
+          result.append(args[part.argument]);
+        } else {
+          if (context == null) {
+            context = new ArgumentContext();
+          }
+          context.value = args[part.argument];
+          try {
+            result.append(part.expression.evaluate(context));
+          } catch (JexlException exception) {
+            result.append("[Bad Expr]");
+          }
+        }
       }
-      Value function = runtime.eval("quickfmt", "(" + source + ")");
-      if (!function.canExecute()) {
-        throw new IllegalArgumentException("QuickFmt expression is not executable: {" + expression + "}");
+      return result.toString();
+    }
+  }
+
+  private record Part(String text, int argument, @Nullable JexlExpression expression) {
+  }
+
+  /** Exposes the current placeholder argument as a read-only {@code v} binding. */
+  private static final class ArgumentContext implements JexlContext {
+    /** Value exposed to the expression currently being evaluated. */
+    private @Nullable Object value;
+
+    /**
+     * Returns the current argument for the formatter's {@code v} variable.
+     *
+     * @param name expression variable name
+     * @return the current argument for {@code v}, or {@code null} for any other name
+     */
+    @Override
+    public @Nullable Object get(String name) {
+      return name.equals("v") ? value : null;
+    }
+
+    /**
+     * Reports whether the formatter exposes the requested expression variable.
+     *
+     * @param name expression variable name
+     * @return {@code true} only for {@code v}
+     */
+    @Override
+    public boolean has(String name) {
+      return name.equals("v");
+    }
+
+    /**
+     * Rejects writes because format arguments are read-only during evaluation.
+     *
+     * @param name expression variable name
+     * @param value proposed value, which is not stored
+     * @throws UnsupportedOperationException always, because the context is read-only
+     */
+    @Override
+    public void set(String name, @Nullable Object value) {
+      throw new UnsupportedOperationException("Format arguments are read-only: " + name);
+    }
+  }
+
+  /** Holds the shared expression engine restricted to formatter helpers. */
+  private static final class Engine {
+    /** Expression engine reused by all compiled templates. */
+    private static final JexlEngine INSTANCE = new JexlBuilder().cache(512).strict(true).silent(false)
+        .permissions(new JexlPermissions.ClassPermissions(JexlPermissions.SECURE, Functions.class))
+        .namespaces(Collections.singletonMap(null, Functions.class)).create();
+  }
+
+  /**
+   * Stateless formatting helpers available to placeholder expressions.
+   *
+   * <p>These helpers do not retain caller state and may be used concurrently.
+   */
+  public static final class Functions {
+    /** Highest supported number of fractional digits for {@link #fixed(Number, int)}. */
+    private static final int MAX_FRACTION_DIGITS = 16;
+
+    private Functions() {
+    }
+
+    /**
+     * Formats a number with a fixed number of fractional digits.
+     *
+     * <p>Finite values are rounded using half-up rounding; non-finite values use their standard
+     * floating-point text representation.
+     *
+     * @param number value to format
+     * @param precision number of fractional digits, from zero through sixteen
+     * @return the formatted number
+     * @throws IllegalArgumentException if {@code precision} is outside the supported range
+     */
+    public static String fixed(Number number, int precision) {
+      if (precision < 0 || precision > MAX_FRACTION_DIGITS) {
+        throw new IllegalArgumentException("Fraction digits must be between 0 and " + MAX_FRACTION_DIGITS);
       }
-      return function;
+      double value = number.doubleValue();
+      // BigDecimal cannot represent infinity or NaN.
+      return Double.isFinite(value)
+          ? BigDecimal.valueOf(value).setScale(precision, RoundingMode.HALF_UP).toPlainString()
+          : Double.toString(value);
     }
   }
 }

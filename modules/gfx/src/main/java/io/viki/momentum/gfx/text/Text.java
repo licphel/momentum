@@ -27,79 +27,106 @@ package io.viki.momentum.gfx.text;
 import io.viki.momentum.gfx.text.raster.Raster;
 import org.jspecify.annotations.Nullable;
 
+import java.util.List;
+
 /**
- * A node in a text component tree that can be rasterized for rendering.
+ * Immutable styled text content and layout that can be shared between consumers.
  *
- * <p>Implementations are either a single styled span ({@link Literal}) or
- * a composite sequence ({@link MutableText}). Each node supplies plain-text
- * content via {@link #text()} and can produce a {@link Raster} for drawing
- * via {@link #raster()}.
- *
- * @see Literal
- * @see MutableText
- * @see TextFormat
+ * <p>Use {@link TextBuilder} to compose spans and produce a completed value. Rasterization is
+ * cached; rendering must follow the owning-thread rules of the fonts, gradients, and inline
+ * metadata referenced by the text.
  */
 public interface Text {
   /**
-   * Returns the content and style revision used to detect in-place changes.
-   *
-   * @return the current revision, or {@code 0} for an immutable component
+   * Invalidates cached rasters after a referenced font resource changes or is released.
    */
-  default long version() {
-    return 0;
+  static void invalidateCache() {
+    TextRasterCache.clear();
   }
 
   /**
-   * Returns the concatenated plain text of this component and all its
-   * descendants.
+   * Returns the plain text formed by concatenating this value's spans.
    *
-   * @return the full text content
+   * @return the UTF-16 text content
    */
   String text();
 
   /**
-   * Returns a styled slice without changing this component.
-   * Indices count UTF-16 code units, like {@link String#substring(int, int)}.
+   * Returns the immutable styled spans in source order.
    *
-   * @param begin  the first included character index
-   * @param length the number of code units to retain
-   * @return the sliced text, preserving span styles and metadata
-   * @throws IndexOutOfBoundsException if the range is outside this text
+   * @return an immutable list of spans
+   */
+  List<Literal> spans();
+
+  /**
+   * Returns a slice of the source text while retaining applicable styles and inline attachments.
+   * Indices count UTF-16 code units, as with {@link String#substring(int, int)}.
+   *
+   * @param begin the first included UTF-16 code-unit index
+   * @param length the number of UTF-16 code units to include
+   * @return the sliced text
+   * @throws IndexOutOfBoundsException if the requested range is outside this text
    */
   Text cut(int begin, int length);
 
   /**
-   * Returns inline metadata at a UTF-16 character index obtained by hit-testing.
-   * The returned array is borrowed and must not be modified.
+   * Returns metadata associated with a UTF-16 character index.
    *
    * @param index the UTF-16 code-unit index to inspect
-   * @return the metadata at that index, or {@code null} if absent or outside the content
+   * @return a defensive copy of the metadata, or {@code null} if none is present
    */
   default Meta @Nullable [] getMeta(int index) {
     return null;
   }
 
   /**
-   * Appends a child component, returning a new {@link MutableText} that
-   * starts with this component followed by the given one.
+   * Returns the layout policy associated with this text.
    *
-   * @param component the text component to append
-   * @return a new sequence containing this component and {@code component}
+   * @return the text layout policy
    */
-  MutableText append(Text component);
+  default TextLayout layout() {
+    return TextLayout.DEFAULT;
+  }
 
   /**
-   * Rasterizes this text component into a {@link Raster} ready for drawing.
+   * Returns the maximum width configured for each line.
    *
-   * @return the rasterized output
+   * @return the maximum line width in text layout units
+   */
+  default float maxWidth() {
+    return layout().maxWidth();
+  }
+
+  /**
+   * Creates a builder initialized with this text's content and layout.
+   *
+   * @return an independent builder
+   */
+  default TextBuilder toBuilder() {
+    return new TextBuilder(this);
+  }
+
+  /**
+   * Creates a builder containing this text followed by the supplied component.
+   *
+   * @param component the text to append
+   * @return a builder containing both text values
+   */
+  default TextBuilder append(Text component) {
+    return toBuilder().append(component);
+  }
+
+  /**
+   * Returns the rasterized layout used for drawing and hit testing.
+   *
+   * @return the rasterized text
    */
   Raster raster();
 
   /**
-   * Returns the trailing style of this component, used when chaining
-   * additional text or appending newlines.
+   * Returns the trailing style, for use when appending text or creating a newline.
    *
-   * @return the last style, or {@code null} if this component is empty
+   * @return the final span's style, or {@code null} if no style is available
    */
   @Nullable TextFormat forwadingStyle();
 }

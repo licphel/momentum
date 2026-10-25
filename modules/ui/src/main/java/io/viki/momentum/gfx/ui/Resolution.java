@@ -34,8 +34,10 @@ import io.viki.momentum.math.shape.Rectangle;
  * Maps a dynamically sized logical UI canvas onto the entire framebuffer.
  *
  * <p>The configured logical dimensions are minimum dimensions for automatic scale selection.
- * The available logical size is the framebuffer size divided by the selected scale. The object is mutable only through
- * {@link #resize(int, int)} and is intended to be updated on the view thread.
+ * The available logical size is the framebuffer size divided by the selected scale. Framebuffer
+ * sizing and the automatic sharp-scale interval are updated through {@link #resize(int, int)} and
+ * {@link #setResolutionKeptSharp(int)}. Use this object on the view thread; it is not
+ * thread-safe.
  */
 public final class Resolution {
   /** Default logical canvas width. */
@@ -46,6 +48,7 @@ public final class Resolution {
   public static final float SCALE_START = 0.5F;
   /** Scale increment used by automatic resolution selection. */
   public static final float SCALE_STEP = 0.5F;
+
   private final float minimumLogicalWidth;
   private final float minimumLogicalHeight;
   private final boolean automatic;
@@ -58,10 +61,25 @@ public final class Resolution {
   private int width;
   private int height;
   private float scale;
+  private int resolutionKeptSharp = 1;
   private Rectangle viewport;
   private Vector2 logicalSize;
 
-  /** Creates a resolution mapping with validated framebuffer and logical dimensions. */
+  /**
+   * Creates a resolution mapping with validated framebuffer and logical dimensions.
+   *
+   * @param width framebuffer width in pixels
+   * @param height framebuffer height in pixels
+   * @param logicalWidth minimum logical canvas width
+   * @param logicalHeight minimum logical canvas height
+   * @param automatic whether to select the scale from the framebuffer size
+   * @param onlyInteger whether automatic scale selection uses integer increments
+   * @param fixedScale fixed scale or the starting scale for automatic selection
+   * @param logicalScale additional multiplier applied to the selected scale
+   * @param handler backend coordinate conversion handler
+   * @throws IllegalArgumentException if a framebuffer dimension, logical dimension, or scale is
+   *         less than or equal to zero
+   */
   private Resolution(int width, int height, float logicalWidth, float logicalHeight,
                      boolean automatic, boolean onlyInteger, float fixedScale,
                      float logicalScale, TransformHandler handler) {
@@ -100,6 +118,7 @@ public final class Resolution {
    * @param onlyInteger whether the selected scale must be an integer
    * @param handler     the backend coordinate conversion handler
    * @return the configured resolution mapping
+   * @throws IllegalArgumentException if either framebuffer dimension is less than or equal to zero
    */
   public static Resolution auto(int width, int height, boolean onlyInteger, TransformHandler handler) {
     return auto(width, height, DEFAULT_LOGICAL_WIDTH, DEFAULT_LOGICAL_HEIGHT, onlyInteger, handler);
@@ -115,6 +134,7 @@ public final class Resolution {
    * @param onlyInteger   whether the selected scale must be an integer
    * @param handler       the backend coordinate conversion handler
    * @return the configured resolution mapping
+   * @throws IllegalArgumentException if a framebuffer or logical dimension is less than or equal to zero
    */
   public static Resolution auto(int width, int height, float logicalWidth, float logicalHeight,
                                 boolean onlyInteger, TransformHandler handler) {
@@ -123,8 +143,20 @@ public final class Resolution {
 
   /**
    * Creates an automatically scaled mapping with an additional per-canvas logical scale.
-   * A value of {@code 2} gives the canvas twice the logical pixel density while preserving its
-   * declared coordinate units.
+   *
+   * <p>A logical scale of {@code 2} gives the canvas twice the logical pixel density while
+   * preserving its declared coordinate units.
+   *
+   * @param width framebuffer width in pixels
+   * @param height framebuffer height in pixels
+   * @param logicalWidth minimum logical canvas width
+   * @param logicalHeight minimum logical canvas height
+   * @param onlyInteger whether automatic selection uses integer increments
+   * @param logicalScale additional multiplier applied to the selected scale
+   * @param handler backend coordinate conversion handler
+   * @return the configured resolution mapping
+   * @throws IllegalArgumentException if a framebuffer or logical dimension, or
+   *         {@code logicalScale}, is less than or equal to zero
    */
   public static Resolution auto(int width, int height, float logicalWidth, float logicalHeight,
                                 boolean onlyInteger, float logicalScale, TransformHandler handler) {
@@ -140,6 +172,8 @@ public final class Resolution {
    * @param scale   the logical-to-framebuffer scale
    * @param handler the backend coordinate conversion handler
    * @return the configured resolution mapping
+   * @throws IllegalArgumentException if a framebuffer dimension or {@code scale} is less than or
+   *         equal to zero
    */
   public static Resolution fixed(int width, int height, float scale, TransformHandler handler) {
     return fixed(width, height, DEFAULT_LOGICAL_WIDTH, DEFAULT_LOGICAL_HEIGHT, scale, handler);
@@ -155,19 +189,45 @@ public final class Resolution {
    * @param scale         the logical-to-framebuffer scale
    * @param handler       the backend coordinate conversion handler
    * @return the configured resolution mapping
+   * @throws IllegalArgumentException if a framebuffer or logical dimension, or {@code scale}, is
+   *         less than or equal to zero
    */
   public static Resolution fixed(int width, int height, float logicalWidth, float logicalHeight,
                                  float scale, TransformHandler handler) {
     return fixed(width, height, logicalWidth, logicalHeight, scale, 1.0F, handler);
   }
 
-  /** Creates a fixed mapping with an additional per-canvas logical scale. */
+  /**
+   * Creates a fixed-scale mapping with an additional per-canvas logical multiplier.
+   *
+   * @param width framebuffer width in pixels
+   * @param height framebuffer height in pixels
+   * @param logicalWidth logical canvas width
+   * @param logicalHeight logical canvas height
+   * @param scale fixed framebuffer scale
+   * @param logicalScale additional multiplier applied to the fixed scale
+   * @param handler backend coordinate conversion handler
+   * @return the configured resolution mapping
+   * @throws IllegalArgumentException if a framebuffer or logical dimension, {@code scale}, or
+   *         {@code logicalScale} is less than or equal to zero
+   */
   public static Resolution fixed(int width, int height, float logicalWidth, float logicalHeight,
                                  float scale, float logicalScale, TransformHandler handler) {
     return new Resolution(width, height, logicalWidth, logicalHeight, false, false, scale,
         logicalScale, handler);
   }
 
+  /**
+   * Selects the largest allowed automatic scale that fits the framebuffer.
+   *
+   * @param width framebuffer width in pixels
+   * @param height framebuffer height in pixels
+   * @param logicalWidth minimum logical canvas width
+   * @param logicalHeight minimum logical canvas height
+   * @param onlyInteger whether allowed scales use integer increments instead of half increments
+   * @return the largest allowed fit scale, or the fractional fit when the framebuffer is smaller
+   *         than one step
+   */
   private static float resolveScale(int width, int height, float logicalWidth, float logicalHeight, boolean onlyInteger) {
     float required = Math.min(width / logicalWidth, height / logicalHeight);
     // Fit even a framebuffer smaller than the minimum logical dimensions.
@@ -234,6 +294,33 @@ public final class Resolution {
   }
 
   /**
+   * Configures the allowed automatic framebuffer scale interval. For example, 2 allows
+   * scales 2, 4, 6, etc. A value of 1 retains the existing scaling policy. This constraint
+   * applies after the per-canvas logical multiplier; explicit fixed scales are unchanged.
+   * If no allowed scale fits, the mapping falls back to at most 1, retaining fractional
+   * downscaling for windows smaller than the minimum logical canvas.
+   *
+   * @param resolutionKeptSharp positive integral scale interval
+   * @throws IllegalArgumentException if {@code resolutionKeptSharp} is less than one
+   */
+  public void setResolutionKeptSharp(int resolutionKeptSharp) {
+    if (resolutionKeptSharp < 1) {
+      throw new IllegalArgumentException("Sharp scale interval must be positive");
+    }
+    this.resolutionKeptSharp = resolutionKeptSharp;
+    recalculate();
+  }
+
+  /**
+   * Returns the additional automatic scale interval, or one for the original policy.
+   *
+   * @return the automatic scale interval
+   */
+  public int resolutionKeptSharp() {
+    return resolutionKeptSharp;
+  }
+
+  /**
    * Returns the optional logical scale multiplier configured for this mapping.
    *
    * @return per-canvas logical scale
@@ -252,9 +339,9 @@ public final class Resolution {
   }
 
   /**
-   * Returns the framebuffer rectangle occupied by the logical canvas.
+   * Returns the full framebuffer viewport used to draw the logical canvas.
    *
-   * @return centered logical viewport
+   * @return framebuffer viewport
    */
   public Rectangle viewport() {
     return viewport;
@@ -274,6 +361,8 @@ public final class Resolution {
    *
    * @param width  the new framebuffer width in pixels
    * @param height the new framebuffer height in pixels
+   * @throws IllegalArgumentException if either framebuffer dimension is less than or equal to
+   *         zero
    */
   public void resize(int width, int height) {
     if (width <= 0 || height <= 0) {
@@ -338,6 +427,9 @@ public final class Resolution {
   /**
    * Converts coordinates from an arbitrary input surface into logical coordinates.
    *
+   * <p>Nonpositive input dimensions are treated as one pixel, allowing conversion while an input
+   * surface is minimized.
+   *
    * @param x           the input-space X coordinate
    * @param y           the input-space Y coordinate
    * @param inputWidth  the input surface width
@@ -361,7 +453,7 @@ public final class Resolution {
    * @param inputWidth  the input surface width
    * @param inputHeight the input surface height
    * @return the corresponding input-space point
-   * @throws IllegalArgumentException if an input dimension is not positive
+   * @throws IllegalArgumentException if an input dimension is less than or equal to zero
    */
   public Vector2 logicalToInput(Vector2 point, double inputWidth, double inputHeight) {
     if (inputWidth <= 0.0 || inputHeight <= 0.0) {
@@ -424,10 +516,16 @@ public final class Resolution {
     target.setCenter(new Vector2(logicalWidth * 0.5F, logicalHeight * 0.5F));
   }
 
+  /** Recomputes the scale, logical dimensions, viewport, and owned camera projection. */
   private void recalculate() {
     if (automatic) {
       scale = resolveScale(width, height, this.minimumLogicalWidth, this.minimumLogicalHeight,
           onlyInteger) * logicalScale;
+      if (resolutionKeptSharp > 1) {
+        scale = scale >= resolutionKeptSharp
+            ? (float) Math.floor(scale / resolutionKeptSharp) * resolutionKeptSharp
+            : Math.min(scale, 1F);
+      }
     } else {
       scale = fixedScale * logicalScale;
     }

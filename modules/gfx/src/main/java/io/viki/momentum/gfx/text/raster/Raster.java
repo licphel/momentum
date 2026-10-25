@@ -39,6 +39,8 @@ import java.util.Locale;
  * <p>Contains per-glyph render entries, decoration strokes, bounding box, and
  * hit-test data for cursor positioning. Entries and hit-test runs retain pen/layout coordinates.
  * Vertical bounds cover complete line boxes, independent of which glyph bitmaps occur in the text.
+ * Cached rasters may be shared by multiple text values. All exposed arrays, including entry
+ * metadata and layout-run arrays, are borrowed read-only data and must not be modified.
  *
  * @param entries       the per-glyph render entries
  * @param strokes       the decoration strokes (underline and strikethrough)
@@ -184,6 +186,24 @@ public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float 
    */
   public int hitTest(Vector2 point) {
     return hitTest(point.x(), point.y());
+  }
+
+  /**
+   * Metadata at an exact raster-space position, including empty-text drawables.
+   * Use this for pointer interaction: several zero-length attachments can share a character index.
+   * The returned array is borrowed and must not be modified.
+   *
+   * @param x pointer x
+   * @param y pointer y
+   * @return metas at this position
+   */
+  public Meta @Nullable [] getMeta(float x, float y) {
+    for (Entry entry : entries) {
+      if (entry.bounds().contains(x, y)) {
+        return entry.metaInfo();
+      }
+    }
+    return null;
   }
 
   /**

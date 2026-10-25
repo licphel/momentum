@@ -57,7 +57,7 @@ public final class HarfbuzzShaper implements AutoCloseable {
    *
    * @param instance  the resolved font and logical size used for shaping
    * @param text      the text string to shape
-     * @param flipY     whether to flip the Y-axis offsets ({@code true} for OpenGL coordinates,
+   * @param flipY     whether to flip the Y-axis offsets ({@code true} for OpenGL coordinates,
    *                  {@code false} for screen coordinates)
    * @param fontStyle the font style (currently unused, reserved for future use)
    * @return a {@code ShapeResult} containing glyph IDs, character indices, advances, and X/Y offsets

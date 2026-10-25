@@ -33,7 +33,7 @@ import io.viki.momentum.math.shape.Rectangle;
  * <p>Changing the bounds, layout, padding, gap, or child list immediately recalculates child
  * positions. The group is mutable and not thread-safe.
  */
-public final class Group extends Element {
+public class Group extends Element {
   private static final float DEFAULT_GAP = 4.0F;
 
   private Layout layout;

@@ -46,6 +46,18 @@ public final class GraphicsMetrics {
   /** Number of executed payload upload batches, including allocations with initial data. */
   public static final LongAdder BufferUploadBatches = new LongAdder();
 
+  /** Shared text LRU lookups, excluding per-instance raster reuse. */
+  public static final LongAdder TextCacheQueries = new LongAdder();
+  /** Shared text LRU hits. TCHR is hits divided by queries. */
+  public static final LongAdder TextCacheHits = new LongAdder();
+  /** Raster reuse on the same immutable text instance, before an LRU lookup is necessary. */
+  public static final LongAdder TextInstanceCacheHits = new LongAdder();
+
+  public static double textCacheHitRate() {
+    long queries = TextCacheQueries.sum();
+    return queries == 0 ? 0 : (double) TextCacheHits.sum() / queries;
+  }
+
   private static final LongAdder pendingBufferUploadBatches = new LongAdder();
   private static volatile long lastFrameBufferUploadBatches;
   private static final LongAdder pendingBufferUploadBytes = new LongAdder();
@@ -143,6 +155,11 @@ public final class GraphicsMetrics {
         lastFrameBufferUploadBytes, peakFrameBufferUploadBytes);
     System.out.printf("  %-40s %10d %12d%n", "BTPT (Buffer Upload Batches)", bufferBatches,
         currentFrameCount > 0 ? bufferBatches / currentFrameCount : 0);
+    long textQueries = TextCacheQueries.sum();
+    long textHits = TextCacheHits.sum();
+    System.out.printf("  TCHR (Text Cache Hit Rate): %.2f%% (%d / %d), instance hits: %d%n",
+        textQueries == 0 ? 0.0 : 100.0 * textHits / textQueries,
+        textHits, textQueries, TextInstanceCacheHits.sum());
     System.out.println();
 
     // Reset counters and frame count for the next interval
@@ -152,6 +169,9 @@ public final class GraphicsMetrics {
     DeviceQueueSize.reset();
     BufferUploadBytes.reset();
     BufferUploadBatches.reset();
+    TextCacheQueries.reset();
+    TextCacheHits.reset();
+    TextInstanceCacheHits.reset();
     peakFrameBufferUploadBytes = 0L;
     frameCount = 0L;
   }

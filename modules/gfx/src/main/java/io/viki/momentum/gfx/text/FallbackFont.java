@@ -29,8 +29,8 @@ import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
-import java.nio.ByteBuffer;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.Objects;
 
 /**
@@ -83,6 +83,15 @@ public final class FallbackFont {
    */
   public static synchronized void set(FontInsta value) {
     font = value;
+  }
+
+  /**
+   * Gets the fallback font.
+   *
+   * @return the fallback font
+   */
+  public static FontInsta get() {
+    return Objects.requireNonNull(font);
   }
 
   /**

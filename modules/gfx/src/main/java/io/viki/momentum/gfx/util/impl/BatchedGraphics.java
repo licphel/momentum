@@ -24,8 +24,6 @@
 
 package io.viki.momentum.gfx.util.impl;
 
-import io.viki.momentum.util.perf.Analysis;
-
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
@@ -33,17 +31,18 @@ import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
 import io.viki.momentum.gfx.cmd.Encoder;
 import io.viki.momentum.gfx.cmd.EncoderDesc;
-import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.*;
 import io.viki.momentum.gfx.shader.*;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.SamplerDesc;
+import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.resource.Resource;
+import io.viki.momentum.util.perf.Analysis;
 
 import java.nio.ByteBuffer;
 

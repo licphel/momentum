@@ -36,7 +36,7 @@ import java.util.stream.Stream;
  *
  * <p>Concrete subclasses decide when each entry's supplier is evaluated:
  * {@link DirectRegistry} evaluates it at registration time,
- * {@link IndirectRegistry} when the registry is frozen.
+ * {@link IndirectRegistry} when a declared holder is first resolved or the registry is frozen.
  *
  * @param <T> registry type
  */
@@ -44,7 +44,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
   private final Identifier key;
   private final Map<Identifier, T> byId = new LinkedHashMap<>();
   private final Map<T, Identifier> byValue = new IdentityHashMap<>();
-  private final List<T> byIndex = new ArrayList<>();
+  private final List<@Nullable T> byIndex = new ArrayList<>();
   private final AtomicInteger nextId = new AtomicInteger();
   private boolean frozen;
 
@@ -67,20 +67,27 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
    * @throws IllegalArgumentException if an entry is already registered under the identifier
    */
   protected T registerValue(Identifier id, T value) {
+    return registerValue(id, value, nextId.get());
+  }
+
+  /** Publishes a value at a declaration-assigned index, independent of resolution order. */
+  protected T registerValue(Identifier id, T value, int index) {
     if (frozen) {
       throw new IllegalStateException("Registry '" + key + "' is frozen");
     }
     if (byId.containsKey(id)) {
       throw new IllegalArgumentException("Duplicate registry entry: " + id);
     }
+    nextId.accumulateAndGet(index + 1, Math::max);
     byId.put(id, value);
     byValue.put(value, id);
     RegistryContext ctx = value.getRegistryContext();
     ctx.putId(id);
-    ctx.putIndex(nextId.getAndIncrement());
+    ctx.putIndex(index);
     ctx.putRegistry(this);
     value.onRegistered();
-    byIndex.add(value);
+    while (byIndex.size() <= index) byIndex.add(null);
+    byIndex.set(index, value);
     return value;
   }
 
@@ -96,7 +103,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
 
   @Override
   public T get(int index) {
-    return byIndex.get(index);
+    return Objects.requireNonNull(byIndex.get(index));
   }
 
   @Override
@@ -106,7 +113,7 @@ public abstract class AbstractRegistry<T extends RegistryEntry> implements Regis
 
   @Override
   public List<T> values() {
-    return List.copyOf(byIndex);
+    return byIndex.stream().map(Objects::requireNonNull).toList();
   }
 
   @Override

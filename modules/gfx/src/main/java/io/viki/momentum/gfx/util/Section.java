@@ -44,25 +44,25 @@ public final class Section implements AutoCloseable {
   private final Material material;
   private final BufferObject vbo;
   private final @Nullable BufferObject ibo;
+  private final Topology topology;
   private int vertexCount;
   private int firstVertex;
   private int firstIndex;
   private int indexCount;
-  private final Topology topology;
   private byte[] vertexStaging = new byte[0];
   private byte[] indexStaging = new byte[0];
 
   /**
    * Creates a retained mesh section with no CPU staging arrays.
    *
-   * @param material the material used to render this section
-   * @param vbo the vertex buffer retained by this section
-   * @param ibo the index buffer, or {@code null} for non-indexed geometry
+   * @param material    the material used to render this section
+   * @param vbo         the vertex buffer retained by this section
+   * @param ibo         the index buffer, or {@code null} for non-indexed geometry
    * @param vertexCount the number of vertices to draw
    * @param firstVertex the first vertex to draw
-   * @param firstIndex the first index to draw
-   * @param indexCount the number of indices to draw
-   * @param topology the primitive topology used for drawing
+   * @param firstIndex  the first index to draw
+   * @param indexCount  the number of indices to draw
+   * @param topology    the primitive topology used for drawing
    */
   public Section(Material material, BufferObject vbo, @Nullable BufferObject ibo,
                  int vertexCount, int firstVertex, int firstIndex, int indexCount,
@@ -83,16 +83,16 @@ public final class Section implements AutoCloseable {
    * <p>The arrays are retained by reference so a mesh rebuild can reuse their capacity.
    * Callers must not modify them while the section is being rebuilt or drawn.
    *
-   * @param material the material used to render this section
-   * @param vbo the vertex buffer retained by this section
-   * @param ibo the index buffer, or {@code null} for non-indexed geometry
-   * @param vertexCount the number of vertices to draw
-   * @param firstVertex the first vertex to draw
-   * @param firstIndex the first index to draw
-   * @param indexCount the number of indices to draw
-   * @param topology the primitive topology used for drawing
+   * @param material      the material used to render this section
+   * @param vbo           the vertex buffer retained by this section
+   * @param ibo           the index buffer, or {@code null} for non-indexed geometry
+   * @param vertexCount   the number of vertices to draw
+   * @param firstVertex   the first vertex to draw
+   * @param firstIndex    the first index to draw
+   * @param indexCount    the number of indices to draw
+   * @param topology      the primitive topology used for drawing
    * @param vertexStaging the retained CPU-side vertex data
-   * @param indexStaging the retained CPU-side index data
+   * @param indexStaging  the retained CPU-side index data
    */
   public Section(Material material, BufferObject vbo, @Nullable BufferObject ibo,
                  int vertexCount, int firstVertex, int firstIndex, int indexCount,
@@ -181,17 +181,17 @@ public final class Section implements AutoCloseable {
    * equal topology, and the same indexed or non-indexed mode.
    *
    * @param pipeline the replacement primitive's render pipeline
-   * @param layout the replacement primitive's resource-set layout
+   * @param layout   the replacement primitive's resource-set layout
    * @param topology the replacement primitive's topology
-   * @param indexed whether the replacement uses an index buffer
+   * @param indexed  whether the replacement uses an index buffer
    * @return {@code true} when this section's resources can be reused
    */
   public boolean isCompatibleWith(Pipeline pipeline, ResourceSetLayout layout, Topology topology,
                                   boolean indexed) {
     return material.pipeline() == pipeline
-        && material.resourceSet().layout() == layout
-        && this.topology == topology
-        && (ibo != null) == indexed;
+           && material.resourceSet().layout() == layout
+           && this.topology == topology
+           && (ibo != null) == indexed;
   }
 
   /**
@@ -201,12 +201,12 @@ public final class Section implements AutoCloseable {
    * are reset to zero. An index upload occurs only when this section has an index buffer
    * and {@code indexBytes} is positive.
    *
-   * @param vertices the replacement vertex data
+   * @param vertices    the replacement vertex data
    * @param vertexBytes the number of vertex bytes to upload
-   * @param indices the replacement index data
-   * @param indexBytes the number of index bytes to upload
+   * @param indices     the replacement index data
+   * @param indexBytes  the number of index bytes to upload
    * @param vertexCount the replacement vertex count
-   * @param indexCount the replacement index count
+   * @param indexCount  the replacement index count
    */
   public void updateGeometry(byte[] vertices, int vertexBytes, byte[] indices, int indexBytes,
                              int vertexCount, int indexCount) {

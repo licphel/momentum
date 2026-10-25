@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  */
 public final class CustomLook {
   /** Logical spacing used by the factory overloads; explicit constructors allow other values. */
-  private static final int DEFAULT_PADDING = 2;
+  private static final int DEFAULT_PADDING = 6;
   /** Matches the automatic tooltip's spacing between rich-text entries. */
   private static final int DEFAULT_TOOLTIP_LINE_GAP = 1;
 
@@ -91,6 +91,20 @@ public final class CustomLook {
    */
   public static CustomTooltipRenderer tooltip(Drawable2D background, int paddingX, int paddingY, int lineGap) {
     return new CustomTooltipRenderer(background, paddingX, paddingY, lineGap);
+  }
+
+  /**
+   * Creates a tooltip skin with explicit text spacing.
+   *
+   * @param background drawable used behind tooltip text
+   * @param paddingX   x inset from the background edge to the text
+   * @param paddingY   y inset from the background edge to the text
+   * @param lineGap    vertical gap between adjacent entries
+   * @param maxWidth   the maximum width capped for tooltips
+   * @return a configured tooltip renderer
+   */
+  public static CustomTooltipRenderer tooltip(Drawable2D background, int paddingX, int paddingY, int lineGap, float maxWidth) {
+    return new CustomTooltipRenderer(background, paddingX, paddingY, lineGap, maxWidth);
   }
 
   /**

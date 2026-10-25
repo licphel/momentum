@@ -24,16 +24,10 @@
 
 package io.viki.momentum.gfx.util.impl;
 
-import io.viki.momentum.util.perf.Analysis;
-
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.buffer.BufferFrequency;
 import io.viki.momentum.gfx.buffer.BufferObject;
 import io.viki.momentum.gfx.buffer.BufferObjectDesc;
-import io.viki.momentum.gfx.util.Material;
-import io.viki.momentum.gfx.util.Mesh;
-import io.viki.momentum.gfx.util.MeshRecycledVertexStore;
-import io.viki.momentum.gfx.util.Section;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pipe.Pipeline;
 import io.viki.momentum.gfx.pipe.Topology;
@@ -41,8 +35,8 @@ import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.shader.ResourceSetLayout;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.Texture;
-import io.viki.momentum.gfx.util.Primitive2D;
-import io.viki.momentum.gfx.util.VertexStore;
+import io.viki.momentum.gfx.util.*;
+import io.viki.momentum.util.perf.Analysis;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -121,9 +115,17 @@ public final class MeshGraphics extends BatchedGraphics {
   }
 
   /**
+   * No-op; render pass management is deferred until the baked mesh is drawn.
+   */
+  @Override
+  public void end() {
+    flush(true);
+  }
+
+  /**
    * Begins a mesh rebuild and reuses the previous mesh's CPU staging arrays when available.
    *
-   * @param pass the render pass descriptor; ignored for retained meshes
+   * @param pass     the render pass descriptor; ignored for retained meshes
    * @param previous the previous mesh to recycle, or {@code null} for the initial build
    */
   public void begin(RenderPass pass, @Nullable Mesh previous) {
@@ -134,14 +136,6 @@ public final class MeshGraphics extends BatchedGraphics {
     } else {
       setVertexStore(new MeshRecycledVertexStore(previous));
     }
-  }
-
-  /**
-   * No-op; render pass management is deferred until the baked mesh is drawn.
-   */
-  @Override
-  public void end() {
-    flush(true);
   }
 
   /**
@@ -164,7 +158,7 @@ public final class MeshGraphics extends BatchedGraphics {
    * Bakes the current geometry, updating compatible sections of {@code reuse} in place.
    *
    * @param device the GPU device that receives uploads
-   * @param reuse the previous mesh to update, or {@code null} to allocate a mesh
+   * @param reuse  the previous mesh to update, or {@code null} to allocate a mesh
    * @return the updated mesh
    */
   public Mesh bake(Device device, @Nullable Mesh reuse) {

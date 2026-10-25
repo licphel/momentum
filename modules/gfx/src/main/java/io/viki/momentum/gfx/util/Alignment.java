@@ -41,8 +41,18 @@ public record Alignment(int horizontal, int vertical) {
   public static final Alignment RIGHT_UP = new Alignment(1, -1);
   /** Horizontally centered, aligned toward the top edge. */
   public static final Alignment CENTRAL_UP = new Alignment(0, -1);
+  /** Vertically centered, aligned toward the left edge. */
+  public static final Alignment CENTRAL_LEFT = new Alignment(-1, 0);
   /** Centered both horizontally and vertically. */
   public static final Alignment CENTRAL = new Alignment(0, 0);
+  /** Vertically centered, aligned toward the right edge. */
+  public static final Alignment CENTRAL_RIGHT = new Alignment(1, 0);
+  /** Horizontally centered, aligned toward the down edge. */
+  public static final Alignment CENTRAL_DOWN = new Alignment(0, 1);
+  /** Alignment toward the bottom-left corner. */
+  public static final Alignment LEFT_DOWN = new Alignment(-1, 1);
+  /** Alignment toward the bottom-right corner. */
+  public static final Alignment RIGHT_DOWN = new Alignment(1, 1);
 
   @Override
   public boolean equals(Object o) {

@@ -25,7 +25,8 @@
 package io.viki.momentum.gfx.ui.element;
 
 import io.viki.momentum.gfx.text.Literal;
-import io.viki.momentum.gfx.text.MutableText;
+import io.viki.momentum.gfx.text.TextBuilder;
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
@@ -48,7 +49,7 @@ import java.util.function.Consumer;
  * and cached text presentation while delegating text semantics to the headless editor. Mutable
  * state is intended for one owning UI thread.
  */
-public final class TextBox extends Element {
+public class TextBox extends Element {
   private final HeadlessTextEditor editor;
   private final float minimumContentWidth;
   private final float minimumContentHeight;
@@ -67,6 +68,7 @@ public final class TextBox extends Element {
    * @param bounds the text box's local bounds
    * @param text   the initial text
    */
+  @SuppressWarnings("this-escape") // Only registers editor callbacks; they run after construction.
   public TextBox(Rectangle bounds, String text) {
     super(bounds);
     minimumContentWidth = bounds.width();
@@ -128,8 +130,8 @@ public final class TextBox extends Element {
         && Float.compare(cached.width(), layoutWidth) == 0) {
       return cached;
     }
-    MutableText component = new MutableText().append(Literal.of(value).with(format))
-        .maxWidth(layoutWidth).justify(editor.wrapText()).flipY(true);
+    Text component = new TextBuilder().append(Literal.of(value).with(format))
+        .maxWidth(layoutWidth).justify(editor.wrapText()).flipY(true).build();
     Layout replacement = new Layout(value, format, layoutWidth, component, component.raster());
     if (actual) {
       actualLayout = replacement;
@@ -640,7 +642,7 @@ public final class TextBox extends Element {
    * @param component rasterizable text component
    * @param raster    rasterized representation of the component
    */
-  public record Layout(String value, TextFormat format, float width, MutableText component,
+  public record Layout(String value, TextFormat format, float width, Text component,
                        Raster raster) {
   }
 }

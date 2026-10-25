@@ -238,7 +238,7 @@ public final class CheckBox extends Element {
 
   @Override
   public boolean onKey(KeyCode key, KeyAction action, int modifiers) {
-    if (!enabled || (key != KeyCode.SPACE && key != KeyCode.ENTER && key != KeyCode.KP_ENTER)) {
+    if (!enabled || (key != KeyCode.ENTER && key != KeyCode.KP_ENTER)) {
       return false;
     }
     if (action == KeyAction.PRESS) {

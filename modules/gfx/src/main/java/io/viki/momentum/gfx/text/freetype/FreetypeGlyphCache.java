@@ -31,13 +31,13 @@ import io.viki.momentum.gfx.texture.FragileTexture;
 import io.viki.momentum.gfx.texture.TextureAtlas;
 import io.viki.momentum.gfx.texture.TexturePart;
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.Pool;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.util.freetype.FT_Bitmap;
 import org.lwjgl.util.freetype.FT_Face;
 import org.lwjgl.util.freetype.FT_GlyphSlot;
 
 import java.nio.ByteBuffer;
-import io.viki.momentum.util.Pool;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -105,6 +105,15 @@ public final class FreetypeGlyphCache implements AutoCloseable {
     if (glyphIndex == 0) {
       return null; // glyph 0 is the .notdef sentinel — control chars, unmapped codepoints, etc.
     }
+    // Filter after fallback resolution and before cache lookup; decorations do not alter glyph bitmaps.
+    int supported = 0;
+    if ((fontStyle & Font.BOLD) != 0 && font.support(Font.BOLD)) {
+      supported |= Font.BOLD;
+    }
+    if ((fontStyle & Font.ITALIC) != 0 && font.support(Font.ITALIC)) {
+      supported |= Font.ITALIC;
+    }
+    fontStyle = supported;
     GlyphKey key = acquireGlyphKey(font, glyphIndex, fontStyle);
     Glyph cached = cache.get(key);
     if (cached != null || cache.containsKey(key)) {
@@ -249,10 +258,10 @@ public final class FreetypeGlyphCache implements AutoCloseable {
         return false;
       }
       return resolution == other.resolution
-          && glyphIndex == other.glyphIndex
-          && fontStyle == other.fontStyle
-          && pixel == other.pixel
-          && font.equals(other.font);
+             && glyphIndex == other.glyphIndex
+             && fontStyle == other.fontStyle
+             && pixel == other.pixel
+             && font.equals(other.font);
     }
   }
 }

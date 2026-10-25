@@ -60,7 +60,7 @@ public record Identifier(Namespace namespace, String path) {
 
     int colon = full.indexOf(':');
     if (colon < 0) {
-      return new Identifier(Namespace.fallback(), full);
+      throw new IllegalArgumentException("No namespace defined for '" + full + "'");
     }
     if (colon == full.length() - 1) {
       throw new IllegalArgumentException("Identifier has empty path: '" + full + "'");

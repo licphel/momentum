@@ -26,13 +26,13 @@ package io.viki.momentum.gfx.util.impl;
 
 import io.viki.momentum.gfx.math.Camera2D;
 import io.viki.momentum.gfx.math.TransformHandler;
-import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.pass.RenderPass;
 import io.viki.momentum.gfx.pass.RenderTarget;
 import io.viki.momentum.gfx.pipe.Pipeline;
 import io.viki.momentum.gfx.pipe.Scissor;
 import io.viki.momentum.gfx.shader.ResourceSet;
 import io.viki.momentum.gfx.texture.Sampler;
+import io.viki.momentum.gfx.util.Mesh;
 import io.viki.momentum.gfx.util.VertexBuilder2D;
 import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.math.shape.Rectangle;

@@ -234,8 +234,8 @@ final class InputRouter implements AutoCloseable {
     if (System.nanoTime() - hoveredSinceNanos < delayNanos) {
       return;
     }
-    hoveredElement.look().tooltipRenderer()
-        .render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F);
+    hoveredElement.look().tooltipRenderer().render(graphics, tooltip, pointerX + 4.0F, pointerY + 4.0F,
+            Rectangle.of(Vector2.ZERO, context.getLogicalSize()));
   }
 
   @Override

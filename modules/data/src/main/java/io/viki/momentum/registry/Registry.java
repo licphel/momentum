@@ -28,6 +28,7 @@ import io.viki.momentum.util.Identifier;
 import io.viki.momentum.util.Palette;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
@@ -64,6 +65,19 @@ public interface Registry<T extends RegistryEntry> extends Palette<T>, Iterable<
    * @throws IllegalArgumentException if an entry is already registered under the identifier
    */
   Holder<T> register(Identifier id, Supplier<? extends T> supplier);
+
+  /**
+   * Looks up the entry registered under the given identifier,
+   * in holder's way which enables complex dependence.
+   *
+   * @param id the identifier to look up
+   * @return the holder of this id
+   */
+  default Holder<T> hold(Identifier id) {
+    Holder<T> holder = new Holder<>(id);
+    holder.resolve(Objects.requireNonNull(get(id)));
+    return holder;
+  }
 
   /**
    * Looks up the entry registered under the given identifier.

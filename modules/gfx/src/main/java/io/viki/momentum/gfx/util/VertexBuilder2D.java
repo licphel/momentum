@@ -25,7 +25,9 @@
 package io.viki.momentum.gfx.util;
 
 import io.viki.momentum.gfx.math.TransformHandler;
+import io.viki.momentum.gfx.text.Icon;
 import io.viki.momentum.gfx.text.Text;
+import io.viki.momentum.gfx.text.TextShadow;
 import io.viki.momentum.gfx.text.raster.Glyph;
 import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.texture.Drawable2D;
@@ -41,13 +43,16 @@ import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.math.util.FastTrigonometric;
 import org.jspecify.annotations.Nullable;
 
+import java.util.Objects;
+
 /**
  * A 2D vertex builder extending {@link VertexBuilder} with texture, shape, and text drawing.
  *
  * <p>All coordinates are in world units and pass through the current transform stack. Draw
  * flags, gradient tint, and the bound texture affect subsequent draw calls until changed;
- * texture source regions are specified in texel coordinates. Not thread-safe; each instance
- * must be confined to a single thread.
+ * texture source regions are specified in texel coordinates. Shadowed text draws use the
+ * configured {@link TextShadow}, which defaults to {@link TextShadow#DEFAULT}. Not thread-safe;
+ * each instance must be confined to a single thread.
  *
  * @see VertexBuilder
  */
@@ -69,6 +74,7 @@ public class VertexBuilder2D extends VertexBuilder {
   protected boolean uvYFlipped;
   private float pointSize = SYSTEM_WIDTH;
   private float strokeWidth = SYSTEM_WIDTH;
+  private TextShadow textShadow = TextShadow.DEFAULT;
 
   /**
    * Creates a new {@code VertexBuilder2D} writing into the given staging area.
@@ -853,11 +859,30 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   /**
+   * Returns the shadow applied by {@link #drawShadowedText(Text, float, float, Alignment)}.
+   *
+   * @return the configured text shadow
+   */
+  public TextShadow textShadow() {
+    return textShadow;
+  }
+
+  /**
+   * Sets the shadow applied by {@link #drawShadowedText(Text, float, float, Alignment)}.
+   *
+   * @param textShadow the shadow to apply
+   * @throws NullPointerException if {@code textShadow} is {@code null}
+   */
+  public void setTextShadow(TextShadow textShadow) {
+    this.textShadow = Objects.requireNonNull(textShadow, "textShadow");
+  }
+
+  /**
    * Draws a text blob anchored at the given position with the specified alignment.
    *
    * <p>The alignment determines how the text is positioned relative to the anchor point
    * {@code (x, y)}. For example, {@link Alignment#CENTRAL} centers the text both
-   * horizontally and vertically.
+   * horizontally and vertically. This method draws no shadow.
    *
    * @param text      the text blob to draw; does nothing if {@code null}
    * @param x         the anchor X coordinate in world units
@@ -868,8 +893,80 @@ public class VertexBuilder2D extends VertexBuilder {
     if (text == null) {
       return;
     }
+    drawTextRaster(text.raster(), x, y, alignment, null);
+  }
 
-    Raster raster = text.raster();
+  /**
+   * Draws text with the configured shadow, followed by the unshadowed text.
+   *
+   * @param text      the text to draw; does nothing if {@code null}
+   * @param x         the anchor X coordinate in world units
+   * @param y         the anchor Y coordinate in world units
+   * @param alignment alignment relative to the anchor point
+   */
+  public void drawShadowedText(@Nullable Text text, float x, float y, Alignment alignment) {
+    drawShadowedText(text, x, y, alignment, textShadow);
+  }
+
+  /**
+   * Draws text with the supplied shadow, followed by the unshadowed text.
+   *
+   * <p>The offset is interpreted in visual coordinates, so its vertical component is reversed
+   * for rasters with an upward-oriented Y axis.
+   *
+   * @param text      the text to draw; does nothing if {@code null}
+   * @param x         the anchor X coordinate in world units
+   * @param y         the anchor Y coordinate in world units
+   * @param alignment alignment relative to the anchor point
+   * @param shadow    shadow offset and color configuration
+   * @throws NullPointerException if {@code shadow} is {@code null}
+   */
+  public void drawShadowedText(@Nullable Text text, float x, float y, Alignment alignment, TextShadow shadow) {
+    Objects.requireNonNull(shadow, "shadow");
+    if (text == null) {
+      return;
+    }
+    drawTextRasterWithShadow(text.raster(), x, y, alignment, shadow);
+  }
+
+  /**
+   * Draws text with a shadow using vector positions.
+   *
+   * @param text      the text to draw; does nothing if {@code null}
+   * @param pos       the anchor position in world units
+   * @param alignment alignment relative to the anchor point
+   * @param shadow    shadow offset and color configuration
+   * @throws NullPointerException if {@code shadow} is {@code null}
+   */
+  public void drawShadowedText(@Nullable Text text, Vector2 pos, Alignment alignment, TextShadow shadow) {
+    drawShadowedText(text, pos.x(), pos.y(), alignment, shadow);
+  }
+
+  /**
+   * Draws text with the configured shadow using a vector anchor position.
+   *
+   * @param text      the text to draw; does nothing if {@code null}
+   * @param pos       the anchor position in world units
+   * @param alignment alignment relative to the anchor point
+   */
+  public void drawShadowedText(@Nullable Text text, Vector2 pos, Alignment alignment) {
+    drawShadowedText(text, pos.x(), pos.y(), alignment);
+  }
+
+  private void drawTextRasterWithShadow(Raster raster, float x, float y, Alignment alignment,
+                                       TextShadow shadow) {
+    Vector2 offset = shadow.offset();
+    if (offset.x() == 0.0F && offset.y() == 0.0F) {
+      drawTextRaster(raster, x, y, alignment, null);
+      return;
+    }
+    float shadowY = raster.flipY() ? y + offset.y() : y - offset.y();
+    drawTextRaster(raster, x + offset.x(), shadowY, alignment, shadow);
+    drawTextRaster(raster, x, y, alignment, null);
+  }
+
+  private void drawTextRaster(Raster raster, float x, float y, Alignment alignment,
+                              @Nullable TextShadow shadow) {
     Rectangle rasterBd = raster.bounds();
 
     float tx = x;
@@ -887,25 +984,34 @@ public class VertexBuilder2D extends VertexBuilder {
     float originY = rasterBd.minY();
 
     Gradient originalColor = gradient();
-    for (Raster.Entry entry : raster.entries()) {
-      Glyph cg = entry.glyph();
-      if (cg == null) {
-        continue;
+    try {
+      for (Raster.Entry entry : raster.entries()) {
+        Glyph cg = entry.glyph();
+        Gradient actualGrad = shadow == null ? entry.gradient() : shadow.color();
+
+        if (cg == null) {
+          Icon drawable = Icon.find(entry.metaInfo());
+          if (drawable != null) {
+            setTint(actualGrad);
+            draw(drawable.drawable(), entry.bounds().translate(tx, ty - originY));
+          }
+          continue;
+        }
+
+        // Bearings are baked in (gx, gy, pixelW, pixelH)
+        setTint(actualGrad);
+        Rectangle bounds = entry.bounds();
+        drawTexture(cg.texPart(), tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
       }
 
-      // Bearings are baked in (gx, gy, pixelW, pixelH)
-      setTint(entry.gradient());
-      Rectangle bounds = entry.bounds();
-      drawTexture(cg.texPart(), tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
+      for (Raster.Stroke stroke : raster.strokes()) {
+        setTint(shadow == null ? stroke.gradient() : shadow.color());
+        Rectangle bounds = stroke.bounds();
+        drawRectangle(tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
+      }
+    } finally {
+      setTint(originalColor);
     }
-
-    for (Raster.Stroke stroke : raster.strokes()) {
-      setTint(stroke.gradient());
-      Rectangle bounds = stroke.bounds();
-      drawRectangle(tx + bounds.minX(), ty + bounds.minY() - originY, bounds.width(), bounds.height());
-    }
-
-    setTint(originalColor);
   }
 
   /**

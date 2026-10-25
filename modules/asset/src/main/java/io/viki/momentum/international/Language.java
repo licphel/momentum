@@ -334,10 +334,13 @@ public final class Language {
    *
    * @param entries translations to add or replace
    */
-  private synchronized void putAll(Map<Identifier, String> entries) {
-    Map<Identifier, String> updated = new HashMap<>(translations);
-    updated.putAll(entries);
-    translations = Map.copyOf(updated);
+  private void putAll(Map<Identifier, String> entries) {
+    entries.values().forEach(QuickFmt::compile);
+    synchronized (this) {
+      Map<Identifier, String> updated = new HashMap<>(translations);
+      updated.putAll(entries);
+      translations = Map.copyOf(updated);
+    }
   }
 
   @Override

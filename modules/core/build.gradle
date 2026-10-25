@@ -3,6 +3,5 @@ plugins {
 }
 
 dependencies {
-  api libs.polyglot
-  runtimeOnly libs.graaljs
+  implementation 'org.apache.commons:commons-jexl3:3.7.1'
 }

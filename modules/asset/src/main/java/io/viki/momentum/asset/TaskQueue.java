@@ -49,10 +49,12 @@ import java.util.function.Consumer;
  * <p>This class is not thread-safe.
  */
 public final class TaskQueue implements AutoCloseable {
-  private static final Comparator<Task> ORDER = Comparator.comparingInt((Task task) -> task.priority).thenComparingLong(task -> task.sequence);
+  private static final Comparator<Task> ORDER
+      = Comparator.comparingInt((Task task) -> task.priority).thenComparingLong(task -> task.sequence);
   private final PriorityQueue<Task> pending = new PriorityQueue<>(ORDER);
   private final PriorityQueue<Task> active = new PriorityQueue<>(ORDER);
-  private final PriorityQueue<Task> preparations = new PriorityQueue<>(ORDER);
+  private final PriorityQueue<Preparation> preparations
+      = new PriorityQueue<>(Comparator.comparing(Preparation::task, ORDER).thenComparingInt(Preparation::index));
   private final int parallelism;
   private @Nullable ExecutorService executor;
   private long nextSequence;
@@ -148,7 +150,9 @@ public final class TaskQueue implements AutoCloseable {
       active.addAll(pending);
       pending.clear();
       for (Task task : active) {
-        offerPreparation(task);
+        for (int i = 0; i < task.steps.size(); i++) {
+          if (task.steps.get(i).parallel) preparations.add(new Preparation(task, i));
+        }
       }
     }
     startPreparations();
@@ -177,8 +181,6 @@ public final class TaskQueue implements AutoCloseable {
     if (task.cursor == task.steps.size()) {
       active.remove();
       task.completed.accept(List.copyOf(task.failures));
-    } else {
-      offerPreparation(task);
     }
     startPreparations();
     return true;
@@ -190,7 +192,7 @@ public final class TaskQueue implements AutoCloseable {
    * @return {@code true} after {@link #next()} has been called and the queue has no pending work
    */
   public boolean done() {
-    return started && size() == 0;
+    return closed || started && size() == 0;
   }
 
   /**
@@ -202,20 +204,14 @@ public final class TaskQueue implements AutoCloseable {
     return pending.size() + active.size();
   }
 
-  private void offerPreparation(Task task) {
-    if (task.cursor < task.steps.size() && task.steps.get(task.cursor).parallel) {
-      preparations.add(task);
-    }
-  }
-
   /** Starts queued preparations until the configured window is full or none remain. */
   private void startPreparations() {
     while (outstanding < parallelism && !preparations.isEmpty()) {
       if (executor == null) {
         executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("Asset-prepare-", 0).factory());
       }
-      Task task = preparations.remove();
-      task.steps.get(task.cursor).start(executor);
+      Preparation preparation = preparations.remove();
+      preparation.task.steps.get(preparation.index).start(executor);
       outstanding++;
     }
   }
@@ -319,7 +315,7 @@ public final class TaskQueue implements AutoCloseable {
      * @throws Exception if preparation or publication fails
      */
     void publish() throws Exception {
-      assert future != null;
+      assert !parallel || future != null;
       publication.accept(parallel ? future.join() : preparation.call());
     }
   }
@@ -339,4 +335,6 @@ public final class TaskQueue implements AutoCloseable {
       this.completed = completed;
     }
   }
+
+  private record Preparation(Task task, int index) { }
 }

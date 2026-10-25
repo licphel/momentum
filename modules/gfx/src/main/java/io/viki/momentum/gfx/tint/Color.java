@@ -64,6 +64,27 @@ public record Color(float red, float green, float blue, float alpha) implements 
   }
 
   /**
+   * Creates a grayscale color.
+   *
+   * @param v the value
+   * @param alpha alpha value
+   * @return color with red, green, blue = v, alpha = alpha
+   */
+  public static Color grayscale(float v, float alpha) {
+    return new Color(v, v, v, alpha);
+  }
+
+  /**
+   * Creates a grayscale color.
+   *
+   * @param v the value
+   * @return color with red, green, blue = v
+   */
+  public static Color grayscale(float v) {
+    return new Color(v, v, v);
+  }
+
+  /**
    * Creates a color from an ARGB hex string like {@code "#FF7744"} (opaque)
    * or {@code "#FF774488"} (with alpha).
    *

@@ -34,17 +34,23 @@ import java.util.function.Supplier;
  * A stable reference to a registered value, also serving as a
  * {@link Supplier} of that value.
  *
- * <p>Direct registries ({@link DirectRegistry}) create the holder with the
- * value already resolved; deferred registries ({@link IndirectRegistry})
- * resolve it when the registry is frozen. Reading an unresolved holder
- * fails, so callers must not read a deferred holder before its registry is
- * frozen. Safe for concurrent use once the value is resolved.
+ * <p>Indirect registries resolve the entry and its dependencies on first access or freeze.
+ * Declaration and first resolution are confined to the loading thread; concurrent reads are
+ * supported after resolution. A manually created holder without a resolver must be explicitly
+ * resolved before use.
  *
  * @param <T> the type of the registered value
  */
 public class Holder<T> implements Supplier<T> {
   private final Identifier id;
   private volatile @Nullable T value;
+  private @Nullable Supplier<? extends T> resolver;
+
+  static <T> Holder<T> deferred(Identifier id, Supplier<? extends T> resolver) {
+    Holder<T> holder = new Holder<>(id);
+    holder.resolver = resolver;
+    return holder;
+  }
 
   /**
    * Creates a holder with the value already resolved.
@@ -52,7 +58,6 @@ public class Holder<T> implements Supplier<T> {
    * @param id    the identifier the value is registered under
    * @param value the registered value
    */
-
   public Holder(Identifier id, @Nullable T value) {
     this.id = id;
     this.value = value;
@@ -64,7 +69,6 @@ public class Holder<T> implements Supplier<T> {
    *
    * @param id the identifier the value is registered under
    */
-
   public Holder(Identifier id) {
     this.id = id;
   }
@@ -91,11 +95,19 @@ public class Holder<T> implements Supplier<T> {
    * Returns the registered value.
    *
    * @return the value
-   * @throws NullPointerException if the value has not been resolved yet
+   * @throws IllegalStateException if the entry is undeclared, unresolved without a factory,
+   *                               or part of a cyclic dependency
    */
   @Override
   public T get() {
-    return Objects.requireNonNull(value);
+    T current = value;
+    if (current != null) return current;
+    Supplier<? extends T> pending = resolver;
+    if (pending == null) throw new IllegalStateException("Unresolved registry entry: " + id);
+    current = Objects.requireNonNull(pending.get(), "Registry supplier returned null: " + id);
+    value = current;
+    resolver = null;
+    return current;
   }
 
   @Override

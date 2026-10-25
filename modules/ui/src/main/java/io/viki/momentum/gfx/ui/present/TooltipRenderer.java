@@ -26,6 +26,7 @@ package io.viki.momentum.gfx.ui.present;
 
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
+import io.viki.momentum.math.shape.Rectangle;
 
 import java.util.List;
 
@@ -42,6 +43,7 @@ public interface TooltipRenderer {
    * @param values   rich-text lines in display order
    * @param x        tooltip origin in logical coordinates
    * @param y        tooltip origin in logical coordinates
+   * @param canvas   available logical canvas bounds, including any canvas-specific scale
    */
-  void render(Graphics graphics, List<Text> values, float x, float y);
+  void render(Graphics graphics, List<Text> values, float x, float y, Rectangle canvas);
 }

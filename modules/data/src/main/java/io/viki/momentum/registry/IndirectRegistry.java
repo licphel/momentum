@@ -25,66 +25,112 @@
 package io.viki.momentum.registry;
 
 import io.viki.momentum.util.Identifier;
-
-import java.util.ArrayList;
-import java.util.List;
+import org.jspecify.annotations.Nullable;
+import java.util.*;
 import java.util.function.Supplier;
+import java.util.stream.Stream;
 
 /**
- * A {@link Registry} that queues entry suppliers during the declaration
- * phase and evaluates them all at once when frozen.
- *
- * <p>Unlike {@link DirectRegistry}, which evaluates each supplier at
- * registration time, entries declared through a deferred registry become
- * available only after {@link #freeze()} runs. This supports the
- * registration phase: values may reference other entries that are not yet
- * created, so their factories are held back until every registry has been
- * declared.
- *
- * <p>Holders returned by {@link #register} are unresolved until
- * {@link #freeze()}; reading one earlier fails.
- *
- * @param <T> registry type
+ * Declaration-ordered identities with lazy, dependency-driven construction.
+ * Declaration and resolution are confined to one loading thread. Freeze resolves every declaration;
+ * afterwards holders and read-only lookups may be shared. Runtime indices follow declaration order,
+ * never the order in which dependencies happen to be resolved.
  */
 public class IndirectRegistry<T extends RegistryEntry> extends AbstractRegistry<T> {
-  private final List<Entry<T>> pending = new ArrayList<>();
+  private static final ThreadLocal<ArrayDeque<String>> RESOLUTION_PATH =
+      ThreadLocal.withInitial(ArrayDeque::new);
+  private final Map<Identifier, Entry> entries = new LinkedHashMap<>();
+  private final List<Entry> declared = new ArrayList<>();
+  private boolean sealing;
 
-  /**
-   * Creates a new unfrozen deferred registry.
-   *
-   * @param key the identifier of this registry
-   */
-  public IndirectRegistry(Identifier key) {
-    super(key);
-  }
+  public IndirectRegistry(Identifier key) { super(key); }
 
   @Override
   public Holder<T> register(Identifier id, Supplier<? extends T> supplier) {
-    Holder<T> holder = new Holder<>(id);
-    pending.add(new Entry<>(id, supplier, holder));
-    return holder;
+    if (isFrozen() || sealing) throw new IllegalStateException("Registry is sealed: " + key());
+    Entry entry = entries.computeIfAbsent(id, Entry::new);
+    if (entry.index >= 0) throw new IllegalArgumentException("Duplicate registry entry: " + id);
+    entry.supplier = supplier;
+    entry.index = declared.size();
+    declared.add(entry);
+    return entry.holder;
   }
 
-  /**
-   * Evaluates all queued suppliers in declaration order, registers their
-   * values, resolves the returned holders, and prevents further
-   * registration.
-   *
-   * <p>Idempotent: subsequent calls have no effect.
-   */
+  /** Obtains a stable forward reference; declaration may happen later. */
   @Override
-  public void freeze() {
-    if (isFrozen()) {
-      return;
+  public Holder<T> hold(Identifier id) {
+    Entry entry = entries.get(id);
+    if (entry != null) return entry.holder;
+    if (isFrozen() || sealing) throw new IllegalArgumentException("Unknown entry " + id + " in " + key());
+    entry = new Entry(id);
+    entries.put(id, entry);
+    return entry.holder;
+  }
+
+  @Override public @Nullable T get(Identifier id) {
+    Entry entry = entries.get(id);
+    return entry == null || entry.index < 0 ? null : entry.holder.get();
+  }
+  @Override public T get(int index) { return declared.get(index).holder.get(); }
+  @Override public int size() { return declared.size(); }
+  @Override public boolean contains(Identifier id) {
+    Entry entry = entries.get(id);
+    return entry != null && entry.index >= 0;
+  }
+  @Override public Set<Identifier> keys() {
+    Set<Identifier> keys = new LinkedHashSet<>();
+    for (Entry entry : declared) keys.add(entry.id);
+    return Collections.unmodifiableSet(keys);
+  }
+  @Override public List<T> values() { return stream().toList(); }
+  @Override public Stream<T> stream() { return declared.stream().map(entry -> entry.holder.get()); }
+  @Override public Iterator<T> iterator() { return stream().iterator(); }
+
+  @Override public void freeze() {
+    if (isFrozen()) return;
+    sealing = true;
+    for (Entry entry : entries.values()) {
+      if (entry.index < 0) throw new IllegalStateException("Undeclared entry " + entry.id + " in " + key());
     }
-    for (Entry<T> entry : pending) {
-      T value = registerValue(entry.id, entry.supplier.get());
-      entry.holder.resolve(value);
-    }
-    pending.clear();
+    for (Entry entry : declared) entry.holder.get();
     super.freeze();
   }
 
-  private record Entry<T>(Identifier id, Supplier<? extends T> supplier, Holder<T> holder) {
+  private final class Entry {
+    final Identifier id;
+    final Holder<T> holder;
+    @Nullable Supplier<? extends T> supplier;
+    int index = -1;
+    boolean resolving;
+    @Nullable RuntimeException failure;
+
+    Entry(Identifier id) {
+      this.id = id;
+      holder = Holder.deferred(id, this::resolve);
+    }
+
+    T resolve() {
+      if (failure != null) throw failure;
+      Supplier<? extends T> factory = supplier;
+      if (factory == null) throw new IllegalStateException("Undeclared entry " + id + " in " + key());
+      var path = RESOLUTION_PATH.get();
+      String name = key() + "/" + id;
+      if (resolving) throw new IllegalStateException("Cyclic registry dependency: "
+          + String.join(" -> ", path) + " -> " + name);
+      resolving = true;
+      path.addLast(name);
+      try {
+        T value = registerValue(id, factory.get(), index);
+        supplier = null;
+        return value;
+      } catch (RuntimeException exception) {
+        failure = exception;
+        throw exception;
+      } finally {
+        path.removeLast();
+        resolving = false;
+        if (path.isEmpty()) RESOLUTION_PATH.remove();
+      }
+    }
   }
 }

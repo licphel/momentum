@@ -23,6 +23,6 @@
  */
 
 @NullMarked
-package io.viki.momentum.js;
+package io.viki.momentum.util.multithread;
 
 import org.jspecify.annotations.NullMarked;

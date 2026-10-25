@@ -78,6 +78,19 @@ public interface Font extends AutoCloseable {
   }
 
   /**
+   * Tests whether all requested flags may be additionally applied to this font.
+   * Already intrinsic styles are not additional capabilities: a bold face rejects
+   * {@link #BOLD} to prevent synthetic double emboldening. Resolve combined fonts
+   * per code point before querying this method. Decorations remain supported.
+   *
+   * @param flags a combination of the style flags declared by this interface
+   * @return whether every requested flag can be applied; regular is always supported
+   */
+  default boolean support(int flags) {
+    return (flags & ~(BOLD | ITALIC | UNDERLINE | STRIKETHROUGH)) == 0;
+  }
+
+  /**
    * Returns the scaled metrics of this font at the current resolution.
    *
    * @return the font metrics
@@ -85,18 +98,18 @@ public interface Font extends AutoCloseable {
   FontMetrics metrics();
 
   /**
-   * Sets whether to use pixel rendering (nearest filter and possible snapping)
-   *
-   * @param flag pixel rendering flag
-   */
-  void setPixel(boolean flag);
-
-  /**
    * Returns whether to use pixel rendering.
    *
    * @return pixel rendering flag
    */
   boolean isPixel();
+
+  /**
+   * Sets whether to use pixel rendering (nearest filter and possible snapping)
+   *
+   * @param flag pixel rendering flag
+   */
+  void setPixel(boolean flag);
 
   /**
    * Tests whether this font covers the given Unicode code point.

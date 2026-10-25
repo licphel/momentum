@@ -28,7 +28,8 @@ import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
 import io.viki.momentum.math.shape.Rectangle;
 
-import java.util.ArrayList;
+import io.viki.momentum.gfx.ui.present.TooltipLayout;
+import io.viki.momentum.math.Vector2;
 import java.util.List;
 
 /**
@@ -40,6 +41,8 @@ import java.util.List;
 public final class AutoTooltipRenderer {
   private static final float PADDING = 4.0F;
   private static final float LINE_GAP = 2.0F;
+  private static final TooltipLayout.Settings SETTINGS = new TooltipLayout.Settings(
+      PADDING, PADDING, LINE_GAP, TooltipLayout.DEFAULT_MAX_WIDTH);
 
   private AutoTooltipRenderer() {
   }
@@ -55,31 +58,11 @@ public final class AutoTooltipRenderer {
    * @param x        left coordinate of the tooltip surface
    * @param y        top coordinate of the tooltip surface
    */
-  public static void render(Graphics graphics, List<Text> values, float x, float y) {
-    if (values.isEmpty()) {
-      return;
-    }
-    List<Rectangle> bounds = new ArrayList<>(values.size());
-    float width = 0.0F;
-    float height = 0.0F;
-    for (Text value : values) {
-      Rectangle textBounds = value.raster().bounds();
-      bounds.add(textBounds);
-      width = Math.max(width, textBounds.width());
-      height += textBounds.height();
-    }
-    height += LINE_GAP * Math.max(0, values.size() - 1);
-    Rectangle area = Rectangle.of(x, y, width + PADDING * 2.0F,
-        height + PADDING * 2.0F);
-    // Draw the tooltip popup surface.
-    AutoRendererSupport.fill(graphics, area, AutoRendererSupport.POPUP_SURFACE);
-    // Draw the tooltip popup border.
-    AutoRendererSupport.drawBoundary(graphics, area, AutoRendererSupport.OUTLINE);
-    // Draw each rich text entry on its own tooltip line.
-    float offsetY = y + PADDING;
-    for (int i = 0; i < values.size(); i++) {
-      graphics.drawText(values.get(i), x + PADDING, offsetY);
-      offsetY += bounds.get(i).height() + LINE_GAP;
-    }
+  public static void render(Graphics graphics, List<Text> values, float x, float y, Rectangle canvas) {
+    if (values.isEmpty() || canvas.width() <= 0 || canvas.height() <= 0) return;
+    TooltipLayout layout = TooltipLayout.create(values, new Vector2(x, y), canvas, SETTINGS);
+    AutoRendererSupport.fill(graphics, layout.bounds(), AutoRendererSupport.POPUP_SURFACE);
+    AutoRendererSupport.drawBoundary(graphics, layout.bounds(), AutoRendererSupport.OUTLINE);
+    layout.drawContents(graphics);
   }
 }

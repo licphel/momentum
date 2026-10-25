@@ -24,7 +24,7 @@
 
 package io.viki.momentum.gfx.ui.element;
 
-import io.viki.momentum.gfx.text.MutableText;
+import io.viki.momentum.gfx.text.TextBuilder;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoTextViewRenderer;
@@ -41,9 +41,8 @@ import org.jspecify.annotations.Nullable;
 public final class TextView extends Element {
   private Text text;
   private boolean wrapText;
-  private @Nullable MutableText layout;
+  private @Nullable Text layout;
   private @Nullable Text layoutSource;
-  private long layoutVersion;
   private float layoutWidth;
   private boolean layoutWrap;
 
@@ -106,25 +105,22 @@ public final class TextView extends Element {
   }
 
   /**
-   * Creates a mutable text suitable for direct rendering.
+   * Returns the immutable text layout for rendering.
    *
    * @param width the max width
    * @return a new, directly renderable text
    */
-  public MutableText layoutForRender(float width) {
-    long version = text.version();
-    if (layout != null && layoutSource == text && layoutVersion == version
+  public Text layoutForRender(float width) {
+    if (layout != null && layoutSource == text
         && layoutWidth == width && layoutWrap == wrapText) {
       return layout;
     }
-    MutableText result = text instanceof MutableText mutable ? mutable.copy()
-        : new MutableText().append(text);
+    TextBuilder result = text.toBuilder();
     if (wrapText) {
       result.maxWidth(Math.min(result.maxWidth(), Math.max(1.0F, width)));
     }
-    layout = result.flipY(true);
+    layout = result.flipY(true).build();
     layoutSource = text;
-    layoutVersion = version;
     layoutWidth = width;
     layoutWrap = wrapText;
     return layout;

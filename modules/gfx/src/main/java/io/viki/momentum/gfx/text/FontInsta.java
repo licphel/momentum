@@ -1,5 +1,7 @@
 package io.viki.momentum.gfx.text;
 
+import org.jspecify.annotations.Nullable;
+
 import java.util.List;
 import java.util.function.IntPredicate;
 
@@ -10,10 +12,13 @@ import java.util.function.IntPredicate;
  * This value does not own or close its fonts.
  */
 public final class FontInsta {
+  private static final IntPredicate ALL_CHARACTERS = codepoint -> true;
   private final Font font;
   private final float size;
   private final IntPredicate characters;
   private final List<FontInsta> combinations;
+  private int hash;
+  private volatile boolean hashed;
 
   private FontInsta(Font font, float size, IntPredicate characters, List<FontInsta> combinations) {
     if (size <= 0) {
@@ -33,14 +38,14 @@ public final class FontInsta {
    * @return a font entry without fallback combinations
    */
   public static FontInsta of(Font font, float size) {
-    return of(font, size, codepoint -> true);
+    return of(font, size, ALL_CHARACTERS);
   }
 
   /**
    * Creates a font entry restricted to the supplied Unicode code points.
    *
-   * @param font the font used by the entry
-   * @param size the logical font size, which must be positive
+   * @param font       the font used by the entry
+   * @param size       the logical font size, which must be positive
    * @param characters predicate identifying code points this entry may serve
    * @return a font entry without fallback combinations
    */
@@ -63,7 +68,7 @@ public final class FontInsta {
       return combinations[0];
     }
     FontInsta first = combinations[0];
-    return new FontInsta(first.font, first.size, codepoint -> true, List.of(combinations));
+    return new FontInsta(first.font, first.size, ALL_CHARACTERS, List.of(combinations));
   }
 
   /**
@@ -125,6 +130,9 @@ public final class FontInsta {
    */
   public FontInsta resized(float size) {
     if (!isCombined()) {
+      if (Float.compare(this.size, size) == 0) {
+        return this;
+      }
       return of(font, size, characters);
     }
     return of(combinations.stream().map(value -> value.resized(size)).toArray(FontInsta[]::new));
@@ -154,5 +162,22 @@ public final class FontInsta {
       result = Math.min(result, combination.descender());
     }
     return result;
+  }
+
+  @Override
+  public int hashCode() {
+    if (!hashed) {
+      hash = 31 * (31 * (31 * System.identityHashCode(font) + Float.hashCode(size))
+                   + System.identityHashCode(characters)) + combinations.hashCode();
+      hashed = true;
+    }
+    return hash;
+  }
+
+  @Override
+  public boolean equals(@Nullable Object other) {
+    return this == other || other instanceof FontInsta that && font == that.font
+                            && Float.compare(size, that.size) == 0 && characters == that.characters
+                            && combinations.equals(that.combinations);
   }
 }

@@ -27,6 +27,7 @@ package io.viki.momentum.gfx.text.freetype;
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.text.Font;
 import io.viki.momentum.gfx.text.FontMetrics;
+import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.text.raster.Glyph;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
@@ -52,6 +53,7 @@ public final class FreetypeFont implements Font {
   private static final float BASIC_LINE_HEIGHT = 16.0F;
 
   private final FT_Face ftFace;
+  private final int supportedStyles;
   private final long ftLib;
   private final FontMetrics metrics;
   private final ByteBuffer fileData;
@@ -84,6 +86,14 @@ public final class FreetypeFont implements Font {
       PointerBuffer faceOut = stack.callocPointer(1);
       check(FT_New_Memory_Face(ftLib, fileData, faceIndex, faceOut));
       ftFace = FT_Face.create(faceOut.get(0));
+      int styles = BOLD | ITALIC | UNDERLINE | STRIKETHROUGH;
+      if ((ftFace.style_flags() & FT_STYLE_FLAG_BOLD) != 0) {
+        styles &= ~BOLD;
+      }
+      if ((ftFace.style_flags() & FT_STYLE_FLAG_ITALIC) != 0) {
+        styles &= ~ITALIC;
+      }
+      supportedStyles = styles;
       FT_Select_Charmap(ftFace, FT_ENCODING_UNICODE);
       FT_Set_Pixel_Sizes(ftFace, 0, (int) BASIC_LINE_HEIGHT);
       // sz.metrics() values are 26.6 fixed-point pixels at BASIC_LINE_HEIGHT.
@@ -115,18 +125,26 @@ public final class FreetypeFont implements Font {
   }
 
   @Override
+  public boolean support(int flags) {
+    return (flags & ~supportedStyles) == 0;
+  }
+
+  @Override
   public FontMetrics metrics() {
     return metrics;
   }
 
   @Override
-  public void setPixel(boolean flag) {
-    pixel = flag;
+  public boolean isPixel() {
+    return pixel;
   }
 
   @Override
-  public boolean isPixel() {
-    return pixel;
+  public void setPixel(boolean flag) {
+    if (pixel != flag) {
+      pixel = flag;
+      Text.invalidateCache();
+    }
   }
 
   @Override
@@ -145,6 +163,10 @@ public final class FreetypeFont implements Font {
       return;
     }
     disposed = true;
+    Text.invalidateCache();
+    if (glyphCache != null) {
+      glyphCache.close();
+    }
     FT_Done_Face(ftFace);
     FT_Done_Library(ftLib);
   }
@@ -160,7 +182,13 @@ public final class FreetypeFont implements Font {
 
   @Override
   public void setResolution(float res) {
-    resolution = res;
+    if (Float.compare(resolution, res) != 0) {
+      resolution = res;
+      if (glyphCache != null) {
+        glyphCache.setResolution((int) res);
+      }
+      Text.invalidateCache();
+    }
   }
 
   @Override
