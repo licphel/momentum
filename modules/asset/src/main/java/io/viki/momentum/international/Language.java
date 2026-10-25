@@ -30,6 +30,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.viki.momentum.util.Identifier;
 import io.viki.momentum.util.Namespace;
 import io.viki.momentum.util.QuickFmt;
+import io.viki.momentum.util.multithread.Parallel;
 import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
@@ -284,7 +285,7 @@ public final class Language {
       } catch (IOException | IllegalArgumentException e) {
         return false;
       }
-    });
+    }, Parallel.io());
   }
 
   /**

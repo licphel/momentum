@@ -47,7 +47,7 @@ public final class AutoButtonRenderer implements ElementRenderer {
 
   private static void drawSurface(Graphics graphics, Rectangle area, Button button,
                                   Button.State state) {
-    var fill = switch (state) {
+    Color fill = switch (state) {
       case IDLE -> button.focused() ? AutoRendererSupport.STATE_HOVER : AutoRendererSupport.CONTROL_SURFACE;
       case HOVERED -> AutoRendererSupport.STATE_HOVER;
       case PRESSED -> AutoRendererSupport.STATE_PRESSED;
@@ -58,7 +58,7 @@ public final class AutoButtonRenderer implements ElementRenderer {
 
   private static void drawBorder(Graphics graphics, Rectangle area, Button button,
                                  Button.State state) {
-    var outline = state == Button.State.DISABLED
+    Color outline = state == Button.State.DISABLED
         ? new Color(AutoRendererSupport.OUTLINE, 0.35F)
         : button.focused() ? AutoRendererSupport.OUTLINE_FOCUS
         : state == Button.State.HOVERED ? AutoRendererSupport.OUTLINE_HOVER

@@ -25,6 +25,7 @@
 package io.viki.momentum.asset;
 
 import org.jspecify.annotations.Nullable;
+import io.viki.momentum.util.multithread.Parallel;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -56,7 +57,6 @@ public final class TaskQueue implements AutoCloseable {
   private final PriorityQueue<Preparation> preparations
       = new PriorityQueue<>(Comparator.comparing(Preparation::task, ORDER).thenComparingInt(Preparation::index));
   private final int parallelism;
-  private @Nullable ExecutorService executor;
   private long nextSequence;
   private int outstanding;
   private boolean started;
@@ -64,7 +64,7 @@ public final class TaskQueue implements AutoCloseable {
 
   /** Creates a queue with a preparation window twice the available CPU count. */
   public TaskQueue() {
-    this(Runtime.getRuntime().availableProcessors() * 2);
+    this(Parallel.CPU_CONCURRENCY * 2);
   }
 
   /**
@@ -207,11 +207,13 @@ public final class TaskQueue implements AutoCloseable {
   /** Starts queued preparations until the configured window is full or none remain. */
   private void startPreparations() {
     while (outstanding < parallelism && !preparations.isEmpty()) {
-      if (executor == null) {
-        executor = Executors.newThreadPerTaskExecutor(Thread.ofVirtual().name("Asset-prepare-", 0).factory());
-      }
       Preparation preparation = preparations.remove();
-      preparation.task.steps.get(preparation.index).start(executor);
+      try {
+        preparation.task.steps.get(preparation.index).start(Parallel.cpu());
+      } catch (RejectedExecutionException exception) {
+        preparations.add(preparation);
+        break;
+      }
       outstanding++;
     }
   }
@@ -238,9 +240,6 @@ public final class TaskQueue implements AutoCloseable {
     pending.clear();
     active.clear();
     preparations.clear();
-    if (executor != null) {
-      executor.shutdownNow();
-    }
   }
 
   /**
@@ -297,9 +296,9 @@ public final class TaskQueue implements AutoCloseable {
      * Starts this preparation asynchronously.
      *
      * @param executor the worker executor that runs the preparation
-     * @throws java.util.concurrent.RejectedExecutionException if the executor rejects the work
+     * @throws RejectedExecutionException if the executor rejects the work
      */
-    void start(ExecutorService executor) {
+    void start(Executor executor) {
       future = CompletableFuture.supplyAsync(() -> {
         try {
           return preparation.call();

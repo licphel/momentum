@@ -40,11 +40,12 @@ import io.viki.momentum.gfx.tint.Gradient;
  * @param font      the font used to render the text
  * @param tint      the text gradient
  * @param fontStyle a bitmask of style flags from {@link Font}
+ * @param shadow    a shadow info
  * @see Font#REGULAR
  * @see Font#BOLD
  * @see Font#ITALIC
  */
-public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
+public record TextFormat(FontInsta font, Gradient tint, int fontStyle, TextShadow shadow) {
   /**
    * Returns a default style using the built-in font, white gradient, regular
    * weight, and the default font size.
@@ -52,11 +53,7 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
    * @return a default text style
    */
   public static TextFormat of() {
-    return new TextFormat(
-        FallbackFont.acquire(),
-        Color.WHITE,
-        Font.REGULAR
-    );
+    return FallbackFont.getDefaultTextFormat();
   }
 
   /**
@@ -66,7 +63,7 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
    * @return a new style with the updated font
    */
   public TextFormat font(FontInsta font) {
-    return new TextFormat(font, tint, fontStyle);
+    return new TextFormat(font, tint, fontStyle, shadow);
   }
 
   /**
@@ -76,7 +73,7 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
    * @return a new style with the updated gradient
    */
   public TextFormat tint(Gradient gradient) {
-    return new TextFormat(font, gradient, fontStyle);
+    return new TextFormat(font, gradient, fontStyle, shadow);
   }
 
   /**
@@ -86,7 +83,7 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
    * @return a new style with the updated font size
    */
   public TextFormat size(float fontSize) {
-    return new TextFormat(font.resized(fontSize), tint, fontStyle);
+    return new TextFormat(font.resized(fontSize), tint, fontStyle, shadow);
   }
 
   /**
@@ -96,7 +93,17 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
    * @return a new style with the updated flags
    */
   public TextFormat style(int fontStyle) {
-    return new TextFormat(font, tint, fontStyle);
+    return new TextFormat(font, tint, fontStyle, shadow);
+  }
+
+  /**
+   * Returns a copy with the replacement shadow.
+   *
+   * @param shadow the replacement shadow
+   * @return a new style with the updated shadow
+   */
+  public TextFormat shadow(TextShadow shadow) {
+    return new TextFormat(font, tint, fontStyle, shadow);
   }
 
   /**
@@ -109,6 +116,7 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
     private FontInsta font;
     private Gradient gradient = Color.WHITE;
     private int fontStyle = Font.REGULAR;
+    private TextShadow shadow = TextShadow.NONE;
 
     /**
      * Creates a builder for the given font.
@@ -156,12 +164,23 @@ public record TextFormat(FontInsta font, Gradient tint, int fontStyle) {
     }
 
     /**
+     * Sets the shadow.
+     *
+     * @param shadow the shadow to set
+     * @return this builder, for chaining
+     */
+    public Builder shadow(TextShadow shadow) {
+      this.shadow = shadow;
+      return this;
+    }
+
+    /**
      * Builds the {@link TextFormat}.
      *
      * @return a new style with the configured attributes
      */
     public TextFormat build() {
-      return new TextFormat(font, gradient, fontStyle);
+      return new TextFormat(font, gradient, fontStyle, shadow);
     }
   }
 }

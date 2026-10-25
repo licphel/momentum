@@ -52,7 +52,7 @@ public final class AutoDropDownRenderer implements ElementRenderer {
   }
 
   private static void drawBorder(Graphics graphics, DropDown dropDown, Rectangle area) {
-    var outline = !dropDown.enabled() ? new Color(
+    Color outline = !dropDown.enabled() ? new Color(
         AutoRendererSupport.OUTLINE, 0.35F)
         : dropDown.focused() || dropDown.expanded() ? AutoRendererSupport.OUTLINE_FOCUS
         : dropDown.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;

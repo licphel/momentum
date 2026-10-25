@@ -40,6 +40,7 @@ import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.function.Consumer;
 
 import static org.lwjgl.glfw.Callbacks.glfwFreeCallbacks;
 import static org.lwjgl.glfw.GLFW.*;
@@ -71,7 +72,8 @@ public final class GlfwDesktopView extends DesktopView {
   /** Holds strong references to GLFW callback objects to prevent GC. */
   private final Object[] callbacks = new Object[CB_COUNT];
   private long handle;
-  private boolean hasContext;
+  private volatile boolean hasContext;
+  private Consumer<Runnable> contextDispatcher = Runnable::run;
   private long cursorHandle;
   private boolean closeRequested;
   private final GlfwJoystickInput joystickInput = new GlfwJoystickInput();
@@ -98,15 +100,21 @@ public final class GlfwDesktopView extends DesktopView {
   @Override
   public Object[] makeContext() {
     long h = handle;
+    // GLFW window operations stay on the window thread; only the context is transferable.
+    glfwShowWindow(h);
     return new Object[] {
         this,
         "GLFW",
         (Runnable) () -> {
           glfwMakeContextCurrent(h);
-          glfwShowWindow(h);
+          glfwSwapInterval(vsync ? 1 : 0);
           hasContext = true;
-          GlfwDesktopView.this.applyPlatformVsync(vsync);
-        }
+        },
+        (Runnable) () -> {
+          glfwMakeContextCurrent(NULL);
+          hasContext = false;
+        },
+        (Consumer<Consumer<Runnable>>) dispatcher -> contextDispatcher = dispatcher
     };
   }
 
@@ -126,7 +134,7 @@ public final class GlfwDesktopView extends DesktopView {
   @Override
   public void present() {
     if (handle != NULL) {
-      glfwSwapBuffers(handle);
+      contextDispatcher.accept(this::swapBuffers);
     }
   }
 
@@ -392,7 +400,7 @@ public final class GlfwDesktopView extends DesktopView {
   @Override
   protected void applyPlatformVsync(boolean vsync) {
     if (handle != NULL && hasContext) {
-      glfwSwapInterval(vsync ? 1 : 0);
+      contextDispatcher.accept(() -> glfwSwapInterval(vsync ? 1 : 0));
     }
   }
 

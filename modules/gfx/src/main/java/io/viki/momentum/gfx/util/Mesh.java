@@ -168,7 +168,7 @@ public final class Mesh implements AutoCloseable {
     if (obj == null || obj.getClass() != this.getClass()) {
       return false;
     }
-    var that = (Mesh) obj;
+    Mesh that = (Mesh) obj;
     return Objects.equals(this.sections, that.sections);
   }
 

@@ -32,6 +32,7 @@ import io.viki.momentum.sfx.*;
 import io.viki.momentum.sfx.ext.SfxEffect;
 import io.viki.momentum.sfx.openal.ext.OpenALEffects;
 import io.viki.momentum.util.multithread.ExecutionMode;
+import io.viki.momentum.util.multithread.Parallel;
 import io.viki.momentum.util.InternalApi;
 import io.viki.momentum.util.Result;
 import org.lwjgl.openal.*;
@@ -57,7 +58,7 @@ import static org.lwjgl.system.MemoryUtil.memFree;
  * OpenAL-backed {@link Mixer} that serializes native calls onto one owning thread.
  *
  * <p>{@link ExecutionMode#DEDICATED_THREAD} owns a daemon audio thread. In
- * {@link ExecutionMode#BOUND_THREAD}, construction, {@link #pollEvents()}, and {@link #close()}
+ * {@link ExecutionMode#CALLER_THREAD}, construction, {@link #pollEvents()}, and {@link #close()}
  * belong to the creating thread (normally the main thread); submissions on that thread execute
  * immediately, while other threads enqueue commands. The owner must poll regularly to service
  * cross-thread work and streaming playback. Other public commands may be submitted concurrently.
@@ -70,7 +71,6 @@ public final class OpenALMixer implements Mixer {
   public static final int AUXILIARY_SEND_CAPACITY = 4;
   /** Sends reserved for mixer-owned environmental effects. */
   public static final int MIXER_EFFECT_SENDS = 2;
-  private static final double BOUND_THREAD_PRESSURE = 0.75;
   private static final Logger LOGGER = Log.getLogger();
   private static final int QUEUE_CAPACITY = 128;
   /** Device discovery is off the caller thread and deliberately limited to one query per second. */
@@ -120,9 +120,9 @@ public final class OpenALMixer implements Mixer {
   private volatile float listenerY;
   private volatile float listenerZ;
   /**
-   * Creates a mixer using budget-based automatic thread ownership.
+   * Creates a mixer using platform-based automatic thread ownership.
    *
-   * <p>Bound mode initializes on the caller; dedicated mode initializes asynchronously.
+   * <p>Caller-thread mode initializes on the caller; dedicated mode initializes asynchronously.
    */
   public OpenALMixer() {
     this(DEFAULT_SOURCE_CAPACITY);
@@ -139,7 +139,7 @@ public final class OpenALMixer implements Mixer {
   }
 
   /**
-   * Creates a mixer with explicit execution ownership or budget-based automatic selection.
+   * Creates a mixer with explicit thread ownership.
    *
    * @param mode           the execution mode
    */
@@ -148,7 +148,7 @@ public final class OpenALMixer implements Mixer {
   }
 
   /**
-   * Bound mode initializes synchronously and must subsequently be polled/closed on this thread.
+   * Caller-thread mode initializes synchronously and must subsequently be polled/closed on this thread.
    *
    * @param sourceCapacity maximum simultaneous effect sources, greater than zero
    * @param mode           the execution mode
@@ -157,10 +157,11 @@ public final class OpenALMixer implements Mixer {
     if (sourceCapacity <= 0) {
       throw new IllegalArgumentException("Source capacity must be positive: " + sourceCapacity);
     }
+    LOGGER.info("OpenAL is created on mode {}", mode);
     sources = new int[sourceCapacity];
     availableSources = new int[sourceCapacity];
     executionMode = mode;
-    if (executionMode == ExecutionMode.BOUND_THREAD) {
+    if (executionMode == ExecutionMode.CALLER_THREAD) {
       audioThread = Thread.currentThread();
       try {
         initializeDevice();
@@ -170,8 +171,7 @@ public final class OpenALMixer implements Mixer {
         throw exception;
       }
     } else {
-      audioThread = new Thread(this::run, "OpenAL-Mixer");
-      audioThread.setDaemon(true);
+      audioThread = Parallel.threadFactory("OpenAL-Mixer-").newThread(this::run);
       audioThread.start();
     }
   }
@@ -194,7 +194,7 @@ public final class OpenALMixer implements Mixer {
 
   private void requireOwnerThread() {
     if (Thread.currentThread() != audioThread) {
-      throw new IllegalStateException("Bound OpenAL mixer must be polled and closed on its creating thread");
+      throw new IllegalStateException("CALLER_THREAD OpenAL mixer must be polled and closed on its creating thread");
     }
   }
 
@@ -316,7 +316,7 @@ public final class OpenALMixer implements Mixer {
     if (!running.get()) {
       return;
     }
-    if (executionMode == ExecutionMode.BOUND_THREAD) {
+    if (executionMode == ExecutionMode.CALLER_THREAD) {
       requireOwnerThread();
       drainCommands();
       refreshDevices();
@@ -396,7 +396,7 @@ public final class OpenALMixer implements Mixer {
   @Override
   public void submit(Runnable work) {
     if (Thread.currentThread() == audioThread) {
-      if (executionMode == ExecutionMode.BOUND_THREAD && !consumingCommands) {
+      if (executionMode == ExecutionMode.CALLER_THREAD && !consumingCommands) {
         drainCommands();
       }
       if (outputDevice == 0) {
@@ -434,13 +434,13 @@ public final class OpenALMixer implements Mixer {
     if (!running.get()) {
       return;
     }
-    if (executionMode == ExecutionMode.BOUND_THREAD) {
+    if (executionMode == ExecutionMode.CALLER_THREAD) {
       requireOwnerThread();
     }
     synchronized (queue) {
       running.set(false);
     }
-    if (executionMode == ExecutionMode.BOUND_THREAD) {
+    if (executionMode == ExecutionMode.CALLER_THREAD) {
       disposeDevice();
       deviceNames = List.of();
       deviceName = DEFAULT_DEVICE;

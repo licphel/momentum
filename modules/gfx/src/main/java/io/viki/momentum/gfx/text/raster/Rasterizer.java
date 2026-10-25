@@ -27,9 +27,9 @@ package io.viki.momentum.gfx.text.raster;
 import com.ibm.icu.text.BreakIterator;
 import io.viki.momentum.gfx.text.*;
 import io.viki.momentum.gfx.text.harfbuzz.HarfbuzzShaper;
-import io.viki.momentum.gfx.tint.Gradient;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.util.Pool;
+import org.jspecify.annotations.Nullable;
 
 import java.util.*;
 
@@ -215,95 +215,51 @@ public final class Rasterizer {
 
   private static List<Raster.Stroke> buildStrokes(List<LayoutRun> runs, List<Literal> literals, boolean flipY) {
     List<Raster.Stroke> result = new ArrayList<>();
-
-    boolean inRun = false;
-    float runX = 0;
-    float runY = 0;
-    float runW = 0;
-    int runFlags = 0;
-    Gradient runGrad = null;
-    float runThicknessU = 0;
-    float runOffsetU = 0;
-    float runThicknessS = 0;
-    float runOffsetS = 0;
-
+    StrokeRun stroke = new StrokeRun();
     for (LayoutRun layoutRun : runs) {
-      for (LayoutGlyph lg : layoutRun.glyphs()) {
-        // Zero-advance glyphs are control chars. Always break the run.
-        if (lg.w() <= 0) {
-          if (inRun) {
-            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
-                runOffsetS, flipY);
-            inRun = false;
-          }
-          continue;
-        }
-
-        Literal lit = literals.get(lg.ownerIndex());
-        int flags = lit.format().fontStyle();
-        boolean wantsDecoration = lg.glyphId() >= 0
-                                  && ((flags & Font.UNDERLINE) != 0 || (flags & Font.STRIKETHROUGH) != 0);
-
-        if (!wantsDecoration) {
-          if (inRun) {
-            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
-                runOffsetS, flipY);
-            inRun = false;
-          }
-          continue;
-        }
-
-        float baseline = lg.y();
-        Gradient gradient = lit.format().tint();
-        float fs = lit.format().font().size();
-        FontMetrics m = lit.format().font().font().metrics();
-        float thicknessU = Math.abs(m.underlineThickness()) * fs;
-        float offsetU = m.underlinePos() * fs;
-        @SuppressWarnings("UnnecessaryLocalVariable")
-        float thicknessS = thicknessU;
-        float offsetS = fs * 0.33F;
-
-        boolean sameRun = inRun && flags == runFlags && gradient.equals(runGrad) && Math.abs(baseline - runY) < 0.5F;
-
-        if (sameRun) {
-          runW += lg.w();
-        } else {
-          if (inRun) {
-            flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS,
-                runOffsetS, flipY);
-          }
-          inRun = true;
-          runX = lg.x();
-          runY = baseline;
-          runW = lg.w();
-          runFlags = flags;
-          runGrad = gradient;
-          runThicknessU = thicknessU;
-          runOffsetU = offsetU;
-          runThicknessS = thicknessS;
-          runOffsetS = offsetS;
-        }
+      for (LayoutGlyph glyph : layoutRun.glyphs()) {
+        stroke.append(glyph, literals.get(glyph.ownerIndex()).format(), result, flipY);
       }
+      stroke.flush(result, flipY);
     }
-
-    if (inRun) {
-      flushStroke(result, runFlags, runGrad, runX, runY, runW, runThicknessU, runOffsetU, runThicknessS, runOffsetS,
-          flipY);
-    }
-
     return result;
   }
 
-  private static void flushStroke(List<Raster.Stroke> out, int flags, Gradient gradient, float x, float baseline,
-                                  float width, float thicknessU, float offsetU, float thicknessS, float offsetS,
-                                  boolean flipY) {
-    if ((flags & Font.UNDERLINE) != 0) {
-      float uy = flipY ? baseline - offsetU : baseline + offsetU;
-      out.add(new Raster.Stroke(Rectangle.of(x, uy, width, thicknessU), gradient));
+  private static final class StrokeRun {
+    private @Nullable TextFormat format;
+    private float x;
+    private float y;
+    private float width;
+
+    private void append(LayoutGlyph glyph, TextFormat next, List<Raster.Stroke> out, boolean flipY) {
+      if (glyph.w() <= 0 || glyph.glyphId() < 0
+          || (next.fontStyle() & (Font.UNDERLINE | Font.STRIKETHROUGH)) == 0) {
+        flush(out, flipY);
+      } else if (next.equals(format) && Math.abs(glyph.y() - y) < 0.5F) {
+        width += glyph.w();
+      } else {
+        flush(out, flipY);
+        format = next;
+        x = glyph.x();
+        y = glyph.y();
+        width = glyph.w();
+      }
     }
-    if ((flags & Font.STRIKETHROUGH) != 0) {
-      float sy = flipY ? baseline - offsetS : baseline + offsetS;
-      out.add(new Raster.Stroke(Rectangle.of(x, sy, width, thicknessS), gradient));
+
+    private void flush(List<Raster.Stroke> out, boolean flipY) {
+      if (format == null) return;
+      float size = format.font().size();
+      FontMetrics metrics = format.font().font().metrics();
+      float thickness = Math.abs(metrics.underlineThickness()) * size;
+      if ((format.fontStyle() & Font.UNDERLINE) != 0) {
+        float offset = metrics.underlinePos() * size;
+        out.add(new Raster.Stroke(Rectangle.of(x, flipY ? y - offset : y + offset, width, thickness), format));
+      }
+      if ((format.fontStyle() & Font.STRIKETHROUGH) != 0) {
+        float offset = size * 0.33F;
+        out.add(new Raster.Stroke(Rectangle.of(x, flipY ? y - offset : y + offset, width, thickness), format));
+      }
+      format = null;
     }
   }
 
@@ -469,7 +425,7 @@ public final class Rasterizer {
         if (source != null) {
           absCharIndex = source.offsets()[absCharIndex];
         }
-        entries.add(new Raster.Entry(g, lit.format().tint(), vb, lg.scale(), lit.meta(), absCharIndex));
+        entries.add(new Raster.Entry(g, lit.format(), vb, lg.scale(), lit.meta(), absCharIndex));
       }
     }
 

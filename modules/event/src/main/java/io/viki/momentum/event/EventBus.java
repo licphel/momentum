@@ -24,6 +24,7 @@
 
 package io.viki.momentum.event;
 
+import io.viki.momentum.util.multithread.Parallel;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
@@ -343,7 +344,7 @@ public final class EventBus {
    * @return a {@link CompletableFuture} that completes with the dispatch context
    */
   public <T extends Event> CompletableFuture<EventContext<T>> postAsync(T event) {
-    return CompletableFuture.supplyAsync(() -> post(event));
+    return CompletableFuture.supplyAsync(() -> post(event), Parallel.cpu());
   }
 
   /**
@@ -355,7 +356,7 @@ public final class EventBus {
    * @return a {@link CompletableFuture} that completes with the dispatch context
    */
   public <T extends Event> CompletableFuture<EventContext<T>> postAsync(T event, Phase phase) {
-    return CompletableFuture.supplyAsync(() -> post(event, phase));
+    return CompletableFuture.supplyAsync(() -> post(event, phase), Parallel.cpu());
   }
 
   private List<HandlerWrapper> getHandlers(Class<? extends Event> eventType) {

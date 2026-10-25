@@ -26,6 +26,7 @@ package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.Device;
 import io.viki.momentum.gfx.GraphicsException;
+import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 
@@ -45,6 +46,7 @@ import java.util.Objects;
 public final class FallbackFont {
   private static volatile @Nullable Font builtin;
   private static volatile @Nullable FontInsta font;
+  private static volatile @Nullable TextFormat defaultTextFormat;
 
   private FallbackFont() {
   }
@@ -81,8 +83,44 @@ public final class FallbackFont {
    *
    * @param value font to set
    */
+  @SuppressWarnings("all")
   public static synchronized void set(FontInsta value) {
     font = value;
+    if (defaultTextFormat != null) {
+      defaultTextFormat = defaultTextFormat.font(value);
+    }
+  }
+
+  /**
+   * Returns the configured template, following changes to the default font and logical size.
+   *
+   * @return the default text format
+   */
+  public static TextFormat getDefaultTextFormat() {
+    FontInsta current = acquire();
+    TextFormat template = defaultTextFormat;
+    if (template != null && template.font() == current) {
+      return template;
+    }
+    synchronized (FallbackFont.class) {
+      template = defaultTextFormat;
+      current = acquire();
+      defaultTextFormat = template == null
+          ? new TextFormat(current, Color.WHITE, Font.REGULAR, TextShadow.NONE)
+          : template.font(current);
+      return Objects.requireNonNull(defaultTextFormat);
+    }
+  }
+
+  /**
+   * Replaces the default immutable template for subsequently created text; existing text is unchanged.
+   *
+   * @param value the default format
+   */
+  public static synchronized void setDefaultTextFormat(TextFormat value) {
+    font = value.font();
+    Font.DEFAULT_SIZE[0] = value.font().size();
+    defaultTextFormat = value;
   }
 
   /**
@@ -111,10 +149,15 @@ public final class FallbackFont {
    *
    * @param size the default font size in logical drawing units
    */
+  @SuppressWarnings("all")
   public static synchronized void setDefaultSize(float size) {
     FontInsta current = font;
     if (current != null) {
       font = current.resized(size);
+      if (defaultTextFormat != null) {
+        assert font != null;
+        defaultTextFormat = defaultTextFormat.font(font);
+      }
     }
     Font.DEFAULT_SIZE[0] = size;
   }

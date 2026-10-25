@@ -39,8 +39,10 @@ import org.jspecify.annotations.Nullable;
  * @param color  shadow color gradient, or {@code null} to shade each text element's gradient
  */
 public record TextShadow(Vector2 offset, @Nullable Gradient color) {
+  /** None shadow, plain text. */
+  public static final TextShadow NONE = new TextShadow(Vector2.ZERO, Color.BLACK);
   /** Default one-unit shadow with a dark gray color. */
-  public static final TextShadow DEFAULT = new TextShadow(Vector2.ONE, Color.grayscale(0.25F));
+  public static final TextShadow DEFAULT = new TextShadow(Vector2.ONE, Color.grayscale(0.0F, 0.5F));
 
   /**
    * Creates a diagonal shadow with the same offset on both visual axes.

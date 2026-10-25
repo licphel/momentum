@@ -24,46 +24,45 @@
 
 package io.viki.momentum.util.multithread;
 
+import java.lang.management.ManagementFactory;
+import java.lang.management.OperatingSystemMXBean;
+
 /**
- * Defines the execution modes for background tasks.
- *
- * <p>This enum guides the system in allocating thread resources for specific tasks under different
- * runtime environments. It is used in conjunction with {@link Parallel#isCpuResourceLimited()} to
- * adaptively adjust between resource-constrained environments (e.g., mobile or embedded devices)
- * and resource-rich environments (e.g., desktops).
- *
- * @see Parallel
- * @since 1.0
+ * Thread ownership for a long-lived native subsystem, not a choice of shared executor.
+ * Immutable and thread-safe. Select once when opening/loading the subsystem.
  */
 public enum ExecutionMode {
-  /**
-   * Dedicated thread mode.
-   *
-   * <p>Tasks should run on dedicated, long-lived threads. This mode is typically suitable for
-   * resource-constrained environments or scenarios where a task requires exclusive thread
-   * context (e.g., specific native dependencies).
-   */
+  /** Creates one component-owned platform thread; native initialization, work and cleanup stay there. */
   DEDICATED_THREAD,
-
   /**
-   * Bound thread mode.
-   *
-   * <p>Tasks should be bound to shared, bounded thread pools (such as {@link Parallel#cpu()} or
-   * {@link Parallel#io()}). This mode is suitable for resource-rich environments, reducing
-   * context-switching and memory overhead through thread reuse.
+   * Creates no worker. The opening/loading caller owns native initialization, polling/execution
+   * and cleanup. Other threads may enqueue commands but never take over its native context.
    */
-  BOUND_THREAD;
+  CALLER_THREAD;
 
   /**
-   * Automatically selects the appropriate execution mode based on the current platform's
-   * resource conditions.
+   * Chooses CALLER_THREAD on thread-constrained cases, otherwise DEDICATED_THREAD.
+   * This is a static platform policy, not live CPU-load measurement or automatic migration.
    *
-   * <p>Returns {@link #DEDICATED_THREAD} if the current platform is deemed CPU-resource-limited
-   * by {@link Parallel#isCpuResourceLimited()}; otherwise returns {@link #BOUND_THREAD}.
-   *
-   * @return the automatically inferred execution mode, never {@code null}
+   * @return currently optimal execution mode
    */
   public static ExecutionMode auto() {
-    return Parallel.isCpuResourceLimited() ? DEDICATED_THREAD : BOUND_THREAD;
+    int cores = Runtime.getRuntime().availableProcessors();
+    if (cores <= 2) {
+      return CALLER_THREAD;
+    }
+
+    try {
+      OperatingSystemMXBean osBean = ManagementFactory.getOperatingSystemMXBean();
+      double load = osBean.getSystemLoadAverage();
+
+      if (load >= 0) {
+        double perCoreLoad = load / cores;
+        return perCoreLoad > 0.7 ? CALLER_THREAD : DEDICATED_THREAD;
+      }
+    } catch (Error | Exception e) {
+      // Ignore
+    }
+    return Parallel.isThreadConstrainedPlatform() ? CALLER_THREAD : DEDICATED_THREAD;
   }
 }

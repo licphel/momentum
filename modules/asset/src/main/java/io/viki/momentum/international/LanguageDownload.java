@@ -1,6 +1,7 @@
 package io.viki.momentum.international;
 
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.multithread.Parallel;
 import org.jspecify.annotations.Nullable;
 
 import java.io.ByteArrayOutputStream;
@@ -43,11 +44,11 @@ final class LanguageDownload implements HttpResponse.BodySubscriber<String> {
    */
   static String fetch(URI uri) throws IOException {
     LanguageDownload download = new LanguageDownload();
-    try (var watchdog = Executors.newSingleThreadScheduledExecutor(r ->
-        Thread.ofPlatform().daemon().name("language-download-watchdog").unstarted(r));
-         HttpClient client = HttpClient.newBuilder().followRedirects(HttpClient.Redirect.NORMAL).build()) {
-      var timer = watchdog.scheduleAtFixedRate(download::checkSpeed, 500, 25, TimeUnit.MILLISECONDS);
-      var request = client.sendAsync(HttpRequest.newBuilder(uri).GET().build(), response -> {
+    try (HttpClient client = HttpClient.newBuilder().executor(Parallel.io())
+        .followRedirects(HttpClient.Redirect.NORMAL).build()) {
+      ScheduledFuture<?> timer = Parallel.registerScheduledTask(25, download::checkSpeed);
+      CompletableFuture<HttpResponse<String>> request
+          = client.sendAsync(HttpRequest.newBuilder(uri).GET().build(), response -> {
         if (response.statusCode() != 200) {
           download.onError(new IOException("Language HTTP status: " + response.statusCode()));
         }

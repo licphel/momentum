@@ -1,9 +1,9 @@
 package io.viki.momentum.sfx;
 
-import java.util.Collections;
-import java.util.IdentityHashMap;
-import java.util.Iterator;
-import java.util.Set;
+import io.viki.momentum.util.multithread.Parallel;
+
+import java.time.Duration;
+import java.util.*;
 
 /**
  * Owns explicitly registered clips and releases them when playback completes.
@@ -18,9 +18,8 @@ import java.util.Set;
  */
 public final class ClipManager implements AutoCloseable {
   /** Maximum interval between automatic completion checks, in milliseconds. */
-  private static final long CLEANUP_INTERVAL_MILLIS = 100;
-  private final Set<Clip> clips = Collections.newSetFromMap(new IdentityHashMap<>());
-  private final Thread cleanupThread;
+  private static final long CLEANUP_INTERVAL_MILLIS = 500;
+  private final Set<Clip> clips = new HashSet<>();
   private volatile boolean running = true;
 
   /**
@@ -29,9 +28,7 @@ public final class ClipManager implements AutoCloseable {
    * <p>Cleanup runs on a daemon thread until this manager is closed.
    */
   public ClipManager() {
-    cleanupThread = new Thread(this::cleanupLoop, "ClipManager-Cleanup");
-    cleanupThread.setDaemon(true);
-    cleanupThread.start();
+    Parallel.registerScheduledTask(Duration.ofMillis(CLEANUP_INTERVAL_MILLIS), this::update);
   }
 
   /**
@@ -93,19 +90,6 @@ public final class ClipManager implements AutoCloseable {
     }
   }
 
-  @SuppressWarnings("BusyWait")
-  private void cleanupLoop() {
-    while (running) {
-      try {
-        Thread.sleep(CLEANUP_INTERVAL_MILLIS);
-        update();
-      } catch (InterruptedException exception) {
-        Thread.currentThread().interrupt();
-        return;
-      }
-    }
-  }
-
   /**
    * Releases all registered clips and permanently rejects further registrations.
    *
@@ -117,7 +101,6 @@ public final class ClipManager implements AutoCloseable {
       return;
     }
     running = false;
-    cleanupThread.interrupt();
     for (Clip clip : clips) {
       clip.close();
     }

@@ -87,8 +87,8 @@ public final class QuickFmt {
    * @throws IllegalArgumentException if a delimited placeholder contains an invalid expression
    */
   private static Template parse(String source) {
-    var parts = new ArrayList<Part>();
-    var literal = new StringBuilder();
+    ArrayList<Part> parts = new ArrayList<Part>();
+    StringBuilder literal = new StringBuilder();
     int argument = 0;
     for (int i = 0; i < source.length(); i++) {
       char ch = source.charAt(i);
@@ -174,7 +174,7 @@ public final class QuickFmt {
      * @return formatted text
      */
     public String format(Object... args) {
-      var result = new StringBuilder();
+      StringBuilder result = new StringBuilder();
       ArgumentContext context = null;
       for (Part part : parts) {
         if (part.argument < 0 || part.argument >= args.length) {

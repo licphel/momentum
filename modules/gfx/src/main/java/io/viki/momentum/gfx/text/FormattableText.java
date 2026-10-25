@@ -45,6 +45,14 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
   T style(int flags);
 
   /**
+   * Replaces the font shadow style used to render this component.
+   *
+   * @param shadow the replacement shadow info
+   * @return a component with its new shadow
+   */
+  T shadow(TextShadow shadow);
+
+  /**
    * Replaces the component font.
    *
    * @param font the replacement font
@@ -99,7 +107,7 @@ public interface FormattableText<T extends FormattableText<T>> extends Text {
    * @return a component with its formatting
    */
   default T with(TextFormat template) {
-    return font(template.font()).tint(template.tint()).style(template.fontStyle());
+    return font(template.font()).tint(template.tint()).style(template.fontStyle()).shadow(template.shadow());
   }
 
   /**

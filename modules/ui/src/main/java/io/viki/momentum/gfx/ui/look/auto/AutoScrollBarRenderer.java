@@ -24,6 +24,7 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
+import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
 import io.viki.momentum.gfx.ui.element.ScrollBar;
@@ -44,7 +45,7 @@ public final class AutoScrollBarRenderer implements ElementRenderer {
   }
 
   private static void drawFrame(Graphics graphics, ScrollBar scrollBar, Rectangle area) {
-    var border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
+    Color border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
         : scrollBar.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;
     AutoRendererSupport.drawBoundary(graphics, area, border);
   }
@@ -62,7 +63,7 @@ public final class AutoScrollBarRenderer implements ElementRenderer {
   }
 
   private static void drawThumbFrame(Graphics graphics, ScrollBar scrollBar, Rectangle visual) {
-    var border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
+    Color border = scrollBar.focused() ? AutoRendererSupport.OUTLINE_FOCUS
         : scrollBar.hovered() ? AutoRendererSupport.OUTLINE_HOVER : AutoRendererSupport.OUTLINE;
     AutoRendererSupport.drawBoundary(graphics, visual, border);
   }

@@ -26,74 +26,126 @@ package io.viki.momentum.registry;
 
 import io.viki.momentum.util.Identifier;
 import org.jspecify.annotations.Nullable;
+
 import java.util.*;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
 
 /**
- * Declaration-ordered identities with lazy, dependency-driven construction.
- * Declaration and resolution are confined to one loading thread. Freeze resolves every declaration;
- * afterwards holders and read-only lookups may be shared. Runtime indices follow declaration order,
+ * A {@link Registry} that has declaration-ordered identities with lazy, dependency-driven construction.
+ *
+ * <p>Declaration and resolution are confined to one loading thread. Freeze resolves every declaration;
+ * afterward holders and read-only lookups may be shared. Runtime indices follow declaration order,
  * never the order in which dependencies happen to be resolved.
+ *
+ * @param <T> registry type
  */
 public class IndirectRegistry<T extends RegistryEntry> extends AbstractRegistry<T> {
-  private static final ThreadLocal<ArrayDeque<String>> RESOLUTION_PATH =
-      ThreadLocal.withInitial(ArrayDeque::new);
+  private static final ThreadLocal<ArrayDeque<String>> RESOLUTION_PATH = ThreadLocal.withInitial(ArrayDeque::new);
+
   private final Map<Identifier, Entry> entries = new LinkedHashMap<>();
   private final List<Entry> declared = new ArrayList<>();
   private boolean sealing;
 
-  public IndirectRegistry(Identifier key) { super(key); }
+  /**
+   * Creates a new unfrozen registry.
+   *
+   * @param key the identifier of this registry
+   */
+  public IndirectRegistry(Identifier key) {
+    super(key);
+  }
 
   @Override
   public Holder<T> register(Identifier id, Supplier<? extends T> supplier) {
-    if (isFrozen() || sealing) throw new IllegalStateException("Registry is sealed: " + key());
+    if (isFrozen() || sealing) {
+      throw new IllegalStateException("Registry is sealed: " + key());
+    }
     Entry entry = entries.computeIfAbsent(id, Entry::new);
-    if (entry.index >= 0) throw new IllegalArgumentException("Duplicate registry entry: " + id);
+    if (entry.index >= 0) {
+      throw new IllegalArgumentException("Duplicate registry entry: " + id);
+    }
     entry.supplier = supplier;
     entry.index = declared.size();
     declared.add(entry);
     return entry.holder;
   }
 
-  /** Obtains a stable forward reference; declaration may happen later. */
   @Override
   public Holder<T> hold(Identifier id) {
     Entry entry = entries.get(id);
-    if (entry != null) return entry.holder;
-    if (isFrozen() || sealing) throw new IllegalArgumentException("Unknown entry " + id + " in " + key());
+    if (entry != null) {
+      return entry.holder;
+    }
+    if (isFrozen() || sealing) {
+      throw new IllegalArgumentException("Unknown entry " + id + " in " + key());
+    }
     entry = new Entry(id);
     entries.put(id, entry);
     return entry.holder;
   }
 
-  @Override public @Nullable T get(Identifier id) {
+  @Override
+  public @Nullable T get(Identifier id) {
     Entry entry = entries.get(id);
     return entry == null || entry.index < 0 ? null : entry.holder.get();
   }
-  @Override public T get(int index) { return declared.get(index).holder.get(); }
-  @Override public int size() { return declared.size(); }
-  @Override public boolean contains(Identifier id) {
+
+  @Override
+  public T get(int index) {
+    return declared.get(index).holder.get();
+  }
+
+  @Override
+  public List<T> values() {
+    return stream().toList();
+  }
+
+  @Override
+  public boolean contains(Identifier id) {
     Entry entry = entries.get(id);
     return entry != null && entry.index >= 0;
   }
-  @Override public Set<Identifier> keys() {
+
+  @Override
+  public Set<Identifier> keys() {
     Set<Identifier> keys = new LinkedHashSet<>();
-    for (Entry entry : declared) keys.add(entry.id);
+    for (Entry entry : declared) {
+      keys.add(entry.id);
+    }
     return Collections.unmodifiableSet(keys);
   }
-  @Override public List<T> values() { return stream().toList(); }
-  @Override public Stream<T> stream() { return declared.stream().map(entry -> entry.holder.get()); }
-  @Override public Iterator<T> iterator() { return stream().iterator(); }
 
-  @Override public void freeze() {
-    if (isFrozen()) return;
+  @Override
+  public Stream<T> stream() {
+    return declared.stream().map(entry -> entry.holder.get());
+  }
+
+  @Override
+  public int size() {
+    return declared.size();
+  }
+
+  @Override
+  public void freeze() {
+    if (isFrozen()) {
+      return;
+    }
     sealing = true;
     for (Entry entry : entries.values()) {
-      if (entry.index < 0) throw new IllegalStateException("Undeclared entry " + entry.id + " in " + key());
+      if (entry.index < 0) {
+        throw new IllegalStateException("Undeclared entry " + entry.id + " in " + key());
+      }
     }
-    for (Entry entry : declared) entry.holder.get();
+    for (Entry entry : declared) {
+      entry.holder.get();
+    }
     super.freeze();
+  }
+
+  @Override
+  public Iterator<T> iterator() {
+    return stream().iterator();
   }
 
   private final class Entry {
@@ -110,13 +162,18 @@ public class IndirectRegistry<T extends RegistryEntry> extends AbstractRegistry<
     }
 
     T resolve() {
-      if (failure != null) throw failure;
+      if (failure != null) {
+        throw failure;
+      }
       Supplier<? extends T> factory = supplier;
-      if (factory == null) throw new IllegalStateException("Undeclared entry " + id + " in " + key());
-      var path = RESOLUTION_PATH.get();
+      if (factory == null) {
+        throw new IllegalStateException("Undeclared entry " + id + " in " + key());
+      }
+      ArrayDeque<String> path = RESOLUTION_PATH.get();
       String name = key() + "/" + id;
-      if (resolving) throw new IllegalStateException("Cyclic registry dependency: "
-          + String.join(" -> ", path) + " -> " + name);
+      if (resolving) {
+        throw new IllegalStateException("Cyclic registry dependency: " + String.join(" -> ", path) + " -> " + name);
+      }
       resolving = true;
       path.addLast(name);
       try {
@@ -129,7 +186,9 @@ public class IndirectRegistry<T extends RegistryEntry> extends AbstractRegistry<
       } finally {
         path.removeLast();
         resolving = false;
-        if (path.isEmpty()) RESOLUTION_PATH.remove();
+        if (path.isEmpty()) {
+          RESOLUTION_PATH.remove();
+        }
       }
     }
   }

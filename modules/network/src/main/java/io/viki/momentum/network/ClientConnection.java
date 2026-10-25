@@ -26,7 +26,6 @@ package io.viki.momentum.network;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.channel.*;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
@@ -45,7 +44,6 @@ import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -101,7 +99,7 @@ public final class ClientConnection implements ConnectionHost {
   private ClientConnection(String targetHost, int targetPort) {
     this.targetHost = targetHost;
     this.targetPort = targetPort;
-    this.group = new NioEventLoopGroup(1);
+    this.group = NetworkThreads.GROUP;
     this.inbound = new ConcurrentLinkedQueue<>();
     this.connectEvents = new ConcurrentLinkedQueue<>();
     this.disconnectEvents = new ConcurrentLinkedQueue<>();
@@ -311,7 +309,6 @@ public final class ClientConnection implements ConnectionHost {
     if (ch != null) {
       ch.close().awaitUninterruptibly(2000);
     }
-    group.shutdownGracefully(0, 2, TimeUnit.SECONDS);
     state = ConnectionState.DISCONNECTED;
   }
 

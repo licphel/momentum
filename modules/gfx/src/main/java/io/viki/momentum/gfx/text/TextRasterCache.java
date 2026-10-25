@@ -5,6 +5,7 @@ import io.viki.momentum.gfx.text.raster.Raster;
 import io.viki.momentum.gfx.text.raster.Rasterizer;
 import io.viki.momentum.util.InternalApi;
 
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -46,7 +47,7 @@ final class TextRasterCache {
       if (generation == currentGeneration) {
         CACHE.put(text, raster);
         if (CACHE.size() > CAPACITY) {
-          var oldest = CACHE.keySet().iterator();
+          Iterator<Text> oldest = CACHE.keySet().iterator();
           oldest.next();
           oldest.remove();
         }

@@ -101,9 +101,13 @@ public class Holder<T> implements Supplier<T> {
   @Override
   public T get() {
     T current = value;
-    if (current != null) return current;
+    if (current != null) {
+      return current;
+    }
     Supplier<? extends T> pending = resolver;
-    if (pending == null) throw new IllegalStateException("Unresolved registry entry: " + id);
+    if (pending == null) {
+      throw new IllegalStateException("Unresolved registry entry: " + id);
+    }
     current = Objects.requireNonNull(pending.get(), "Registry supplier returned null: " + id);
     value = current;
     resolver = null;

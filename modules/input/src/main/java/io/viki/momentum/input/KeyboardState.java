@@ -2,6 +2,7 @@ package io.viki.momentum.input;
 
 import java.util.EnumMap;
 import java.util.EnumSet;
+import java.util.Map;
 
 /**
  * Keyboard physical state and transitions; confined to the owning snapshot thread.
@@ -127,7 +128,7 @@ public final class KeyboardState {
 
   /** Releases all held keys and clears lock modifier state. */
   public void reset() {
-    for (var entry : states.entrySet()) {
+    for (Map.Entry<KeyCode, KeyAction> entry : states.entrySet()) {
       if (entry.getValue() != KeyAction.RELEASE) {
         released.add(entry.getKey());
       }

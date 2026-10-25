@@ -2,6 +2,7 @@ package io.viki.momentum.input;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
@@ -33,7 +34,7 @@ public record InputProfile(Map<String, List<BindingDefinition>> bindings) {
     Map<String, List<BindingDefinition>> copy = new LinkedHashMap<>();
     bindings.forEach((id, definitions) -> {
       if (id.isBlank()) throw new IllegalArgumentException("Action ID must not be blank");
-      var ids = new HashSet<String>();
+      HashSet<String> ids = new HashSet<String>();
       for (BindingDefinition definition : definitions) {
         if (!ids.add(definition.id())) throw new IllegalArgumentException("Duplicate alternative in action " + id + ": " + definition.id());
       }
@@ -59,14 +60,14 @@ public record InputProfile(Map<String, List<BindingDefinition>> bindings) {
       throw new IOException("Input profile bindings must be an object");
     }
     Map<String, List<BindingDefinition>> overrides = new LinkedHashMap<>();
-    for (var field : entries.properties()) {
+    for (Map.Entry<String, JsonNode> field : entries.properties()) {
       String id = field.getKey();
       if (!field.getValue().isArray()) throw new IOException("Input action alternatives must be an array: " + id);
       List<BindingDefinition> alternatives = new ArrayList<>();
       for (JsonNode node : field.getValue()) {
         JsonNode controls = node.path("controls");
         if (!controls.isArray()) throw new IOException("Input binding controls must be an array: " + id);
-        var paths = new ArrayList<String>();
+        ArrayList<String> paths = new ArrayList<String>();
         for (JsonNode control : controls) {
           if (!control.isTextual()) throw new IOException("Input control must be a string: " + id);
           paths.add(control.textValue());
@@ -118,11 +119,11 @@ public record InputProfile(Map<String, List<BindingDefinition>> bindings) {
     root.put("version", VERSION);
     ObjectNode entries = root.putObject("bindings");
     bindings.keySet().stream().sorted().forEach(id -> {
-      var alternatives = entries.putArray(id);
+      ArrayNode alternatives = entries.putArray(id);
       for (BindingDefinition binding : bindings.get(id)) {
         ObjectNode node = alternatives.addObject();
         node.put("id", binding.id());
-        var controls = node.putArray("controls");
+        ArrayNode controls = node.putArray("controls");
         binding.controls().forEach(controls::add);
         node.put("pressPoint", binding.pressPoint());
         node.put("releasePoint", binding.releasePoint());

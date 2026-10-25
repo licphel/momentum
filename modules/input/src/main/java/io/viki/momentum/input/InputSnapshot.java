@@ -101,7 +101,7 @@ public final class InputSnapshot {
       }
       return existing;
     }
-    var ids = new HashSet<String>();
+    HashSet<String> ids = new HashSet<String>();
     for (BindingDefinition definition : definitions) {
       if (!ids.add(definition.id())) {
         throw new IllegalArgumentException("Duplicate binding definition: " + definition.id());

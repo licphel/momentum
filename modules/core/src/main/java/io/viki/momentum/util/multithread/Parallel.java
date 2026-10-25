@@ -24,6 +24,8 @@
 
 package io.viki.momentum.util.multithread;
 
+import io.viki.momentum.logging.Log;
+import io.viki.momentum.logging.Logger;
 import io.viki.momentum.util.Platform;
 
 import java.time.Duration;
@@ -74,7 +76,7 @@ public final class Parallel {
   public static final int CPU_CONCURRENCY = Runtime.getRuntime().availableProcessors() <= 2 ? 1 : 2;
   /** Maximum queue capacity for the CPU executor. */
   private static final int CPU_QUEUE_CAPACITY = 256;
-  private static final System.Logger LOGGER = System.getLogger(Parallel.class.getName());
+  private static final Logger LOGGER = Log.getLogger();
   private static final ThreadPoolExecutor CPU;
   private static final Semaphore IO_PERMITS = new Semaphore(IO_CONCURRENCY);
   private static final Executor IO;
@@ -100,6 +102,31 @@ public final class Parallel {
   }
 
   private Parallel() {
+  }
+
+  /**
+   * Supplies daemon platform threads for native contexts and event loops which cannot move
+   * between pooled workers. These are explicit component-owned exceptions to the shared pools;
+   * their owner must stop and join them. Never use this for ordinary background tasks.
+   *
+   * @param prefix thread name prefix
+   * @return a thread factory
+   */
+  public static ThreadFactory threadFactory(String prefix) {
+    return Thread.ofPlatform().daemon().name(prefix, 0).factory();
+  }
+
+  /**
+   * Starts an owner-thread loop for a native context; the returned thread remains caller-owned.
+   *
+   * @param name thread name
+   * @param task thread task
+   * @return a newly started daemon thread
+   */
+  public static Thread startDedicated(String name, Runnable task) {
+    Thread thread = threadFactory(name).newThread(task);
+    thread.start();
+    return thread;
   }
 
   /**
@@ -172,7 +199,7 @@ public final class Parallel {
       try {
         task.run();
       } catch (Exception exception) {
-        LOGGER.log(System.Logger.Level.WARNING, "Scheduled background task failed", exception);
+        LOGGER.warnExc("Scheduled background task failed", exception);
       } finally {
         pending.set(false);
       }
@@ -203,11 +230,11 @@ public final class Parallel {
   }
 
   /**
-   * Determines whether the current platform is CPU-resource-limited.
+   * Returns the default thread-budget policy for the platform, not OS load or CPU pressure.
    *
-   * @return {@code true} if the platform is resource-limited, otherwise {@code false}
+   * @return true for platforms where native subsystems should reuse the calling thread
    */
-  public static boolean isCpuResourceLimited() {
+  public static boolean isThreadConstrainedPlatform() {
     Platform platform = Platform.currentOS();
     return !(platform == Platform.WINDOWS || platform == Platform.LINUX || platform == Platform.MACOS);
   }

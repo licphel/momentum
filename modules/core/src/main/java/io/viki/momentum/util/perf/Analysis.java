@@ -37,15 +37,18 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Collects keyed wall-clock timings for a single profiling session.
  *
  * <p>Profiling is disabled by default. Enable it with {@link #setEnabled(boolean)} before opening
  * a session; disabled {@link #start(String)} and {@link #end(String)} calls return immediately.
- * Session operations belong to one thread, while the enabled flag may be changed from any thread
- * when no timing interval is running. Nested keys must finish in reverse start order, and a key
- * cannot re-enter itself.
+ * Start/end pairs belong to the same thread. Each thread owns its nesting stack and sample
+ * storage; different threads may time the same key concurrently. Within one thread nested keys
+ * must finish in reverse start order, and a key cannot re-enter itself. Closing safely freezes
+ * all thread-local stores before writing; still-running spans are reported as unfinished.
  */
 public final class Analysis implements AutoCloseable {
   private static final Logger LOGGER = Log.getLogger();
@@ -59,14 +62,14 @@ public final class Analysis implements AutoCloseable {
   /** Whether timing collection is enabled; volatile so changes are visible across threads. */
   private static volatile boolean enabled;
   /** The currently open profiling session, if any. */
-  private static @Nullable Analysis active;
+  private static volatile @Nullable Analysis active;
   private final Path output;
   private final long origin = System.nanoTime();
-  private final Map<String, Process> processes = new LinkedHashMap<>();
-  private int samples;
-  private long droppedSamples;
-  private long nextSpan;
-  private @Nullable Process current;
+  private final List<ThreadState> threads = new ArrayList<>();
+  private final ThreadLocal<ThreadState> local = ThreadLocal.withInitial(this::registerThread);
+  private final AtomicInteger samples = new AtomicInteger();
+  private final AtomicLong nextSpan = new AtomicLong();
+  private volatile boolean closed;
 
   private Analysis(Path output) {
     this.output = output;
@@ -101,13 +104,21 @@ public final class Analysis implements AutoCloseable {
    * @return the opened session, which must be closed to finish the session
    * @throws IllegalStateException if another session is already open
    */
-  public static Analysis open(Path output) {
+  public static synchronized Analysis open(Path output) {
     if (active != null) {
       throw new IllegalStateException("An analysis session is already open");
     }
     Analysis session = new Analysis(output);
     active = session;
     return session;
+  }
+
+  private ThreadState registerThread() {
+    ThreadState state = new ThreadState();
+    synchronized (Analysis.class) {
+      if (!closed) threads.add(state);
+    }
+    return state;
   }
 
   /**
@@ -124,15 +135,23 @@ public final class Analysis implements AutoCloseable {
     if (session == null) {
       return;
     }
-    Process process = session.processes.computeIfAbsent(key, ignored -> new Process());
+    ThreadState state = session.local.get();
+    synchronized (state) {
+      if (session.closed) return;
+      session.start(state, key);
+    }
+  }
+
+  private void start(ThreadState state, String key) {
+    Process process = state.processes.computeIfAbsent(key, ignored -> new Process(state));
     if (process.running) {
       throw new IllegalStateException("Analysis key is already running: " + key);
     }
     process.running = true;
-    process.parent = session.current;
-    process.span = ++session.nextSpan;
+    process.parent = state.current;
+    process.span = nextSpan.incrementAndGet();
     process.childNanos = 0;
-    session.current = process;
+    state.current = process;
     process.start = System.nanoTime();
   }
 
@@ -151,17 +170,25 @@ public final class Analysis implements AutoCloseable {
     if (session == null) {
       return;
     }
+    ThreadState state = session.local.get();
+    synchronized (state) {
+      if (session.closed) return;
+      session.end(state, key);
+    }
+  }
+
+  private void end(ThreadState state, String key) {
     long end = System.nanoTime();
-    Process process = session.processes.get(key);
+    Process process = state.processes.get(key);
     if (process == null || !process.running) {
       throw new IllegalStateException("Analysis key was not started: " + key);
     }
-    if (session.current != process) {
+    if (state.current != process) {
       throw new IllegalStateException("Analysis keys must end in nested order: " + key);
     }
     long duration = end - process.start;
     Process parent = process.parent;
-    session.current = parent;
+    state.current = parent;
     if (parent != null) {
       parent.childNanos += duration;
     }
@@ -169,12 +196,11 @@ public final class Analysis implements AutoCloseable {
     long interval = process.hasPrevious ? process.start - process.previousStart : 0;
     process.hasPrevious = true;
     process.previousStart = process.start;
-    if (session.samples == MAX_SAMPLES) {
-      session.droppedSamples++;
+    if (samples.getAndIncrement() >= MAX_SAMPLES) {
+      state.droppedSamples++;
       return;
     }
-    process.record(process.start - session.origin, duration, interval);
-    session.samples++;
+    process.record(process.start - origin, duration, interval);
   }
 
   /**
@@ -230,35 +256,52 @@ public final class Analysis implements AutoCloseable {
    */
   @Override
   public void close() {
-    if (active != this) {
-      return;
+    List<ThreadState> recordedThreads;
+    synchronized (Analysis.class) {
+      if (active != this) return;
+      active = null;
+      closed = true;
+      recordedThreads = List.copyOf(threads);
     }
-    active = null;
+    Map<String, List<Process>> processes = new LinkedHashMap<>();
+    long droppedSamples = 0;
+    for (ThreadState state : recordedThreads) {
+      // Only close shares this lock with the owning thread; recording threads never contend.
+      state.processes.forEach((key, process) ->
+          processes.computeIfAbsent(key, ignored -> new ArrayList<>()).add(process));
+      droppedSamples += state.droppedSamples;
+    }
     if (processes.isEmpty()) {
       return;
     }
     try (BufferedWriter writer = Files.newBufferedWriter(output)) {
       writer.write("{\"unit\":\"ms\",\"nested\":true,\"dropped_samples\":" + droppedSamples + ",\"processes\":[\n");
       boolean first = true;
-      for (var entry : processes.entrySet()) {
+      for (Map.Entry<String, List<Process>> entry : processes.entrySet()) {
         if (!first) {
           writer.write(",\n");
         }
         first = false;
-        Process process = entry.getValue();
-        writer.write("{\"name\":" + quoted(entry.getKey()) + ",\"unfinished\":" + process.running + ",\"samples\":[\n");
-        for (int i = 0; i < process.samples; i++) {
-          long[] block = process.blocks.get(i / BLOCK_SAMPLES);
-          int offset = (i % BLOCK_SAMPLES) * SAMPLE_FIELDS;
-          if (i > 0) {
-            writer.write(",\n");
+        boolean unfinished = entry.getValue().stream().anyMatch(process -> process.running);
+        writer.write("{\"name\":" + quoted(entry.getKey()) + ",\"unfinished\":" + unfinished + ",\"samples\":[\n");
+        boolean firstSample = true;
+        for (Process process : entry.getValue()) {
+          for (int i = 0; i < process.samples; i++) {
+            long[] block = process.blocks.get(i / BLOCK_SAMPLES);
+            int offset = (i % BLOCK_SAMPLES) * SAMPLE_FIELDS;
+            if (!firstSample) {
+              writer.write(",\n");
+            }
+            firstSample = false;
+            writer.write("{\"start_ms\":" + block[offset] / 1_000_000.0
+                + ",\"duration_ms\":" + block[offset + 1] / 1_000_000.0
+                + ",\"interval_ms\":" + block[offset + 2] / 1_000_000.0
+                + ",\"exclusive_ms\":" + block[offset + 3] / 1_000_000.0
+                + ",\"span\":" + block[offset + 4]
+                + ",\"parent_span\":" + block[offset + 5]
+                + ",\"thread_id\":" + process.owner.threadId
+                + ",\"thread_name\":" + quoted(process.owner.threadName) + "}");
           }
-          writer.write("{\"start_ms\":" + block[offset] / 1_000_000.0
-              + ",\"duration_ms\":" + block[offset + 1] / 1_000_000.0
-              + ",\"interval_ms\":" + block[offset + 2] / 1_000_000.0
-              + ",\"exclusive_ms\":" + block[offset + 3] / 1_000_000.0
-              + ",\"span\":" + block[offset + 4]
-              + ",\"parent_span\":" + block[offset + 5] + "}");
         }
         writer.write("\n]}");
       }
@@ -268,7 +311,16 @@ public final class Analysis implements AutoCloseable {
     }
   }
 
+  private static final class ThreadState {
+    private final long threadId = Thread.currentThread().threadId();
+    private final String threadName = Thread.currentThread().getName();
+    private final Map<String, Process> processes = new LinkedHashMap<>();
+    private @Nullable Process current;
+    private long droppedSamples;
+  }
+
   private static final class Process {
+    private final ThreadState owner;
     private final List<long[]> blocks = new ArrayList<>();
     private int samples;
     private boolean running;
@@ -278,6 +330,10 @@ public final class Analysis implements AutoCloseable {
     private long span;
     private long childNanos;
     private @Nullable Process parent;
+
+    private Process(ThreadState owner) {
+      this.owner = owner;
+    }
 
     /**
      * Appends one completed interval to this process's sample storage.

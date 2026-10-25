@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.text.raster;
 
 import com.ibm.icu.text.BreakIterator;
 import io.viki.momentum.gfx.text.Meta;
-import io.viki.momentum.gfx.tint.Gradient;
+import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.math.Vector2;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
@@ -210,23 +210,22 @@ public record Raster(Entry[] entries, Stroke[] strokes, Rectangle bounds, float 
    * A render entry for a single glyph.
    *
    * @param glyph     the rasterized glyph bitmap, or {@code null} if the glyph has no visual representation
-   * @param gradient  the glyph gradient
+   * @param format    the text format
    * @param bounds    the bearing-adjusted bounding rectangle in visual space
    * @param scale     the rendering scale factor
    * @param metaInfo  optional metadata, or {@code null} if none
    * @param charIndex the absolute character index in the merged source text
    */
-  public record Entry(@Nullable Glyph glyph, Gradient gradient, Rectangle bounds, float scale,
-                      Meta @Nullable [] metaInfo,
-                      int charIndex) {
+  public record Entry(@Nullable Glyph glyph, TextFormat format, Rectangle bounds, float scale,
+                      Meta @Nullable [] metaInfo, int charIndex) {
   }
 
   /**
    * A decoration line (underline or strikethrough) in visual space.
    *
    * @param bounds   the bounding rectangle of the stroke
-   * @param gradient the stroke gradient
+   * @param format    the text format
    */
-  public record Stroke(Rectangle bounds, Gradient gradient) {
+  public record Stroke(Rectangle bounds, TextFormat format) {
   }
 }

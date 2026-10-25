@@ -45,20 +45,29 @@ import io.viki.momentum.gfx.view.View;
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.multithread.ExecutionMode;
+import io.viki.momentum.util.multithread.Parallel;
 import org.jspecify.annotations.Nullable;
 import org.lwjgl.opengl.*;
 import org.lwjgl.system.Callback;
 import java.util.ArrayDeque;
 import java.util.Objects;
+import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Semaphore;
+import java.util.function.Consumer;
 
 /**
  * OpenGL implementation of {@link Device}.
  *
  * <p>GL commands are submitted from any thread via {@link #submit(Runnable)}
- * into a synchronized array queue and execute on the context thread via {@link #execute()}.
+ * into a synchronized array queue. {@link #execute()} seals a batch, executed either on
+ * the loading caller or on one dedicated context thread, depending on {@link #executionMode()}.
  *
  * <p><b>Thread safety:</b> submission is thread-safe; execution and the state cache
- * are confined to the GL context thread.
+ * are confined to the GL context thread. Batch submission and close belong to the loading
+ * caller. Dedicated mode permits recording the next batch while one batch executes; the
+ * next submission applies backpressure rather than accumulating frames.
  *
  * @see OpenGLCache
  * @see View
@@ -78,7 +87,21 @@ public final class OpenGLDevice implements Device {
    */
   final VaoRegistry vaos = new VaoRegistry(this);
 
-  private final ArrayDeque<Runnable> queue = new ArrayDeque<>();
+  private final ExecutionMode executionMode;
+  private final Object queueLock = new Object();
+  private ArrayDeque<Runnable> queue = new ArrayDeque<>();
+  private ArrayDeque<Runnable> spare = new ArrayDeque<>();
+  private final ArrayDeque<Runnable> stop = new ArrayDeque<>();
+  private final ArrayBlockingQueue<ArrayDeque<Runnable>> batches = new ArrayBlockingQueue<>(1);
+  private final Semaphore available = new Semaphore(1);
+  private final CompletableFuture<Void> terminated = new CompletableFuture<>();
+  private Runnable releaseContext = () -> { };
+  private @Nullable Thread callerThread;
+  private @Nullable Thread contextThread;
+  private volatile @Nullable Throwable executionFailure;
+  private boolean executing;
+  private volatile boolean closed;
+  private long frameFence;
   private final OpenGLSwapchain swapchain = new OpenGLSwapchain(this);
   private final OpenGLTransformHandler transformHandler = new OpenGLTransformHandler();
   @Nullable View view;
@@ -92,41 +115,95 @@ public final class OpenGLDevice implements Device {
    * <p>Call {@link #load(Object...)} before any GPU resource creation.
    */
   public OpenGLDevice() {
+    this(ExecutionMode.auto());
+  }
+
+  /**
+   * Creates a new device.
+   *
+   * @param executionMode the execution mode
+   */
+  public OpenGLDevice(ExecutionMode executionMode) {
+    this.executionMode = executionMode;
+    LOGGER.info("OpenGL is created on mode {}", executionMode);
+  }
+
+  /**
+   * Returns the resolved mode.
+   *
+   * @return the resolved execution mode
+   */
+  public ExecutionMode executionMode() {
+    return executionMode;
   }
 
   /**
    * Initializes this device for a GLFW view.
    *
-   * <p>The view's context is owned by the calling thread. This must be called before
-   * creating graphics resources.
+   * <p>Window setup stays on the caller. Context binding, initialization and destruction
+   * stay on the selected context thread. This must precede graphics resource creation.
    *
    * @param context platform values containing the view, backend identifier, and context lifecycle callbacks
    * @throws IllegalArgumentException if the backend is not GLFW
    */
   @Override
+  @SuppressWarnings("unchecked")
   public void load(Object... context) {
     this.view = (View) context[0];
-    String bk = (String) context[1];
-
-    if ("GLFW".equals(bk)) {
-      ((Runnable) context[2]).run();
-      GL.createCapabilities();
-      if (view.isDebug()) {
-        installDebugCallback();
-      }
-    } else {
+    if (!"GLFW".equals(context[1])) {
       throw new IllegalArgumentException("OpenGL device only supports GLFW");
     }
+    callerThread = Thread.currentThread();
+    ((Consumer<Consumer<Runnable>>) context[4]).accept(this::submit);
+    Runnable bind = (Runnable) context[2];
+    Runnable release = (Runnable) context[3];
+    if (executionMode == ExecutionMode.CALLER_THREAD) {
+      contextThread = callerThread;
+      initialize(bind);
+    } else {
+      CompletableFuture<Void> initialized = new CompletableFuture<>();
+      contextThread = Parallel.threadFactory("OpenGL-Context-").newThread(
+          () -> consume(bind, release, initialized));
+      contextThread.start();
+      initialized.join();
+    }
+    releaseContext = release;
+  }
 
-    /*
-     * Okay, so we handle this here.
-     * I don't know if this will cause some problems -
-     * like initialization order, or so.
-     *
-     * But we cannot assume that users can invoke it
-     * correctly. At least it works for now.
-     */
+  private void initialize(Runnable bind) {
+    bind.run();
+    GL.createCapabilities();
+    if (Objects.requireNonNull(view).isDebug()) installDebugCallback();
     FallbackFont.init(this);
+  }
+
+  @SuppressWarnings("all")
+  private void consume(Runnable bind, Runnable release, CompletableFuture<Void> initialized) {
+    try {
+      initialize(bind);
+      initialized.complete(null);
+      while (true) {
+        ArrayDeque<Runnable> batch = batches.take();
+        if (batch == stop) break;
+        try {
+          runBatch(batch);
+        } finally {
+          spare = batch;
+          available.release();
+        }
+      }
+      awaitFence();
+    } catch (Throwable failure) {
+      executionFailure = failure;
+      initialized.completeExceptionally(failure);
+    } finally {
+      try {
+        GL.setCapabilities(null);
+        release.run();
+      } finally {
+        terminated.complete(null);
+      }
+    }
   }
 
   /** Registers the supported OpenGL debug callback for reporting driver errors. */
@@ -253,27 +330,91 @@ public final class OpenGLDevice implements Device {
 
   @Override
   public void submit(Runnable work) {
-    synchronized (queue) {
+    if (Thread.currentThread() == contextThread && executing) {
+      work.run();
+      return;
+    }
+    synchronized (queueLock) {
+      if (closed) throw new IllegalStateException("OpenGL device is closed");
       queue.addLast(work);
     }
   }
 
   @Override
   public void execute() {
-    synchronized (queue) {
-      GraphicsMetrics.DeviceQueueSize.add(queue.size());
+    if (Thread.currentThread() == contextThread && executing) return;
+    requireCaller();
+    if (closed) throw new IllegalStateException("OpenGL device is closed");
+    if (executionFailure != null) {
+      throw new IllegalStateException("OpenGL context execution failed", executionFailure);
     }
-    try {
-      Runnable task;
-      while ((task = pollCommand()) != null) task.run();
-    } catch (Exception exception) {
-      LOGGER.warn("OpenGL execution error", exception);
+    dispatchBatch(false);
+  }
+
+  private void requireCaller() {
+    if (Thread.currentThread() != callerThread) {
+      throw new IllegalStateException("OpenGL batch submission and close require the loading thread");
     }
   }
 
-  private @Nullable Runnable pollCommand() {
-    synchronized (queue) {
-      return queue.pollFirst();
+  private void dispatchBatch(boolean closing) {
+    if (executionMode == ExecutionMode.DEDICATED_THREAD) available.acquireUninterruptibly();
+    if (terminated.isDone()) {
+      available.release();
+      throw new IllegalStateException("OpenGL context thread terminated", executionFailure);
+    }
+    ArrayDeque<Runnable> batch;
+    synchronized (queueLock) {
+      if (closing) closed = true;
+      batch = queue;
+      queue = spare;
+    }
+    if (executionMode == ExecutionMode.DEDICATED_THREAD) {
+      batches.add(batch);
+    } else {
+      try {
+        runBatch(batch);
+      } finally {
+        spare = batch;
+      }
+    }
+  }
+
+  private void runBatch(ArrayDeque<Runnable> batch) {
+    awaitFence();
+    GraphicsMetrics.DeviceQueueSize.add(batch.size());
+    executing = true;
+    try {
+      Runnable task;
+      while ((task = batch.pollFirst()) != null) {
+        try {
+          task.run();
+        } catch (Exception failure) {
+          executionFailure = failure;
+          LOGGER.warn("OpenGL execution error", failure);
+        }
+      }
+      // One fence and flush per sealed batch, never per command or upload.
+      frameFence = GL32.glFenceSync(GL32.GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+      GL11.glFlush();
+    } finally {
+      executing = false;
+    }
+  }
+
+  private void awaitFence() {
+    if (frameFence == 0) return;
+    try {
+      int result;
+      do {
+        result = GL32.glClientWaitSync(frameFence, 0, 1_000_000L);
+        if (result == GL32.GL_WAIT_FAILED) {
+          throw new IllegalStateException("OpenGL frame fence wait failed");
+        }
+      } while (result == GL32.GL_TIMEOUT_EXPIRED);
+    } finally {
+      GL32.glDeleteSync(frameFence);
+      frameFence = 0;
     }
   }
 
@@ -299,10 +440,16 @@ public final class OpenGLDevice implements Device {
    */
   @Override
   public void close() {
+    requireCaller();
+    if (closed) return;
+    if (terminated.isDone()) {
+      closed = true;
+      throw new IllegalStateException("OpenGL context thread terminated", executionFailure);
+    }
     submit(vaos::clear);
     submit(() -> {
       if (debugCallback != null) {
-        var caps = GL.getCapabilities();
+        GLCapabilities caps = GL.getCapabilities();
         if (caps.OpenGL43 || caps.GL_KHR_debug) {
           KHRDebug.glDebugMessageCallback(null, 0L);
         } else {
@@ -313,7 +460,19 @@ public final class OpenGLDevice implements Device {
         debugCallback = null;
       }
     });
-    execute();
+    dispatchBatch(true);
+    if (executionMode == ExecutionMode.DEDICATED_THREAD) {
+      available.acquireUninterruptibly();
+      batches.add(stop);
+      terminated.join();
+    } else {
+      try {
+        awaitFence();
+      } finally {
+        GL.setCapabilities(null);
+        releaseContext.run();
+      }
+    }
   }
 
 }

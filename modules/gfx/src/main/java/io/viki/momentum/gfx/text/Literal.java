@@ -26,6 +26,7 @@ package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.text.raster.Raster;
+import io.viki.momentum.gfx.texture.Drawable2D;
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.tint.Gradient;
 import org.jspecify.annotations.Nullable;
@@ -69,7 +70,7 @@ public final class Literal implements FormattableText<Literal> {
   }
 
   private static boolean sameFormat(TextFormat a, TextFormat b) {
-    return a.font().equals(b.font()) && a.fontStyle() == b.fontStyle()
+    return a.font().equals(b.font()) && a.fontStyle() == b.fontStyle() && a.shadow().equals(b.shadow())
            && (a.tint() == b.tint() || a.tint() instanceof Color && a.tint().equals(b.tint()));
   }
 
@@ -78,7 +79,7 @@ public final class Literal implements FormattableText<Literal> {
       return value.hashCode();
     }
     if (value instanceof Icon(
-        float width, float height, float baseline, io.viki.momentum.gfx.texture.Drawable2D drawable
+        float width, float height, float baseline, Drawable2D drawable
     )) {
       return 31 * (31 * (31 * Float.hashCode(width) + Float.hashCode(height))
                    + Float.hashCode(baseline)) + System.identityHashCode(drawable);
@@ -101,9 +102,9 @@ public final class Literal implements FormattableText<Literal> {
         continue;
       }
       if (a[i] instanceof Icon(
-          float width1, float height1, float baseline1, io.viki.momentum.gfx.texture.Drawable2D drawable1
+          float width1, float height1, float baseline1, Drawable2D drawable1
       ) && b[i] instanceof Icon(
-          float width, float height, float baseline, io.viki.momentum.gfx.texture.Drawable2D drawable
+          float width, float height, float baseline, Drawable2D drawable
       )
           && Float.compare(width1, width) == 0 && Float.compare(height1, height) == 0
           && Float.compare(baseline1, baseline) == 0 && drawable1 == drawable) {
@@ -132,6 +133,11 @@ public final class Literal implements FormattableText<Literal> {
   @Override
   public Literal style(int value) {
     return with(format.style(value));
+  }
+
+  @Override
+  public Literal shadow(TextShadow value) {
+    return with(format.shadow(value));
   }
 
   @Override
@@ -204,6 +210,7 @@ public final class Literal implements FormattableText<Literal> {
     if (!hashed) {
       int styleHash = 31 * (31 * format.font().hashCode() + format.fontStyle())
                       + gradientHash(format.tint());
+      styleHash = 31 * styleHash + format.shadow().hashCode();
       int metadataHash = 0;
       if (meta != null) {
         metadataHash = 1;

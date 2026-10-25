@@ -26,6 +26,7 @@ package io.viki.momentum.tag;
 
 import io.viki.momentum.codec.nbt.CompoundNBT;
 import io.viki.momentum.codec.nbt.ListNBT;
+import io.viki.momentum.codec.nbt.NBT;
 import io.viki.momentum.registry.Registry;
 import io.viki.momentum.registry.RegistryEntry;
 import io.viki.momentum.util.Identifier;
@@ -127,7 +128,7 @@ public final class TagManager<T extends RegistryEntry> {
     }
     Map<Identifier, V> rawMappings = new LinkedHashMap<>();
     Map<Identifier, V> tagRefMappings = new LinkedHashMap<>();
-    for (var entry : mappingsTag.entrySet()) {
+    for (Map.Entry<String, NBT> entry : mappingsTag.entrySet()) {
       String rawKey = entry.getKey();
       if (rawKey.isBlank()) {
         continue;

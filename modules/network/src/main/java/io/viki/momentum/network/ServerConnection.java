@@ -28,11 +28,9 @@ import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.*;
 import io.netty.channel.group.ChannelGroup;
 import io.netty.channel.group.DefaultChannelGroup;
-import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 import io.netty.handler.codec.LengthFieldBasedFrameDecoder;
 import io.netty.handler.codec.LengthFieldPrepender;
-import io.netty.util.concurrent.GlobalEventExecutor;
 import io.viki.momentum.network.codec.PacketDecoder;
 import io.viki.momentum.network.codec.PacketEncoder;
 import io.viki.momentum.network.packet.ConnectionAckPacket;
@@ -118,9 +116,9 @@ public final class ServerConnection implements ConnectionHost {
   private ServerConnection(String bindHost, int bindPort) {
     this.bindHost = bindHost;
     this.bindPort = bindPort;
-    this.bossGroup = new NioEventLoopGroup(1);
-    this.workerGroup = new NioEventLoopGroup();
-    this.channels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE);
+    this.bossGroup = NetworkThreads.GROUP;
+    this.workerGroup = NetworkThreads.GROUP;
+    this.channels = new DefaultChannelGroup(NetworkThreads.GROUP.next());
     this.inbound = new ConcurrentLinkedQueue<>();
     this.sessions = new ConcurrentHashMap<>();
     this.connectEvents = new ConcurrentLinkedQueue<>();
@@ -394,8 +392,6 @@ public final class ServerConnection implements ConnectionHost {
     if (serverChannel != null) {
       serverChannel.close().awaitUninterruptibly(2000);
     }
-    bossGroup.shutdownGracefully(0, 2, TimeUnit.SECONDS);
-    workerGroup.shutdownGracefully(0, 2, TimeUnit.SECONDS);
     sessions.clear();
   }
 
