@@ -1,0 +1,760 @@
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package io.viki.momentum.math.shape;
+
+import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.Vector2d;
+
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+
+/**
+ * Immutable double-precision two-dimensional polygon represented as one or more convex parts.
+ * Instances are thread-safe.
+ */
+public final class Polyd implements Shaped<Polyd> {
+  /** An empty polygon with no convex components. */
+  public static final Polyd EMPTY = new Polyd();
+  /** Tolerance used for geometric equality, orientation, and intersection checks. */
+  private static final double GEOMETRY_EPSILON = 1.0E-12;
+  /** Minimum number of vertices required to define a polygon. */
+  private static final int MINIMUM_VERTEX_COUNT = 3;
+  /** Number of coordinate values stored for each vertex. */
+  private static final int COORDINATE_STRIDE = 2;
+
+  private final ConvexPart[] parts;
+  private final Rectangled bounds;
+  private final double area;
+
+  private Polyd(ConvexPart... parts) {
+    this.parts = parts;
+
+    if (parts.length == 0) {
+      bounds = Rectangled.ZERO;
+      area = 0.0;
+      return;
+    }
+
+    double minX = Double.POSITIVE_INFINITY;
+    double minY = Double.POSITIVE_INFINITY;
+    double maxX = Double.NEGATIVE_INFINITY;
+    double maxY = Double.NEGATIVE_INFINITY;
+    double totalArea = 0.0;
+    for (ConvexPart part : parts) {
+      minX = Math.min(minX, part.minX);
+      minY = Math.min(minY, part.minY);
+      maxX = Math.max(maxX, part.maxX);
+      maxY = Math.max(maxY, part.maxY);
+      totalArea += part.area;
+    }
+
+    bounds = new Rectangled(minX, minY, maxX, maxY);
+    area = totalArea;
+  }
+
+  /**
+   * Creates a polygon from a simple vertex loop. Concave loops are decomposed
+   * into convex triangles. Clockwise and counter-clockwise input are accepted.
+   *
+   * @param vertices ordered vertices of a simple polygon
+   * @return immutable polygon
+   * @throws IllegalArgumentException if the vertices do not define a valid simple polygon
+   */
+  public static Polyd of(Vector2d... vertices) {
+    double[] coordinates = sanitize(vertices);
+    validateSimple(coordinates);
+    if (isConvex(coordinates)) {
+      return new Polyd(ConvexPart.of(coordinates));
+    }
+    return new Polyd(decompose(coordinates));
+  }
+
+  /**
+   * Creates a compound polygon from existing polygons. Components may be
+   * disconnected. Their interiors are expected not to overlap.
+   *
+   * @param polygons polygons to combine
+   * @return immutable compound polygon
+   * @throws ArithmeticException if the combined number of convex components exceeds the integer range
+   */
+  public static Polyd of(Polyd... polygons) {
+    if (polygons.length == 0) {
+      return EMPTY;
+    }
+
+    int partCount = 0;
+    for (Polyd polygon : polygons) {
+      partCount = Math.addExact(partCount, polygon.parts.length);
+    }
+    if (partCount == 0) {
+      return EMPTY;
+    }
+
+    ConvexPart[] parts = new ConvexPart[partCount];
+    int offset = 0;
+    for (Polyd polygon : polygons) {
+      System.arraycopy(polygon.parts, 0, parts, offset, polygon.parts.length);
+      offset += polygon.parts.length;
+    }
+    return new Polyd(parts);
+  }
+
+  /**
+   * Creates a polygon from a non-degenerate rectangle.
+   *
+   * @param rectangles source rectangles
+   * @return immutable polygon
+   * @throws IllegalArgumentException if the rectangle has non-positive dimensions
+   */
+  public static Polyd of(Rectangled... rectangles) {
+    List<ConvexPart> parts = new ArrayList<>();
+
+    for  (Rectangled rectangle : rectangles) {
+      ConvexPart part = ConvexPart.of(new double[] {
+          rectangle.minX(), rectangle.minY(),
+          rectangle.maxX(), rectangle.minY(),
+          rectangle.maxX(), rectangle.maxY(),
+          rectangle.minX(), rectangle.maxY()
+      });
+      parts.add(part);
+    }
+
+    return new Polyd(parts.toArray(new ConvexPart[0]));
+  }
+
+  /**
+   * Normalizes and validates the vertices of a polygon before construction.
+   *
+   * @param vertices candidate polygon vertices
+   * @return counter-clockwise coordinates with redundant vertices removed
+   * @throws IllegalArgumentException if the vertices are insufficient or degenerate
+   */
+  private static double[] sanitize(Vector2d[] vertices) {
+    if (vertices.length < MINIMUM_VERTEX_COUNT) {
+      throw new IllegalArgumentException("A polygon requires at least three vertices, got " + vertices.length);
+    }
+
+    double[] coordinates = new double[vertices.length * COORDINATE_STRIDE];
+    int size = 0;
+    for (Vector2d vertex : vertices) {
+      double x = vertex.x();
+      double y = vertex.y();
+      if (size >= COORDINATE_STRIDE
+          && samePoint(coordinates[size - 2], coordinates[size - 1], x, y)) {
+        continue;
+      }
+      coordinates[size++] = x;
+      coordinates[size++] = y;
+    }
+
+    if (size >= COORDINATE_STRIDE * 2
+        && samePoint(coordinates[0], coordinates[1], coordinates[size - 2], coordinates[size - 1])) {
+      size -= COORDINATE_STRIDE;
+    }
+    coordinates = Arrays.copyOf(coordinates, size);
+    coordinates = removeCollinearVertices(coordinates);
+    if (coordinates.length < MINIMUM_VERTEX_COUNT * COORDINATE_STRIDE) {
+      throw new IllegalArgumentException("A polygon requires at least three distinct non-collinear vertices");
+    }
+
+    double signedArea = signedArea(coordinates);
+    if (Math.abs(signedArea) <= GEOMETRY_EPSILON) {
+      throw new IllegalArgumentException("Polygon area must be greater than zero");
+    }
+    if (signedArea < 0.0) {
+      reverse(coordinates);
+    }
+    return coordinates;
+  }
+
+  /**
+   * Removes vertices that are collinear with their immediate neighbors.
+   *
+   * @param coordinates polygon coordinates
+   * @return coordinates without removable collinear vertices
+   */
+  private static double[] removeCollinearVertices(double[] coordinates) {
+    double[] result = coordinates;
+    boolean changed;
+    do {
+      int count = result.length / COORDINATE_STRIDE;
+      if (count <= MINIMUM_VERTEX_COUNT) {
+        return result;
+      }
+
+      boolean[] remove = new boolean[count];
+      int removeCount = 0;
+      for (int i = 0; i < count; i++) {
+        int previous = (i + count - 1) % count;
+        int next = (i + 1) % count;
+        if (Math.abs(cross(result, previous, i, next)) <= GEOMETRY_EPSILON) {
+          remove[i] = true;
+          removeCount++;
+        }
+      }
+
+      changed = removeCount > 0 && count - removeCount >= MINIMUM_VERTEX_COUNT;
+      if (changed) {
+        double[] compacted = new double[(count - removeCount) * COORDINATE_STRIDE];
+        int output = 0;
+        for (int i = 0; i < count; i++) {
+          if (!remove[i]) {
+            compacted[output++] = result[i * 2];
+            compacted[output++] = result[i * 2 + 1];
+          }
+        }
+        result = compacted;
+      }
+    } while (changed);
+    return result;
+  }
+
+  /**
+   * Validates that a polygon vertex loop has no self-intersections.
+   *
+   * @param coordinates polygon coordinates
+   * @throws IllegalArgumentException if non-adjacent polygon edges intersect
+   */
+  private static void validateSimple(double[] coordinates) {
+    int count = coordinates.length / COORDINATE_STRIDE;
+    for (int first = 0; first < count; first++) {
+      int firstNext = (first + 1) % count;
+      for (int second = first + 1; second < count; second++) {
+        int secondNext = (second + 1) % count;
+        if (first == second || firstNext == second || secondNext == first) {
+          continue;
+        }
+        if (segmentsIntersect(coordinates, first, firstNext, second, secondNext)) {
+          throw new IllegalArgumentException("Polygon vertex loop self-intersects between edges "
+              + first + " and " + second);
+        }
+      }
+    }
+  }
+
+  /**
+   * Returns whether two polygon edges intersect, including endpoint contact.
+   *
+   * @param coordinates polygon coordinates
+   * @param a           first endpoint of the first edge
+   * @param b           second endpoint of the first edge
+   * @param c           first endpoint of the second edge
+   * @param d           second endpoint of the second edge
+   * @return whether the edges intersect
+   */
+  private static boolean segmentsIntersect(double[] coordinates, int a, int b, int c, int d) {
+    double abC = cross(coordinates, a, b, c);
+    double abD = cross(coordinates, a, b, d);
+    double cdA = cross(coordinates, c, d, a);
+    double cdB = cross(coordinates, c, d, b);
+    if (((abC > GEOMETRY_EPSILON && abD < -GEOMETRY_EPSILON)
+        || (abC < -GEOMETRY_EPSILON && abD > GEOMETRY_EPSILON))
+        && ((cdA > GEOMETRY_EPSILON && cdB < -GEOMETRY_EPSILON)
+        || (cdA < -GEOMETRY_EPSILON && cdB > GEOMETRY_EPSILON))) {
+      return true;
+    }
+    return Math.abs(abC) <= GEOMETRY_EPSILON && onSegment(coordinates, a, b, c)
+        || Math.abs(abD) <= GEOMETRY_EPSILON && onSegment(coordinates, a, b, d)
+        || Math.abs(cdA) <= GEOMETRY_EPSILON && onSegment(coordinates, c, d, a)
+        || Math.abs(cdB) <= GEOMETRY_EPSILON && onSegment(coordinates, c, d, b);
+  }
+
+  private static boolean onSegment(double[] coordinates, int a, int b, int point) {
+    double px = coordinates[point * 2];
+    double py = coordinates[point * 2 + 1];
+    return px >= Math.min(coordinates[a * 2], coordinates[b * 2]) - GEOMETRY_EPSILON
+        && px <= Math.max(coordinates[a * 2], coordinates[b * 2]) + GEOMETRY_EPSILON
+        && py >= Math.min(coordinates[a * 2 + 1], coordinates[b * 2 + 1]) - GEOMETRY_EPSILON
+        && py <= Math.max(coordinates[a * 2 + 1], coordinates[b * 2 + 1]) + GEOMETRY_EPSILON;
+  }
+
+  private static boolean isConvex(double[] coordinates) {
+    int count = coordinates.length / COORDINATE_STRIDE;
+    for (int i = 0; i < count; i++) {
+      if (cross(coordinates, i, (i + 1) % count, (i + 2) % count) <= GEOMETRY_EPSILON) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Decomposes a counter-clockwise concave polygon into convex triangles.
+   *
+   * @param coordinates counter-clockwise polygon coordinates
+   * @return convex triangular components
+   * @throws IllegalArgumentException if no valid decomposition can be found
+   */
+  private static ConvexPart[] decompose(double[] coordinates) {
+    int vertexCount = coordinates.length / COORDINATE_STRIDE;
+    int[] indices = new int[vertexCount];
+    for (int i = 0; i < vertexCount; i++) {
+      indices[i] = i;
+    }
+
+    ConvexPart[] result = new ConvexPart[vertexCount - 2];
+    int remaining = vertexCount;
+    int output = 0;
+    while (remaining > MINIMUM_VERTEX_COUNT) {
+      boolean earFound = false;
+      for (int i = 0; i < remaining; i++) {
+        int previous = indices[(i + remaining - 1) % remaining];
+        int current = indices[i];
+        int next = indices[(i + 1) % remaining];
+        if (cross(coordinates, previous, current, next) <= GEOMETRY_EPSILON
+            || containsOtherVertex(coordinates, indices, remaining, previous, current, next)) {
+          continue;
+        }
+
+        result[output++] = ConvexPart.triangle(coordinates, previous, current, next);
+        System.arraycopy(indices, i + 1, indices, i, remaining - i - 1);
+        remaining--;
+        earFound = true;
+        break;
+      }
+      if (!earFound) {
+        throw new IllegalArgumentException("Unable to decompose polygon; check for duplicate or invalid vertices");
+      }
+    }
+    result[output] = ConvexPart.triangle(coordinates, indices[0], indices[1], indices[2]);
+    return result;
+  }
+
+  /**
+   * Returns whether a triangle contains any remaining polygon vertex.
+   *
+   * @param coordinates polygon coordinates
+   * @param indices     remaining polygon vertex indices
+   * @param count       number of remaining indices
+   * @param a           first triangle vertex index
+   * @param b           second triangle vertex index
+   * @param c           third triangle vertex index
+   * @return whether another vertex lies in the triangle
+   */
+  private static boolean containsOtherVertex(double[] coordinates, int[] indices, int count,
+                                             int a, int b, int c) {
+    for (int i = 0; i < count; i++) {
+      int point = indices[i];
+      if (point != a && point != b && point != c && pointInTriangle(coordinates, point, a, b, c)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private static boolean pointInTriangle(double[] coordinates, int point, int a, int b, int c) {
+    return cross(coordinates, a, b, point) >= -GEOMETRY_EPSILON
+        && cross(coordinates, b, c, point) >= -GEOMETRY_EPSILON
+        && cross(coordinates, c, a, point) >= -GEOMETRY_EPSILON;
+  }
+
+  private static double cross(double[] coordinates, int a, int b, int c) {
+    double abX = coordinates[b * 2] - coordinates[a * 2];
+    double abY = coordinates[b * 2 + 1] - coordinates[a * 2 + 1];
+    double acX = coordinates[c * 2] - coordinates[a * 2];
+    double acY = coordinates[c * 2 + 1] - coordinates[a * 2 + 1];
+    return abX * acY - abY * acX;
+  }
+
+  private static double signedArea(double[] coordinates) {
+    double twiceArea = 0.0;
+    int count = coordinates.length / COORDINATE_STRIDE;
+    for (int i = 0; i < count; i++) {
+      int next = (i + 1) % count;
+      twiceArea += coordinates[i * 2] * coordinates[next * 2 + 1]
+          - coordinates[next * 2] * coordinates[i * 2 + 1];
+    }
+    return twiceArea * 0.5;
+  }
+
+  private static void reverse(double[] coordinates) {
+    int count = coordinates.length / COORDINATE_STRIDE;
+    for (int left = 0, right = count - 1; left < right; left++, right--) {
+      double x = coordinates[left * 2];
+      double y = coordinates[left * 2 + 1];
+      coordinates[left * 2] = coordinates[right * 2];
+      coordinates[left * 2 + 1] = coordinates[right * 2 + 1];
+      coordinates[right * 2] = x;
+      coordinates[right * 2 + 1] = y;
+    }
+  }
+
+  private static boolean samePoint(double firstX, double firstY, double secondX, double secondY) {
+    return firstX == secondX && firstY == secondY;
+  }
+
+  /**
+   * Returns the number of convex polygons composing this shape.
+   *
+   * @return convex component count
+   */
+  public int convexCount() {
+    return parts.length;
+  }
+
+  /**
+   * Returns whether this shape has no convex components.
+   *
+   * @return whether this polygon is empty
+   */
+  public boolean isEmpty() {
+    return parts.length == 0;
+  }
+
+  /**
+   * Returns the number of vertices in a convex component.
+   *
+   * @param convexIndex convex component index
+   * @return vertex count
+   * @throws IndexOutOfBoundsException if {@code convexIndex} is outside the component range
+   */
+  public int vertexCount(int convexIndex) {
+    return part(convexIndex).vertexCount();
+  }
+
+  /**
+   * Returns a vertex in a convex component.
+   *
+   * @param convexIndex convex component index
+   * @param vertexIndex vertex index
+   * @return vertex value
+   * @throws IndexOutOfBoundsException if either index is outside its corresponding range
+   */
+  public Vector2d vertex(int convexIndex, int vertexIndex) {
+    ConvexPart part = part(convexIndex);
+    int coordinateIndex = part.coordinateIndex(vertexIndex);
+    return new Vector2d(part.coordinates[coordinateIndex], part.coordinates[coordinateIndex + 1]);
+  }
+
+  /**
+   * Returns a vertex x coordinate without allocating a vector.
+   *
+   * @param convexIndex convex component index
+   * @param vertexIndex vertex index
+   * @return vertex x coordinate
+   * @throws IndexOutOfBoundsException if either index is outside its corresponding range
+   */
+  public double vertexX(int convexIndex, int vertexIndex) {
+    ConvexPart part = part(convexIndex);
+    return part.coordinates[part.coordinateIndex(vertexIndex)];
+  }
+
+  /**
+   * Returns a vertex y coordinate without allocating a vector.
+   *
+   * @param convexIndex convex component index
+   * @param vertexIndex vertex index
+   * @return vertex y coordinate
+   * @throws IndexOutOfBoundsException if either index is outside its corresponding range
+   */
+  public double vertexY(int convexIndex, int vertexIndex) {
+    ConvexPart part = part(convexIndex);
+    return part.coordinates[part.coordinateIndex(vertexIndex) + 1];
+  }
+
+  /**
+   * Returns the enclosing axis-aligned bounds.
+   *
+   * @return immutable bounds
+   */
+  public Rectangled bounds() {
+    return bounds;
+  }
+
+  @Override
+  public double area() {
+    return area;
+  }
+
+  @Override
+  public double centralX() {
+    return bounds.centralX();
+  }
+
+  @Override
+  public double centralY() {
+    return bounds.centralY();
+  }
+
+  @Override
+  public Vector2d center() {
+    return bounds.center();
+  }
+
+  @Override
+  public boolean contains(double x, double y) {
+    if (!bounds.contains(x, y)) {
+      return false;
+    }
+    for (ConvexPart part : parts) {
+      if (part.contains(x, y)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns whether the polygon interiors overlap. Edge or vertex contact alone
+   * does not count as an intersection. Empty polygons never intersect.
+   * The check allocates no objects and takes O(sum(n * m * (n + m))) time
+   * over pairs of convex components with n and m vertices.
+   *
+   * @param other polygon to test in the same coordinate space
+   * @return whether any convex component interiors overlap
+   */
+  public boolean intersects(Polyd other) {
+    if (isEmpty() || other.isEmpty() || !bounds.intersects(other.bounds)) {
+      return false;
+    }
+
+    for (ConvexPart first : parts) {
+      for (ConvexPart second : other.parts) {
+        if (first.minX < second.maxX && first.maxX > second.minX
+            && first.minY < second.maxY && first.maxY > second.minY
+            && !first.hasSeparatingAxis(second) && !second.hasSeparatingAxis(first)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Returns a new polygon scaled by the given factors.
+   *
+   * @param sx x scale factor
+   * @param sy y scale factor
+   * @return scaled polygon
+   * @throws IllegalArgumentException if either scale factor is zero
+   */
+  @Override
+  public Polyd scale(double sx, double sy) {
+    if (isEmpty()) {
+      return this;
+    }
+
+    ConvexPart[] scaled = new ConvexPart[parts.length];
+    for (int i = 0; i < parts.length; i++) {
+      scaled[i] = parts[i].scale(sx, sy);
+    }
+    return new Polyd(scaled);
+  }
+
+  /**
+   * Returns a new polygon translated by the given amounts.
+   *
+   * @param tx x translation
+   * @param ty y translation
+   * @return translated polygon
+   */
+  @Override
+  public Polyd translate(double tx, double ty) {
+    if (isEmpty()) {
+      return this;
+    }
+
+    ConvexPart[] translated = new ConvexPart[parts.length];
+    for (int i = 0; i < parts.length; i++) {
+      translated[i] = parts[i].translate(tx, ty);
+    }
+    return new Polyd(translated);
+  }
+
+  /**
+   * Narrows this polygon to single precision.
+   *
+   * @return this polygon as a {@link Poly}
+   * @throws IllegalArgumentException if narrowing makes any convex component invalid
+   */
+  public Poly toPoly() {
+    Poly[] converted = new Poly[parts.length];
+    for (int component = 0; component < parts.length; component++) {
+      ConvexPart part = parts[component];
+      Vector2[] vertices = new Vector2[part.vertexCount()];
+      for (int vertex = 0; vertex < vertices.length; vertex++) {
+        int coordinateIndex = part.coordinateIndex(vertex);
+        vertices[vertex] = new Vector2((float) part.coordinates[coordinateIndex],
+            (float) part.coordinates[coordinateIndex + 1]);
+      }
+      converted[component] = Poly.of(vertices);
+    }
+    return Poly.of(converted);
+  }
+
+  @Override
+  public double minX() {
+    return bounds.minX();
+  }
+
+  @Override
+  public double minY() {
+    return bounds.minY();
+  }
+
+  @Override
+  public double maxX() {
+    return bounds.maxX();
+  }
+
+  @Override
+  public double maxY() {
+    return bounds.maxY();
+  }
+
+  private ConvexPart part(int convexIndex) {
+    if (convexIndex < 0 || convexIndex >= parts.length) {
+      throw new IndexOutOfBoundsException("Convex component index out of range: " + convexIndex);
+    }
+    return parts[convexIndex];
+  }
+
+  private static final class ConvexPart {
+    private final double[] coordinates;
+    private final double minX;
+    private final double minY;
+    private final double maxX;
+    private final double maxY;
+    private final double area;
+
+    private ConvexPart(double[] coordinates) {
+      this.coordinates = coordinates;
+
+      double minX = coordinates[0];
+      double minY = coordinates[1];
+      double maxX = minX;
+      double maxY = minY;
+      for (int i = COORDINATE_STRIDE; i < coordinates.length; i += COORDINATE_STRIDE) {
+        minX = Math.min(minX, coordinates[i]);
+        minY = Math.min(minY, coordinates[i + 1]);
+        maxX = Math.max(maxX, coordinates[i]);
+        maxY = Math.max(maxY, coordinates[i + 1]);
+      }
+      this.minX = minX;
+      this.minY = minY;
+      this.maxX = maxX;
+      this.maxY = maxY;
+      area = signedArea(coordinates);
+    }
+
+    private static ConvexPart of(double[] coordinates) {
+      return new ConvexPart(coordinates.clone());
+    }
+
+    private static ConvexPart triangle(double[] source, int a, int b, int c) {
+      return new ConvexPart(new double[] {
+          source[a * 2], source[a * 2 + 1],
+          source[b * 2], source[b * 2 + 1],
+          source[c * 2], source[c * 2 + 1]
+      });
+    }
+
+    private int vertexCount() {
+      return coordinates.length / COORDINATE_STRIDE;
+    }
+
+    private int coordinateIndex(int vertexIndex) {
+      int count = vertexCount();
+      if (vertexIndex < 0 || vertexIndex >= count) {
+        throw new IndexOutOfBoundsException("Vertex index out of range: " + vertexIndex);
+      }
+      return vertexIndex * COORDINATE_STRIDE;
+    }
+
+    private boolean contains(double x, double y) {
+      int count = vertexCount();
+      for (int i = 0; i < count; i++) {
+        int next = (i + 1) % count;
+        double edgeX = coordinates[next * 2] - coordinates[i * 2];
+        double edgeY = coordinates[next * 2 + 1] - coordinates[i * 2 + 1];
+        double pointX = x - coordinates[i * 2];
+        double pointY = y - coordinates[i * 2 + 1];
+        if (edgeX * pointY - edgeY * pointX < -GEOMETRY_EPSILON) {
+          return false;
+        }
+      }
+      return true;
+    }
+
+    private boolean hasSeparatingAxis(ConvexPart other) {
+      for (int i = 0; i < coordinates.length; i += COORDINATE_STRIDE) {
+        int next = (i + COORDINATE_STRIDE) % coordinates.length;
+        // Project relative to an edge origin in double precision to avoid
+        // cancellation at large world coordinates. Axis normalization is unnecessary.
+        double originX = coordinates[i];
+        double originY = coordinates[i + 1];
+        double axisX = originY - coordinates[next + 1];
+        double axisY = coordinates[next] - originX;
+        if (axisX == 0.0 && axisY == 0.0) {
+          continue;
+        }
+
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+        for (int j = 0; j < coordinates.length; j += COORDINATE_STRIDE) {
+          double projection = (coordinates[j] - originX) * axisX
+              + (coordinates[j + 1] - originY) * axisY;
+          min = Math.min(min, projection);
+          max = Math.max(max, projection);
+        }
+
+        double otherMin = Double.POSITIVE_INFINITY;
+        double otherMax = Double.NEGATIVE_INFINITY;
+        for (int j = 0; j < other.coordinates.length; j += COORDINATE_STRIDE) {
+          double projection = (other.coordinates[j] - originX) * axisX
+              + (other.coordinates[j + 1] - originY) * axisY;
+          otherMin = Math.min(otherMin, projection);
+          otherMax = Math.max(otherMax, projection);
+        }
+        if (max <= otherMin || otherMax <= min) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    private ConvexPart scale(double sx, double sy) {
+      double[] scaled = new double[coordinates.length];
+      for (int i = 0; i < coordinates.length; i += COORDINATE_STRIDE) {
+        scaled[i] = coordinates[i] * sx;
+        scaled[i + 1] = coordinates[i + 1] * sy;
+      }
+      if (sx * sy < 0.0) {
+        reverse(scaled);
+      }
+      return new ConvexPart(scaled);
+    }
+
+    private ConvexPart translate(double tx, double ty) {
+      double[] translated = new double[coordinates.length];
+      for (int i = 0; i < coordinates.length; i += COORDINATE_STRIDE) {
+        translated[i] = coordinates[i] + tx;
+        translated[i + 1] = coordinates[i + 1] + ty;
+      }
+      return new ConvexPart(translated);
+    }
+  }
+}

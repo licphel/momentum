@@ -64,7 +64,10 @@ public final class ListNBT implements NBT, Iterable<NBT> {
 
     @Override
     public ListNBT deserialize(NBT nbt) {
-      return (ListNBT) nbt;
+      if (nbt instanceof ListNBT list) {
+        return list;
+      }
+      throw new IllegalArgumentException("Expected a list, got " + nbt.dataType());
     }
 
     @Override
@@ -152,7 +155,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
    *
    * @param index the zero-based element index
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param <T>   the expected tag subtype; no runtime subtype check is performed
    * @return the stored tag, or {@code null} for a out-of-bounds index
    */
   @SuppressWarnings("unchecked")
@@ -182,8 +185,8 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * <p>The caller must ensure that the stored tag matches the expected subtype.
    * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
    *
-   * @param index the zero-based element index
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param index    the zero-based element index
+   * @param <T>      the expected tag subtype; no runtime subtype check is performed
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored tag, or {@code fallback} for a out-of-bounds index
    */
@@ -195,7 +198,8 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   /**
    * Returns the value at the index as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
    * @param index the zero-based element index
    * @return an optional containing the converted value, or empty for a out-of-bounds index or incompatible tag
@@ -283,7 +287,9 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    */
   public Optional<Boolean> getBoolean(int index) {
     NBT value = get(index);
-    if (value instanceof BooleanNBT bool) return Optional.of(bool.get());
+    if (value instanceof BooleanNBT bool) {
+      return Optional.of(bool.get());
+    }
     Number number = getNumber(index);
     return number == null ? Optional.empty() : Optional.of(number.longValue() != 0);
   }
@@ -302,9 +308,10 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   /**
    * Returns the value at the index as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -321,7 +328,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Numeric tags use {@link Number#shortValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -335,7 +342,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Numeric tags use {@link Number#intValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -349,7 +356,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Numeric tags use {@link Number#longValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -363,7 +370,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Numeric tags use {@link Number#floatValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -377,7 +384,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Numeric tags use {@link Number#doubleValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -391,7 +398,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>Boolean tags are returned directly; numeric tags are true when their {@link Number#longValue()} is nonzero.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -434,7 +441,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -449,7 +456,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -475,7 +482,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -490,7 +497,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -516,7 +523,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a out-of-bounds index or incompatible tag
    */
@@ -531,7 +538,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -546,7 +553,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
    *
    * @param index the zero-based element index
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param <T>   the expected tag subtype; no runtime subtype check is performed
    * @return an optional containing the stored tag, or empty for a out-of-bounds index
    */
   public <T extends NBT> Optional<T> tryGet(int index) {
@@ -561,8 +568,8 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index.
    *
-   * @param index the zero-based element index
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param index    the zero-based element index
+   * @param <T>      the expected tag subtype; no runtime subtype check is performed
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored tag, or the supplied fallback value for a out-of-bounds index
    */
@@ -574,11 +581,12 @@ public final class ListNBT implements NBT, Iterable<NBT> {
   /**
    * Returns the value at the index as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -593,7 +601,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -608,7 +616,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -623,7 +631,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -638,7 +646,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -653,7 +661,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -668,7 +676,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */
@@ -681,7 +689,7 @@ public final class ListNBT implements NBT, Iterable<NBT> {
    *
    * <p>The fallback supplier is invoked only for a out-of-bounds index or incompatible tag.
    *
-   * @param index the zero-based element index
+   * @param index    the zero-based element index
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a out-of-bounds index or incompatible tag
    */

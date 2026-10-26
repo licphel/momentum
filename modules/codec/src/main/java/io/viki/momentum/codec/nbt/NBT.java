@@ -27,6 +27,8 @@ import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.primitives.*;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Function;
+
 /**
  * Contract for all NBT tag wrappers that provide type-safe serialization.
  *
@@ -34,6 +36,9 @@ import org.jspecify.annotations.Nullable;
  * deep copying, and identity comparison independently.
  */
 public interface NBT {
+  /** Passes a tree through without copying. The caller owns its mutability. */
+  Codec<NBT> CODEC = Codec.of(Function.identity(), Function.identity());
+
   /**
    * Wraps a raw value in its corresponding tag representation.
    *

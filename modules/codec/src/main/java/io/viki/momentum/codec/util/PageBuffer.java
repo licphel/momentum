@@ -24,13 +24,10 @@
 
 package io.viki.momentum.codec.util;
 
-import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
-import java.util.NavigableMap;
-import java.util.TreeMap;
 import org.jspecify.annotations.Nullable;
+
+import java.nio.ByteBuffer;
+import java.util.*;
 
 /**
  * A growable page-aligned byte store with malloc-style free-range allocation.
@@ -54,11 +51,11 @@ public final class PageBuffer {
   public static final int DEFAULT_INITIAL_PAGES = 16;
 
   private final int pageSize;
+  private final NavigableMap<Integer, Integer> freeRanges = new TreeMap<>();
+  private final NavigableMap<Integer, Allocation> allocations = new TreeMap<>();
   private byte[] storage;
   private int pageCount;
   private int usedPages;
-  private final NavigableMap<Integer, Integer> freeRanges = new TreeMap<>();
-  private final NavigableMap<Integer, Allocation> allocations = new TreeMap<>();
 
   private PageBuffer(int pageSize, int initialPages) {
     this.pageSize = pageSize;
@@ -91,7 +88,7 @@ public final class PageBuffer {
   /**
    * Opens a page buffer with an initial number of free pages.
    *
-   * @param pageSize size of one allocation page in bytes
+   * @param pageSize     size of one allocation page in bytes
    * @param initialPages initial free page count
    * @return a new page buffer
    */

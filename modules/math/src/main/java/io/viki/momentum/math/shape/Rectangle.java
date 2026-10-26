@@ -274,4 +274,13 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
   public Rectangle inflate(Vector2 v) {
     return inflate(v.x(), v.y());
   }
+
+  /**
+   * Promotes this box to double precision.
+   *
+   * @return this box as a {@link Rectangled}
+   */
+  public Rectangled toRectangled() {
+    return new Rectangled(minX, minY, maxX, maxY);
+  }
 }

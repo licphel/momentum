@@ -308,4 +308,13 @@ public record Vector2(float x, float y) {
   public float angle() {
     return (float) Math.atan2(y, x);
   }
+
+  /**
+   * Promotes this vector to double precision.
+   *
+   * @return this vector as a {@link Vector2d}
+   */
+  public Vector2d toVector2d() {
+    return new Vector2d(x, y);
+  }
 }

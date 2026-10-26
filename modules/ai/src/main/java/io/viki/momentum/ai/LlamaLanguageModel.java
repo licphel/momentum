@@ -1,6 +1,7 @@
 package io.viki.momentum.ai;
 
 import io.viki.momentum.util.InternalApi;
+import io.viki.momentum.util.multithread.Parallel;
 import net.ladenthin.llama.LlamaModel;
 import net.ladenthin.llama.parameters.InferenceParameters;
 import net.ladenthin.llama.parameters.ModelParameters;
@@ -8,8 +9,6 @@ import net.ladenthin.llama.value.Pair;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 /**
  * Provides the {@link LanguageModel} contract through a native llama.cpp model instance.
@@ -17,12 +16,9 @@ import java.util.concurrent.Executors;
 @InternalApi
 final class LlamaLanguageModel implements LanguageModel {
   private final LlamaModel model;
-  private final ExecutorService streamingExecutor;
 
   private LlamaLanguageModel(LlamaModel model) {
     this.model = model;
-    streamingExecutor = Executors.newSingleThreadExecutor(
-        Thread.ofPlatform().name("momentum-ai-stream").daemon(true).factory());
   }
 
   /**
@@ -71,7 +67,7 @@ final class LlamaLanguageModel implements LanguageModel {
     InferenceParameters parameters = parameters(request);
     CompletableFuture<Void> response = CompletableFuture.runAsync(
         () -> model.streamChatCompletion(parameters,
-            chunk -> ChatChunkDecoder.decode(chunk, callback)), streamingExecutor);
+            chunk -> ChatChunkDecoder.decode(chunk, callback)), Parallel.io());
     response.whenComplete((ignored, failure) -> {
       if (failure == null) {
         callback.onComplete();
@@ -84,7 +80,6 @@ final class LlamaLanguageModel implements LanguageModel {
 
   @Override
   public void close() {
-    streamingExecutor.close();
     model.close();
   }
 }

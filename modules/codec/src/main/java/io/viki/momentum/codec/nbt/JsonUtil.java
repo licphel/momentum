@@ -26,7 +26,6 @@ package io.viki.momentum.codec.nbt;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.MappingJsonFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -49,7 +48,7 @@ import java.util.Map;
  * BYTE         -&gt; number
  * SHORT        -&gt; number
  * INT          -&gt; number
- * LONG         -&gt; number (string if &gt; 2&lt;sup&gt;53&lt;/sup&gt;-1)
+ * LONG         -&gt; number (preserves all 64 bits when read back by this parser)
  * FLOAT        -&gt; number
  * DOUBLE       -&gt; number
  * BOOLEAN      -&gt; boolean
@@ -61,22 +60,20 @@ import java.util.Map;
  * </pre>
  */
 public final class JsonUtil {
-  private static final long MAX_SAFE_INTEGER = 9007199254740991L;
   private static final ObjectMapper MAPPER = new ObjectMapper();
-  private static final MappingJsonFactory JSON_FACTORY = new MappingJsonFactory();
 
   private JsonUtil() {
   }
 
   /**
-   * Serializes an NBT compound to a JSON string.
+   * Serializes an NBT to a JSON string.
    *
-   * @param compound the NBT compound to serialize
-   * @param pretty   whether to pretty-print with indentation
+   * @param value  the NBT to serialize
+   * @param pretty whether to pretty-print with indentation
    * @return the JSON string representation
    */
-  public static String dump(CompoundNBT compound, boolean pretty) {
-    ObjectNode root = toJsonNode(compound);
+  public static String dump(NBT value, boolean pretty) {
+    JsonNode root = valueToJsonNode(value);
     try {
       if (pretty) {
         return MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(root);
@@ -88,13 +85,13 @@ public final class JsonUtil {
   }
 
   /**
-   * Serializes an NBT compound to a pretty-printed JSON string.
+   * Serializes an NBT to a pretty-printed JSON string.
    *
-   * @param compound the NBT compound to serialize
+   * @param value the NBT to serialize
    * @return the formatted JSON string
    */
-  public static String dumpPrettily(CompoundNBT compound) {
-    return dump(compound, true);
+  public static String dumpPrettily(NBT value) {
+    return dump(value, true);
   }
 
   /**
@@ -105,13 +102,27 @@ public final class JsonUtil {
    * @throws IllegalArgumentException if the JSON is malformed or the root is not an object
    */
   public static CompoundNBT parse(String json) {
+    NBT value = parseValue(json);
+    if (!(value instanceof CompoundNBT compound)) {
+      throw new IllegalArgumentException("Root must be a JSON object");
+    }
+    return compound;
+  }
+
+  /**
+   * Parses any JSON value; JSON null is represented by NullNBT.
+   *
+   * @param json the JSON string to parse
+   * @return an NBT value
+   */
+  public static NBT parseValue(String json) {
     try {
       JsonNode root = MAPPER.reader().with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
           .readTree(json);
-      if (root == null || !root.isObject()) {
-        throw new IllegalArgumentException("Root must be a JSON object");
+      if (root == null) {
+        throw new IllegalArgumentException("Expected a JSON value");
       }
-      return fromJsonNode(root);
+      return jsonNodeToValue(root);
     } catch (IOException e) {
       throw new IllegalArgumentException("Failed to parse JSON: " + e.getMessage(), e);
     }
@@ -134,13 +145,7 @@ public final class JsonUtil {
       case BYTE -> MAPPER.getNodeFactory().numberNode(((ByteNBT) value).get());
       case SHORT -> MAPPER.getNodeFactory().numberNode(((ShortNBT) value).get());
       case INT -> MAPPER.getNodeFactory().numberNode(((IntNBT) value).get());
-      case LONG -> {
-        long l = ((LongNBT) value).get();
-        if (l > MAX_SAFE_INTEGER || l < -MAX_SAFE_INTEGER) {
-          yield MAPPER.getNodeFactory().textNode(Long.toString(l));
-        }
-        yield MAPPER.getNodeFactory().numberNode(l);
-      }
+      case LONG -> MAPPER.getNodeFactory().numberNode(((LongNBT) value).get());
       case FLOAT -> MAPPER.getNodeFactory().numberNode(((FloatNBT) value).get());
       case DOUBLE -> MAPPER.getNodeFactory().numberNode(((DoubleNBT) value).get());
       case BOOLEAN -> MAPPER.getNodeFactory().booleanNode(((BooleanNBT) value).get());
@@ -176,7 +181,7 @@ public final class JsonUtil {
       String key = names.next();
       // Insert directly into the map: JSON keys may legitimately start with '$'
       // (written via the "$$" escape), and put() would re-parse them as paths.
-      CompoundNBT.putDirect(compound, key, jsonNodeToValue(node.get(key)));
+      compound.directPut(key, jsonNodeToValue(node.get(key)));
     }
     return compound;
   }

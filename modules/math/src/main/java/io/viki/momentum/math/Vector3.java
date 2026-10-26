@@ -373,4 +373,13 @@ public record Vector3(float x, float y, float z) {
   public Euler toEuler() {
     return new Euler(x, y, z);
   }
+
+  /**
+   * Promotes this vector to double precision.
+   *
+   * @return this vector as a {@link Vector3d}
+   */
+  public Vector3d toVector3d() {
+    return new Vector3d(x, y, z);
+  }
 }

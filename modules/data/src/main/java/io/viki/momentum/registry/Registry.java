@@ -28,6 +28,7 @@ import io.viki.momentum.util.Identifier;
 import io.viki.momentum.util.Palette;
 import org.jspecify.annotations.Nullable;
 
+import java.lang.invoke.MethodHandles;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
@@ -135,4 +136,17 @@ public interface Registry<T extends RegistryEntry> extends Palette<T>, Iterable<
    * @return {@code true} if this registry is frozen
    */
   boolean isFrozen();
+
+  /**
+   * Initializes a class and its static members immediately.
+   *
+   * @param clazz the class to initialize
+   */
+  static void initialize(Class<?> clazz) {
+    try {
+      MethodHandles.lookup().ensureInitialized(clazz);
+    } catch (IllegalAccessException e) {
+      // Ignore
+    }
+  }
 }

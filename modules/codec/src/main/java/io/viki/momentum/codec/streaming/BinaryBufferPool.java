@@ -60,7 +60,7 @@ public final class BinaryBufferPool implements AutoCloseable {
    * Creates an independent buffer pool.
    *
    * @param initialCapacity capacity used for newly acquired buffers
-   * @param retainedLimit maximum number of available buffers retained by this pool
+   * @param retainedLimit   maximum number of available buffers retained by this pool
    */
   public BinaryBufferPool(int initialCapacity, int retainedLimit) {
     if (initialCapacity <= 0 || retainedLimit <= 0) {

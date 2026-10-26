@@ -29,12 +29,12 @@ public final class Loop {
   private boolean hasTicked;
   private boolean runningSlowly;
 
-  private float delta;
-  private float renderDelta;
-  private float partialTicks;
-  private float tickTime;
-  private float frameTime;
-  private float realFrameTime;
+  private double delta;
+  private double renderDelta;
+  private double partialTicks;
+  private double tickTime;
+  private double frameTime;
+  private double realFrameTime;
   private volatile int currentFps;
   private volatile int currentTps;
 
@@ -75,16 +75,16 @@ public final class Loop {
     double tickLength = 1_000_000_000.0 / maxTps;
     double frameLength = maxFps > 0 ? 1_000_000_000.0 / maxFps : 0.0;
 
-    this.delta = (float) (1.0 / maxTps);
-    renderDelta = 0F;
+    this.delta = 1.0 / maxTps;
+    renderDelta = 0;
     stopped = false;
-    tickTime = 0F;
-    frameTime = 0F;
+    tickTime = 0;
+    frameTime = 0;
     tickCount = 0L;
     hasTicked = false;
     runningSlowly = false;
-    partialTicks = 0F;
-    realFrameTime = 0F;
+    partialTicks = 0;
+    realFrameTime = 0;
     currentFps = 0;
     currentTps = 0;
 
@@ -101,7 +101,7 @@ public final class Loop {
       long frameStartNanos = System.nanoTime();
 
       // Real elapsed time since the previous frame, in seconds.
-      realFrameTime = (float) ((frameStartNanos - previousFrameNanos) / 1_000_000_000.0);
+      realFrameTime = (frameStartNanos - previousFrameNanos) / 1_000_000_000.0;
       previousFrameNanos = frameStartNanos;
 
       // Catch up on ticks.
@@ -111,7 +111,7 @@ public final class Loop {
         hasTicked = true;
         nextTickNanos += tickLength;
         tickCount++;
-        tickTime = (float) ((double) tickCount / maxTps);
+        tickTime = (double) tickCount / maxTps;
         loops++;
         tick.run();
       }
@@ -128,13 +128,13 @@ public final class Loop {
       // Include time spent updating, rather than rendering with a stale frame-start timestamp.
       long renderNanos = System.nanoTime();
       double partial = (renderNanos + tickLength - nextTickNanos) / tickLength;
-      partialTicks = (float) Math.max(0.0, Math.min(partial, 1.0));
+      partialTicks = Math.max(0.0, Math.min(partial, 1.0));
 
       // Frame time for rendering: accumulated tick time plus the interpolated step.
-      frameTime = (float) ((tickCount + (double) partialTicks) / maxTps);
+      frameTime = (tickCount + partialTicks) / maxTps;
 
-      renderDelta = previousRenderNanos == 0L ? 0F
-          : (float) ((renderNanos - previousRenderNanos) / 1_000_000_000.0);
+      renderDelta = previousRenderNanos == 0L ? 0
+          : (renderNanos - previousRenderNanos) / 1_000_000_000.0;
       previousRenderNanos = renderNanos;
       draw.run();
       frameCounter++;
@@ -215,7 +215,7 @@ public final class Loop {
    *
    * @return the fixed time step
    */
-  public float delta() {
+  public double delta() {
     return delta;
   }
 
@@ -227,7 +227,7 @@ public final class Loop {
    *
    * @return the elapsed render step in seconds
    */
-  public float renderDelta() {
+  public double renderDelta() {
     return renderDelta;
   }
 
@@ -237,7 +237,7 @@ public final class Loop {
    *
    * @return the render partial ticks
    */
-  public float partialTicks() {
+  public double partialTicks() {
     return partialTicks;
   }
 
@@ -246,7 +246,7 @@ public final class Loop {
    *
    * @return the logic tick time in seconds
    */
-  public float tickTime() {
+  public double tickTime() {
     return tickTime;
   }
 
@@ -256,7 +256,7 @@ public final class Loop {
    *
    * @return interpolated frame time in seconds
    */
-  public float frameTime() {
+  public double frameTime() {
     return frameTime;
   }
 
@@ -266,7 +266,7 @@ public final class Loop {
    *
    * @return real frame time in seconds
    */
-  public float realFrameTime() {
+  public double realFrameTime() {
     return realFrameTime;
   }
 
@@ -325,7 +325,7 @@ public final class Loop {
    * @param t the interpolation factor
    * @return {@code a + (b - a) * t}
    */
-  public static float lerp(float a, float b, float t) {
+  public static double lerp(double a, double b, double t) {
     return a + (b - a) * t;
   }
 
@@ -337,7 +337,7 @@ public final class Loop {
    * @param b the value at {@code t = 1}
    * @return {@code a + (b - a) * partialTicks()}
    */
-  public float lerp(float a, float b) {
+  public double lerp(double a, double b) {
     return a + (b - a) * partialTicks;
   }
 }

@@ -32,9 +32,9 @@ import java.nio.ByteOrder;
 @InternalApi
 final class HeapBinaryBuffer extends BinaryBuffer {
   private static final byte[] EMPTY = new byte[0];
+  private final @Nullable BinaryBufferPool owner;
   private byte[] data;
   private boolean bigEndian; // LE by default
-  private final @Nullable BinaryBufferPool owner;
   private boolean released;
 
   public HeapBinaryBuffer(int capacity) {
@@ -167,10 +167,10 @@ final class HeapBinaryBuffer extends BinaryBuffer {
     short v;
     if (bigEndian) {
       v = (short) ((data[ri] << 8)
-          | (data[ri + 1] & 0xFF));
+                   | (data[ri + 1] & 0xFF));
     } else {
       v = (short) ((data[ri] & 0xFF)
-          | (data[ri + 1] << 8));
+                   | (data[ri + 1] << 8));
     }
     readerIndex = ri + 2;
     return v;

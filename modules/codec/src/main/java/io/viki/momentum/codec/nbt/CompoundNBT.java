@@ -77,7 +77,10 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
 
     @Override
     public CompoundNBT deserialize(NBT nbt) {
-      return (CompoundNBT) nbt;
+      if (nbt instanceof CompoundNBT compound) {
+        return compound;
+      }
+      throw new IllegalArgumentException("Expected an object, got " + nbt.dataType());
     }
 
     @Override
@@ -101,7 +104,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
         }
         String key = buffer.readUTF8();
         NBT value = tagClass.codec().deserialize(buffer);
-        CompoundNBT.putDirect(compound, key, value);
+        compound.directPut(key, value);
       }
       return compound;
     }
@@ -142,19 +145,30 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
     return unmodifiable;
   }
 
-  /**
-   * Inserts a key/value pair without path resolution or {@code $} escaping.
-   *
-   * <p>Keys read from an external representation (binary wire format, JSON)
-   * are already literal — {@link #put(String, NBT)} would re-parse keys that
-   * start with {@code $} as paths and corrupt them. Non-null invariant applies.
-   */
-  static void putDirect(CompoundNBT target, String key, NBT value) {
-    target.map.put(key, value);
-  }
-
   private static boolean isPather(String key) {
     return !key.isEmpty() && key.charAt(0) == PATH_PREFIX;
+  }
+
+  /**
+   * Reads a literal serialization key without interpreting '$' or dots as a path.
+   *
+   * @param key the raw key
+   * @return a literal value
+   */
+  public @Nullable NBT directGet(String key) {
+    return map.get(key);
+  }
+
+  /**
+   * Writes a literal serialization key, honoring this compound's mutability.
+   *
+   * @param key   the raw key
+   * @param value the value to put
+   */
+  public void directPut(String key, NBT value) {
+    if (modifiable) {
+      map.put(key, value);
+    }
   }
 
   /**
@@ -440,8 +454,8 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    * <p>The caller must ensure that the stored tag matches the expected subtype.
    * A stored {@link NullNBT} is returned as a tag and is not treated as absent.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param <T>      the expected tag subtype; no runtime subtype check is performed
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored tag, or {@code fallback} for a missing key or path
    */
@@ -467,7 +481,8 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   /**
    * Returns the value at the key or path as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
    * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @return an optional containing the converted value, or empty for a missing key or path or incompatible tag
@@ -555,7 +570,9 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    */
   public Optional<Boolean> getBoolean(String key) {
     NBT value = get(key);
-    if (value instanceof BooleanNBT bool) return Optional.of(bool.get());
+    if (value instanceof BooleanNBT bool) {
+      return Optional.of(bool.get());
+    }
     Number number = getNumber(key);
     return number == null ? Optional.empty() : Optional.of(number.longValue() != 0);
   }
@@ -574,9 +591,10 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   /**
    * Returns the value at the key or path as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -593,7 +611,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Numeric tags use {@link Number#shortValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -607,7 +625,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Numeric tags use {@link Number#intValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -621,7 +639,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Numeric tags use {@link Number#longValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -635,7 +653,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Numeric tags use {@link Number#floatValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -649,7 +667,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Numeric tags use {@link Number#doubleValue()} conversion, which may lose precision or narrow the value.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -663,7 +681,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>Boolean tags are returned directly; numeric tags are true when their {@link Number#longValue()} is nonzero.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the converted value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -706,7 +724,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -721,7 +739,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -747,7 +765,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -762,7 +780,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -788,7 +806,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The stored value is returned by reference; changes to it affect this container.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback the fallback value to return as-is when no compatible value is available
    * @return the stored value, or {@code fallback} for a missing key or path or incompatible tag
    */
@@ -803,7 +821,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -819,8 +837,8 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
-   * @param <T> the expected tag subtype; no runtime subtype check is performed
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param <T>      the expected tag subtype; no runtime subtype check is performed
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored tag, or the supplied fallback value for a missing key or path
    */
@@ -832,11 +850,12 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
   /**
    * Returns the value at the key or path as a {@code byte}.
    *
-   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
+   * <p>Numeric tags use {@link Number#byteValue()} conversion, which may lose precision or narrow the value. Boolean
+   * tags map {@code true} to {@code 1} and {@code false} to {@code 0}.
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -851,7 +870,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -866,7 +885,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -881,7 +900,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -896,7 +915,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -911,7 +930,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -926,7 +945,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the converted value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -939,7 +958,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
    *
    * <p>The fallback supplier is invoked only for a missing key or path or incompatible tag.
    *
-   * @param key the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
+   * @param key      the key or path; {@code $} enables path traversal and {@code $$} escapes a leading dollar
    * @param fallback supplies a non-null fallback value only when no compatible value is available
    * @return the stored value, or the supplied fallback value for a missing key or path or incompatible tag
    */
@@ -968,7 +987,7 @@ public final class CompoundNBT implements NBT, Iterable<Map.Entry<String, NBT>> 
     for (Map.Entry<String, NBT> entry : map.entrySet()) {
       String key = entry.getKey();
       NBT value = entry.getValue();
-      copy.put(key, value.copy());
+      copy.directPut(key, value.copy());
     }
     return copy;
   }

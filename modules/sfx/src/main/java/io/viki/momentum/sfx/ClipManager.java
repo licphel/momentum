@@ -19,7 +19,7 @@ import java.util.*;
 public final class ClipManager implements AutoCloseable {
   /** Maximum interval between automatic completion checks, in milliseconds. */
   private static final long CLEANUP_INTERVAL_MILLIS = 500;
-  private final Set<Clip> clips = new HashSet<>();
+  private final List<Clip> clips = new LinkedList<>();
   private volatile boolean running = true;
 
   /**
@@ -80,11 +80,10 @@ public final class ClipManager implements AutoCloseable {
    * Calling it after closure has no effect.
    */
   public synchronized void update() {
-    Iterator<Clip> iterator = clips.iterator();
-    while (iterator.hasNext()) {
-      Clip clip = iterator.next();
+    for (int i = clips.size() - 1; i >= 0; i--) {
+      Clip clip = clips.get(i);
       if (clip.shouldClose()) {
-        iterator.remove();
+        clips.remove(i);
         clip.close();
       }
     }

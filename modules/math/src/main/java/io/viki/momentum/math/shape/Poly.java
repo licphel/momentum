@@ -25,6 +25,7 @@
 package io.viki.momentum.math.shape;
 
 import io.viki.momentum.math.Vector2;
+import io.viki.momentum.math.Vector2d;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -581,6 +582,25 @@ public final class Poly implements Shape<Poly> {
       translated[i] = parts[i].translate(tx, ty);
     }
     return new Poly(translated);
+  }
+
+  /**
+   * Promotes this polygon to double precision.
+   *
+   * @return this polygon as a {@link Polyd}
+   */
+  public Polyd toPolyd() {
+    Polyd[] converted = new Polyd[parts.length];
+    for (int component = 0; component < parts.length; component++) {
+      ConvexPart part = parts[component];
+      Vector2d[] vertices = new Vector2d[part.vertexCount()];
+      for (int vertex = 0; vertex < vertices.length; vertex++) {
+        int coordinateIndex = part.coordinateIndex(vertex);
+        vertices[vertex] = new Vector2d(part.coordinates[coordinateIndex], part.coordinates[coordinateIndex + 1]);
+      }
+      converted[component] = Polyd.of(vertices);
+    }
+    return Polyd.of(converted);
   }
 
   @Override
