@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.GraphicsException;
 import io.viki.momentum.gfx.GraphicsMetrics;
@@ -138,8 +137,6 @@ public final class OpenGLEncoder implements Encoder {
    */
   @Override
   public void queuedExecute() {
-    Analysis.start("encoder.snapshotReferencesAndQueueCommands");
-    try {
       int ints = pendingInts;
       pendingInts = 0;
       int refStart = batchRefStart;
@@ -155,9 +152,6 @@ public final class OpenGLEncoder implements Encoder {
       command.intCount = ints;
       command.references = refsSnapshot;
       ctx.submit(command);
-    } finally {
-      Analysis.end("encoder.snapshotReferencesAndQueueCommands");
-    }
   }
 
   @Override
@@ -382,8 +376,6 @@ public final class OpenGLEncoder implements Encoder {
    * @param pool the objects referenced by the batch's commands
    */
   private void executeBatch(int intCount, @Nullable Object[] pool) {
-    Analysis.start("gl.decodeAndExecuteCommandBatch");
-    try {
       int consumed = 0;
       while (consumed < intCount) {
         int op = ring.poll();
@@ -503,12 +495,7 @@ public final class OpenGLEncoder implements Encoder {
             int vao = currentPipe.acquireVao(currentVboHandle, 0, 0, currentInstanceBase);
             ctx.cache.bindVao(vao);
             GraphicsMetrics.Drawcalls.increment();
-            Analysis.start("gl.glDrawArrays");
-            try {
               glDrawArrays(topology, firstVertex, vertexCount);
-            } finally {
-              Analysis.end("gl.glDrawArrays");
-            }
             ctx.cache.bindVao(0);
           }
           case OP_DRAW_INDEXED -> {
@@ -530,12 +517,7 @@ public final class OpenGLEncoder implements Encoder {
             int vao = currentPipe.acquireVao(currentVboHandle, 0, currentEboHandle, currentInstanceBase);
             ctx.cache.bindVao(vao);
             GraphicsMetrics.Drawcalls.increment();
-            Analysis.start("gl.glDrawElements");
-            try {
               glDrawElements(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES);
-            } finally {
-              Analysis.end("gl.glDrawElements");
-            }
             ctx.cache.bindVao(0);
           }
           case OP_DRAW_INSTANCED -> {
@@ -555,12 +537,7 @@ public final class OpenGLEncoder implements Encoder {
             int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, 0, currentInstanceBase);
             ctx.cache.bindVao(vao);
             GraphicsMetrics.Drawcalls.increment();
-            Analysis.start("gl.glDrawArraysInstanced");
-            try {
               glDrawArraysInstanced(topology, firstVertex, vertexCount, instanceCount);
-            } finally {
-              Analysis.end("gl.glDrawArraysInstanced");
-            }
             ctx.cache.bindVao(0);
           }
           case OP_DRAW_INDEXED_INSTANCED -> {
@@ -583,12 +560,7 @@ public final class OpenGLEncoder implements Encoder {
             int vao = currentPipe.acquireVao(currentVboHandle, currentInstHandle, currentEboHandle, currentInstanceBase);
             ctx.cache.bindVao(vao);
             GraphicsMetrics.Drawcalls.increment();
-            Analysis.start("gl.glDrawElementsInstanced");
-            try {
               glDrawElementsInstanced(topology, indexCount, GL_UNSIGNED_INT, (long) firstIndex * Integer.BYTES, instanceCount);
-            } finally {
-              Analysis.end("gl.glDrawElementsInstanced");
-            }
             ctx.cache.bindVao(0);
           }
           case OP_DISPATCH -> {
@@ -602,9 +574,6 @@ public final class OpenGLEncoder implements Encoder {
           default -> throw new GraphicsException("Unknown command opcode: " + op);
         }
       }
-    } finally {
-      Analysis.end("gl.decodeAndExecuteCommandBatch");
-    }
   }
 
   /** Returns command-local resource snapshots once their batch has executed. */
@@ -633,8 +602,6 @@ public final class OpenGLEncoder implements Encoder {
    * @throws GraphicsException if a required resource set is missing or incompatible
    */
   private void applyResources() {
-    Analysis.start("gl.validateAndBindResources");
-    try {
       assert currentPipe != null;
 
       ResourceSetLayout[] layouts = currentPipe.desc().resourceLayouts();
@@ -647,9 +614,6 @@ public final class OpenGLEncoder implements Encoder {
         rs.validate(layouts[i]);
         rs.apply(ctx.cache);
       }
-    } finally {
-      Analysis.end("gl.validateAndBindResources");
-    }
   }
 
   private static final class BatchCommand implements Runnable {

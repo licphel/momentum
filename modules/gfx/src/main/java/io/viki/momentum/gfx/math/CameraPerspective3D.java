@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.math.Matrix4x4;
 
 /**
@@ -59,7 +61,7 @@ public class CameraPerspective3D extends Camera3D {
    * @param value field of view in radians
    */
   public void setFieldOfView(float value) {
-    float clamped = Math.clamp(value, 0.01F, (float) Math.PI - 0.01F);
+    float clamped = Mutil.clamp(value, 0.01F, (float) Math.PI - 0.01F);
     if (fov != clamped) {
       fov = clamped;
       dirty = true;

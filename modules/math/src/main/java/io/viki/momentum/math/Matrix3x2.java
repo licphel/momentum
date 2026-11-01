@@ -44,6 +44,7 @@ import io.viki.momentum.math.util.FastTrigonometric;
  * @see Matrix4x4
  */
 public record Matrix3x2(float m00, float m10, float m01, float m11, float m02, float m12) {
+  /** The identity transform, which leaves points unchanged. */
   public static final Matrix3x2 IDENTITY = new Matrix3x2(1.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F);
 
   /**

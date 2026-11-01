@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx.ext;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Backend-neutral parameters for the standard EFX environmental reverb.
  * Values intentionally correspond one-to-one with OpenAL's reverb object;
@@ -57,19 +59,19 @@ public record Reverb(float density, float diffusion, float gain, float gainHF,
    * @return reverb parameters derived from the supplied strength and delay
    */
   public static Reverb simple(float strength, float delay) {
-    return new Reverb(0.65F + Math.clamp(strength, 0F, 1F) * 0.35F,
-        0.75F + Math.clamp(strength, 0F, 1F) * 0.25F,
-        Math.clamp(strength, 0F, 1F) * 0.35F,
+    return new Reverb(0.65F + Mutil.clamp(strength, 0F, 1F) * 0.35F,
+        0.75F + Mutil.clamp(strength, 0F, 1F) * 0.25F,
+        Mutil.clamp(strength, 0F, 1F) * 0.35F,
         0.7F,
-        0.8F + Math.clamp(strength, 0F, 1F) * 3.2F,
+        0.8F + Mutil.clamp(strength, 0F, 1F) * 3.2F,
         0.75F,
-        Math.clamp(strength, 0F, 1F) * 0.25F,
+        Mutil.clamp(strength, 0F, 1F) * 0.25F,
         delay,
-        Math.clamp(strength, 0F, 1F) * 0.4F,
+        Mutil.clamp(strength, 0F, 1F) * 0.4F,
         Math.min(Math.max(delay, 0F) * 0.5F, 0.1F),
-        0.9F + Math.clamp(strength, 0F, 1F) * 0.1F,
+        0.9F + Mutil.clamp(strength, 0F, 1F) * 0.1F,
         0F,
         true,
-        Math.clamp(strength, 0F, 1F));
+        Mutil.clamp(strength, 0F, 1F));
   }
 }

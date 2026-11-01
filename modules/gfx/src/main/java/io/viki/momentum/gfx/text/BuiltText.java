@@ -107,7 +107,7 @@ final class BuiltText implements Text {
 
   @Override
   public @Nullable TextFormat forwadingStyle() {
-    return spans.isEmpty() ? null : spans.getLast().format();
+    return spans.isEmpty() ? null : spans.get(spans.size() - 1).format();
   }
 
   @Override

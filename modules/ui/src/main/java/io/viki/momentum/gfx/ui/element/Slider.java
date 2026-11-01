@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
@@ -494,7 +496,7 @@ public final class Slider extends Element {
     Rectangle track = trackArea(Rectangle.of(0.0F, 0.0F, bounds().width(), bounds().height()));
     double ratio = track.width() == 0.0F || maximum == minimum ? 0.0
         : (x - track.minX()) / track.width();
-    updateValue(minimum + Math.clamp(ratio, 0.0, 1.0) * (maximum - minimum), true);
+    updateValue(minimum + Mutil.clamp(ratio, 0.0, 1.0) * (maximum - minimum), true);
   }
 
   private Rectangle trackArea(Rectangle area) {
@@ -522,7 +524,7 @@ public final class Slider extends Element {
 
   private double snap(double candidate) {
     double snapped = minimum + Math.round((candidate - minimum) / step) * step;
-    return Math.clamp(snapped, minimum, maximum);
+    return Mutil.clamp(snapped, minimum, maximum);
   }
 
   private float normalizedValue() {

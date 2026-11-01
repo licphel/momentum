@@ -37,6 +37,7 @@ import io.viki.momentum.math.shape.Rectangle;
  * @param maxZ maximum z coordinate
  */
 public record Cube(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+  /** A box whose corners are both at the origin. */
   public static final Cube ZERO = new Cube(0.0F, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 
   /**

@@ -27,12 +27,13 @@ package io.viki.momentum.math;
 /**
  * A fixed-depth matrix stack (max 256 entries).
  *
- * <p>The top of the stack is the "current transform". Each {@link #push()} duplicates
- * the top; each {@link #pop()} discards it.
+ * <p>The top of the stack is the current transform. Each {@link #push()} duplicates
+ * the top; each {@link #pop()} discards it. Instances are mutable and not thread-safe.
  *
  * @see Matrix4x4
  */
 public final class MatrixStack {
+  /** Maximum number of matrix levels, including the initial identity level. */
   private static final int MAX_DEPTH = 256;
 
   private final Matrix4x4[] stack = new Matrix4x4[MAX_DEPTH];
@@ -62,6 +63,7 @@ public final class MatrixStack {
    * Pushes a new level whose matrix is {@code current × m}.
    *
    * @param m matrix to concatenate with the current top
+   * @throws IllegalStateException if the stack is full
    */
   public void push(Matrix4x4 m) {
     push();

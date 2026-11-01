@@ -1,5 +1,7 @@
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.input.InputModifiers;
 import io.viki.momentum.input.KeyAction;
 import io.viki.momentum.input.KeyCode;
@@ -110,7 +112,7 @@ public final class CommandBox extends TextBox {
       select(0, 0);
       return;
     }
-    if (commands.isEmpty() || !commands.getLast().equals(value)) {
+    if (commands.isEmpty() || !commands.get(commands.size() - 1).equals(value)) {
       if (commands.size() == MAX_COMMAND_HISTORY) {
         commands.removeFirst();
       }
@@ -129,7 +131,7 @@ public final class CommandBox extends TextBox {
     if (historyIndex == commands.size()) {
       draft = text();
     }
-    historyIndex = Math.clamp(historyIndex + direction, 0, commands.size());
+    historyIndex = Mutil.clamp(historyIndex + direction, 0, commands.size());
     String value = historyIndex == commands.size() ? draft : commands.get(historyIndex);
     setText(value);
     select(value.length(), value.length());

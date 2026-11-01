@@ -55,7 +55,7 @@ public final class TextBuilder {
    * @return this builder
    */
   public TextBuilder newLine() {
-    Literal newline = spans.isEmpty() ? Literal.of("\n") : Literal.of("\n").with(spans.getLast().format());
+    Literal newline = spans.isEmpty() ? Literal.of("\n") : Literal.of("\n").with(spans.get(spans.size() - 1).format());
     return append(newline);
   }
 
@@ -134,7 +134,7 @@ public final class TextBuilder {
   public Text build() {
     TextLayout layout = new TextLayout(maxWidth, flipY, justify, lineSpacing, maxLines);
     if (spans.size() == 1 && layout.equals(TextLayout.DEFAULT)) {
-      return spans.getFirst();
+      return spans.get(0);
     }
     return new BuiltText(spans, layout);
   }

@@ -2,14 +2,17 @@ package io.viki.momentum.resource;
 
 import org.jspecify.annotations.Nullable;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.JarURLConnection;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Enumeration;
 import java.util.List;
@@ -129,7 +132,7 @@ public final class ClasspathResource implements Resource {
   @Override
   public @Nullable InputStream open(String path) throws IOException {
     String normalized = rootedPath(path);
-    if (codeSource != null) {
+    if (!ResourceRuntime.nativeImage() && codeSource != null) {
       Resource source = Files.isRegularFile(codeSource)
           ? Resource.jar(codeSource) : Resource.directory(codeSource);
       if (source.exists(normalized)) {
@@ -142,6 +145,12 @@ public final class ClasspathResource implements Resource {
   @Override
   public Stream<String> walk(String relativeDir) throws IOException {
     String directory = rootedPath(relativeDir);
+    if (ResourceRuntime.nativeImage()) {
+      return walkNativeIndex();
+    }
+    if (classLoader instanceof ResourceWalkableClassLoader resources) {
+      return relativePaths(resources.walkResources(directory).toList());
+    }
     List<String> paths = new ArrayList<>();
     if (codeSource != null && Files.isRegularFile(codeSource)) {
       collectJar(codeSource, directory, paths);
@@ -150,6 +159,27 @@ public final class ClasspathResource implements Resource {
     Enumeration<URL> roots = classLoader.getResources(directory);
     while (roots.hasMoreElements()) {
       collect(roots.nextElement(), directory, paths);
+    }
+    return relativePaths(paths);
+  }
+
+  private Stream<String> walkNativeIndex() throws IOException {
+    String prefix = root.isEmpty() ? "" : root + "/";
+    List<String> paths = new ArrayList<>();
+    InputStream input = classLoader.getResourceAsStream(ResourceRuntime.NATIVE_RESOURCE_INDEX);
+    if (input == null) {
+      throw new IOException("Native resource index is missing: "
+          + ResourceRuntime.NATIVE_RESOURCE_INDEX);
+    }
+    try (BufferedReader reader = new BufferedReader(new InputStreamReader(input,
+        StandardCharsets.UTF_8))) {
+      String path;
+      while ((path = reader.readLine()) != null) {
+        path = Resource.normalizePath(path);
+        if (!path.isEmpty() && (prefix.isEmpty() || path.startsWith(prefix))) {
+          paths.add(path);
+        }
+      }
     }
     return relativePaths(paths);
   }

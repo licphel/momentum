@@ -35,6 +35,86 @@ public final class Mutil {
   }
 
   /**
+   * Clamps an integer to an inclusive range.
+   *
+   * @param value value to clamp
+   * @param min inclusive lower bound
+   * @param max inclusive upper bound
+   * @return the value constrained to {@code [min, max]}
+   * @throws IllegalArgumentException if {@code min} exceeds {@code max}
+   */
+  public static int clamp(int value, int min, int max) {
+    if (min > max) {
+      throw new IllegalArgumentException("Minimum exceeds maximum");
+    }
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Clamps a long value to an inclusive integer range.
+   *
+   * @param value value to clamp
+   * @param min inclusive lower bound
+   * @param max inclusive upper bound
+   * @return the value constrained to {@code [min, max]}
+   * @throws IllegalArgumentException if {@code min} exceeds {@code max}
+   */
+  public static int clamp(long value, int min, int max) {
+    if (min > max) {
+      throw new IllegalArgumentException("Minimum exceeds maximum");
+    }
+    return (int) Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Clamps a long value to an inclusive range.
+   *
+   * @param value value to clamp
+   * @param min inclusive lower bound
+   * @param max inclusive upper bound
+   * @return the value constrained to {@code [min, max]}
+   * @throws IllegalArgumentException if {@code min} exceeds {@code max}
+   */
+  public static long clamp(long value, long min, long max) {
+    if (min > max) {
+      throw new IllegalArgumentException("Minimum exceeds maximum");
+    }
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Clamps a float to an inclusive range.
+   *
+   * @param value value to clamp
+   * @param min inclusive lower bound
+   * @param max inclusive upper bound
+   * @return the value constrained to {@code [min, max]}
+   * @throws IllegalArgumentException if either bound is NaN or {@code min} exceeds {@code max}
+   */
+  public static float clamp(float value, float min, float max) {
+    if (Float.isNaN(min) || Float.isNaN(max) || Float.compare(min, max) > 0) {
+      throw new IllegalArgumentException("Invalid clamp bounds");
+    }
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
+   * Clamps a double to an inclusive range.
+   *
+   * @param value value to clamp
+   * @param min inclusive lower bound
+   * @param max inclusive upper bound
+   * @return the value constrained to {@code [min, max]}
+   * @throws IllegalArgumentException if either bound is NaN or {@code min} exceeds {@code max}
+   */
+  public static double clamp(double value, double min, double max) {
+    if (Double.isNaN(min) || Double.isNaN(max) || Double.compare(min, max) > 0) {
+      throw new IllegalArgumentException("Invalid clamp bounds");
+    }
+    return Math.min(max, Math.max(min, value));
+  }
+
+  /**
    * Computes the cartesian product of keyed value domains.
    *
    * @param domains keyed value domains, in product order

@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.pipe.*;
 import io.viki.momentum.util.InternalApi;
@@ -142,12 +141,7 @@ public final class OpenGLPipeline implements Pipeline {
    * @return a GL VAO handle configured for this (VBO, instance-VBO, IBO) triple
    */
   public int acquireVao(int vboHandle, int instanceVboHandle, int eboHandle, int instanceBase) {
-    Analysis.start("gl.lookupOrCreateVertexArray");
-    try {
       return ctx.vaos.acquire(desc.vertexLayout(), vboHandle, instanceVboHandle, eboHandle, instanceBase);
-    } finally {
-      Analysis.end("gl.lookupOrCreateVertexArray");
-    }
   }
 
   @Override

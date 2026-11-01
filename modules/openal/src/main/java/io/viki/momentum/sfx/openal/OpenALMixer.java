@@ -755,7 +755,7 @@ public final class OpenALMixer implements Mixer {
       alDeleteSources(source);
     }
     while (!buffers.isEmpty()) {
-      buffers.getLast().delete();
+      buffers.get(buffers.size() - 1).delete();
     }
     for (int send = 0; send < MIXER_EFFECT_SENDS; send++) {
       int slot = effectSlots[send];

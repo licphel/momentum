@@ -36,7 +36,6 @@ import io.viki.momentum.gfx.shader.ResourceSetLayout;
 import io.viki.momentum.gfx.texture.Sampler;
 import io.viki.momentum.gfx.texture.Texture;
 import io.viki.momentum.gfx.util.*;
-import io.viki.momentum.util.perf.Analysis;
 import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
@@ -197,8 +196,6 @@ public final class MeshGraphics extends BatchedGraphics {
     }
 
     Mesh bake(Device device, @Nullable Mesh reuse) {
-      Analysis.start("mesh.allocateBuffersAndQueueUploads");
-      try {
         List<Section> sections = new ArrayList<>();
         List<Section> previous = reuse == null ? List.of() : reuse.sections();
         int previousIndex = 0;
@@ -246,9 +243,6 @@ public final class MeshGraphics extends BatchedGraphics {
         }
         reuse.replaceSections(sections);
         return reuse;
-      } finally {
-        Analysis.end("mesh.allocateBuffersAndQueueUploads");
-      }
     }
   }
 

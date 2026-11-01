@@ -4,4 +4,5 @@ plugins {
 
 dependencies {
   api project(':momentum-core')
+  implementation project(':momentum-math')
 }

@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
@@ -40,6 +42,7 @@ import io.viki.momentum.math.util.FastTrigonometric;
  * @see Matrix4x4
  */
 public record Matrix2x2(float m00, float m10, float m01, float m11) {
+  /** The identity transform, which leaves vectors unchanged. */
   public static final Matrix2x2 IDENTITY = new Matrix2x2(1.0F, 0.0F, 0.0F, 1.0F);
 
   /**
@@ -170,7 +173,7 @@ public record Matrix2x2(float m00, float m10, float m01, float m11) {
    * @return interpolated matrix
    */
   public static Matrix2x2 lerp(Matrix2x2 a, Matrix2x2 b, float t) {
-    t = Math.clamp(t, 0.0F, 1.0F);
+    t = Mutil.clamp(t, 0.0F, 1.0F);
     return new Matrix2x2(a.m00 + (b.m00 - a.m00) * t, a.m10 + (b.m10 - a.m10) * t, a.m01 + (b.m01 - a.m01) * t,
         a.m11 + (b.m11 - a.m11) * t);
   }

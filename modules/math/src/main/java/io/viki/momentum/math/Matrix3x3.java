@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
@@ -47,6 +49,7 @@ import io.viki.momentum.math.util.FastTrigonometric;
  */
 public record Matrix3x3(float m00, float m10, float m20, float m01, float m11, float m21, float m02, float m12,
                         float m22) {
+  /** The identity transform, which leaves vectors unchanged. */
   public static final Matrix3x3 IDENTITY = new Matrix3x3(1.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 1.0F);
 
   /**
@@ -208,7 +211,7 @@ public record Matrix3x3(float m00, float m10, float m20, float m01, float m11, f
    * @return interpolated matrix
    */
   public static Matrix3x3 lerp(Matrix3x3 a, Matrix3x3 b, float t) {
-    t = Math.clamp(t, 0.0F, 1.0F);
+    t = Mutil.clamp(t, 0.0F, 1.0F);
     return new Matrix3x3(a.m00 + (b.m00 - a.m00) * t, a.m10 + (b.m10 - a.m10) * t, a.m20 + (b.m20 - a.m20) * t,
         a.m01 + (b.m01 - a.m01) * t, a.m11 + (b.m11 - a.m11) * t, a.m21 + (b.m21 - a.m21) * t,
         a.m02 + (b.m02 - a.m02) * t, a.m12 + (b.m12 - a.m12) * t, a.m22 + (b.m22 - a.m22) * t);

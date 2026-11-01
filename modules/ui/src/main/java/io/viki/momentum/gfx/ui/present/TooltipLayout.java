@@ -1,5 +1,7 @@
 package io.viki.momentum.gfx.ui.present;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.text.TextBuilder;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.util.impl.Graphics;
@@ -103,8 +105,8 @@ public record TooltipLayout(Rectangle bounds, List<Line> lines, float paddingX, 
     float margin = Math.min(CANVAS_MARGIN, Math.min(canvas.width(), canvas.height()) / 2);
     float width = Math.min(requested.width(), Math.max(0, canvas.width() - margin * 2));
     float height = Math.min(requested.height(), Math.max(0, canvas.height() - margin * 2));
-    float x = Math.clamp(requested.minX(), canvas.minX() + margin, canvas.maxX() - margin - width);
-    float y = Math.clamp(requested.minY(), canvas.minY() + margin, canvas.maxY() - margin - height);
+    float x = Mutil.clamp(requested.minX(), canvas.minX() + margin, canvas.maxX() - margin - width);
+    float y = Mutil.clamp(requested.minY(), canvas.minY() + margin, canvas.maxY() - margin - height);
     return Rectangle.of(x, y, width, height);
   }
 

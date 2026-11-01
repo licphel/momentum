@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx.openal.ext;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import io.viki.momentum.sfx.Clip;
@@ -115,22 +117,22 @@ final class ExtEfxEcho implements SfxEffect.Binding {
   private void configure(int effectId, int slotId) {
     EXTEfx.alEffecti(effectId, EXTEfx.AL_EFFECT_TYPE, EXTEfx.AL_EFFECT_ECHO);
     EXTEfx.alEffectf(effectId, EXTEfx.AL_ECHO_DELAY,
-        Math.clamp(parameters.delay(), EXTEfx.AL_ECHO_MIN_DELAY, EXTEfx.AL_ECHO_MAX_DELAY));
+        Mutil.clamp(parameters.delay(), EXTEfx.AL_ECHO_MIN_DELAY, EXTEfx.AL_ECHO_MAX_DELAY));
     EXTEfx.alEffectf(effectId, EXTEfx.AL_ECHO_LRDELAY,
-        Math.clamp(parameters.leftRightDelay(), EXTEfx.AL_ECHO_MIN_LRDELAY,
+        Mutil.clamp(parameters.leftRightDelay(), EXTEfx.AL_ECHO_MIN_LRDELAY,
             EXTEfx.AL_ECHO_MAX_LRDELAY));
     EXTEfx.alEffectf(effectId, EXTEfx.AL_ECHO_DAMPING,
-        Math.clamp(parameters.damping(), EXTEfx.AL_ECHO_MIN_DAMPING,
+        Mutil.clamp(parameters.damping(), EXTEfx.AL_ECHO_MIN_DAMPING,
             EXTEfx.AL_ECHO_MAX_DAMPING));
     EXTEfx.alEffectf(effectId, EXTEfx.AL_ECHO_FEEDBACK,
-        Math.clamp(parameters.feedback(), EXTEfx.AL_ECHO_MIN_FEEDBACK,
+        Mutil.clamp(parameters.feedback(), EXTEfx.AL_ECHO_MIN_FEEDBACK,
             EXTEfx.AL_ECHO_MAX_FEEDBACK));
     EXTEfx.alEffectf(effectId, EXTEfx.AL_ECHO_SPREAD,
-        Math.clamp(parameters.spread(), EXTEfx.AL_ECHO_MIN_SPREAD,
+        Mutil.clamp(parameters.spread(), EXTEfx.AL_ECHO_MIN_SPREAD,
             EXTEfx.AL_ECHO_MAX_SPREAD));
     EXTEfx.alAuxiliaryEffectSloti(slotId, EXTEfx.AL_EFFECTSLOT_EFFECT, effectId);
     EXTEfx.alAuxiliaryEffectSlotf(slotId, EXTEfx.AL_EFFECTSLOT_GAIN,
-        Math.clamp(parameters.sendGain(), 0F, 1F));
+        Mutil.clamp(parameters.sendGain(), 0F, 1F));
   }
 
   private void detachLocal() {

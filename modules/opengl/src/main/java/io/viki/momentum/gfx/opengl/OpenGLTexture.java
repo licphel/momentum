@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.DirectBufferPool;
 import io.viki.momentum.gfx.io.ImageUtil;
@@ -195,8 +194,6 @@ public final class OpenGLTexture implements Texture, Handle {
   }
 
   private void queueUpload(ByteBuffer bytes, Cube region, boolean replacement) {
-    Analysis.start("texture.copyUploadDataAndQueue");
-    try {
       int x = (int) region.minX();
       int y = (int) region.minY();
       int z = (int) region.minZ();
@@ -222,9 +219,6 @@ public final class OpenGLTexture implements Texture, Handle {
       command.depth = d;
       command.replacement = replacement;
       ctx.submit(command);
-    } finally {
-      Analysis.end("texture.copyUploadDataAndQueue");
-    }
   }
 
   /**
@@ -341,9 +335,6 @@ public final class OpenGLTexture implements Texture, Handle {
         int[] fmt = texture.format;
         int glY = texture.desc.height() - y - height;
         glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-        String timing = replacement ? "gl.textureReplace" : "gl.textureSubImage";
-        Analysis.start(timing);
-        try {
           if (replacement) {
             switch (texture.desc.type()) {
               case TEXTURE_1D -> glTexImage1D(texture.target, 0, fmt[0], width, 0, fmt[1], fmt[2], bytes);
@@ -359,9 +350,6 @@ public final class OpenGLTexture implements Texture, Handle {
                   glTexSubImage3D(texture.target, 0, x, glY, z, width, height, depth, fmt[1], fmt[2], bytes);
             }
           }
-        } finally {
-          Analysis.end(timing);
-        }
         if (texture.desc.mipLevels() > 1) {
           glGenerateMipmap(texture.target);
         }

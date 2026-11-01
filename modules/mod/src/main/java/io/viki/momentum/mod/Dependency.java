@@ -45,7 +45,7 @@ public record Dependency(String modId, Predicate<SemanticVersion> condition, Str
    * @param modId the required mod identifier
    */
   public Dependency(String modId) {
-    this(modId, _ -> true, "<any>");
+    this(modId, ignored -> true, "<any>");
   }
 
   /**

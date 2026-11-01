@@ -42,7 +42,6 @@ import io.viki.momentum.gfx.util.VertexStore;
 import io.viki.momentum.math.Matrix4x4;
 import io.viki.momentum.math.shape.Rectangle;
 import io.viki.momentum.resource.Resource;
-import io.viki.momentum.util.perf.Analysis;
 
 import java.nio.ByteBuffer;
 
@@ -129,8 +128,6 @@ public class BatchedGraphics extends StatefulGraphics {
    */
   @Override
   public void drawMesh(Mesh mesh) {
-    Analysis.start("graphics.flushAndRecordMeshDraws");
-    try {
       if (mesh.isEmpty()) {
         return;
       }
@@ -141,9 +138,6 @@ public class BatchedGraphics extends StatefulGraphics {
       encoder.setScissor(scissor.x(), scissor.y(), scissor.width(), scissor.height(), scissor.enable());
 
       mesh.submit(encoder, 0, ubo);
-    } finally {
-      Analysis.end("graphics.flushAndRecordMeshDraws");
-    }
   }
 
   /**
@@ -232,8 +226,6 @@ public class BatchedGraphics extends StatefulGraphics {
    * <p>Does nothing if no primitive has been selected or no camera is set.
    */
   private void submitBatch() {
-    Analysis.start("graphics.copyVerticesAndQueueBatch");
-    try {
       if (currentPrimitive == null) {
         return;
       }
@@ -295,9 +287,6 @@ public class BatchedGraphics extends StatefulGraphics {
       encoder.queuedExecute();
       encoder.reset();
       encoder.beginPass(new RenderPass.Builder().target(renderTarget).clearMask(0).build());
-    } finally {
-      Analysis.end("graphics.copyVerticesAndQueueBatch");
-    }
   }
 
   /**

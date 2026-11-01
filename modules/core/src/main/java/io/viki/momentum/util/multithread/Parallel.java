@@ -61,8 +61,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Components should cancel their own tasks instead of shutting down shared services.
  * CPU admission is bounded; saturation throws {@link RejectedExecutionException} and <b>never</b>
  * executes work on the caller thread.
- *
- * @since 1.0
  */
 public final class Parallel {
   /**

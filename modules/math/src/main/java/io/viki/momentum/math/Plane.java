@@ -36,9 +36,10 @@ import org.jspecify.annotations.Nullable;
  * For a normalized normal, {@code distance} is the signed distance from the origin to the plane.
  *
  * @param normal   the plane's normal vector (not necessarily normalized on input)
- * @param distance the signed distance from the origin
+ * @param distance plane offset in {@code normal · x + distance = 0}; it is a signed origin distance only when the normal is normalized
  */
 public record Plane(Vector3 normal, float distance) {
+  /** Plane through the origin with a unit X normal. */
   public static final Plane ZERO = new Plane(Vector3.UNIT_X, 0.0F);
 
   /**
@@ -75,7 +76,7 @@ public record Plane(Vector3 normal, float distance) {
    * <p>After normalization, the normal is a unit vector and the distance
    * becomes the true signed distance from the origin.
    *
-   * @return normalized plane
+   * @return plane with a unit normal, or this plane when its normal is near zero
    */
   public Plane normalize() {
     float len = normal.length();

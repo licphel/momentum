@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Immutable 2D double-precision vector.
  *
@@ -124,7 +126,7 @@ public record Vector2d(double x, double y) {
    * @return clamped vector
    */
   public static Vector2d clamp(Vector2d v, Vector2d min, Vector2d max) {
-    return new Vector2d(Math.clamp(v.x, min.x, max.x), Math.clamp(v.y, min.y, max.y));
+    return new Vector2d(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y));
   }
 
   /**

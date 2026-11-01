@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.util;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.math.TransformHandler;
 import io.viki.momentum.gfx.text.Icon;
 import io.viki.momentum.gfx.text.Text;
@@ -98,7 +100,7 @@ public class VertexBuilder2D extends VertexBuilder {
   }
 
   private static int computeRoundSegments(float radius) {
-    return Math.clamp((int) Math.ceil(radius / ROUND_SEGMENT_LENGTH), MIN_ROUND_SEGMENTS, MAX_ROUND_SEGMENTS);
+    return Mutil.clamp((int) Math.ceil(radius / ROUND_SEGMENT_LENGTH), MIN_ROUND_SEGMENTS, MAX_ROUND_SEGMENTS);
   }
 
   /**
@@ -1033,7 +1035,7 @@ public class VertexBuilder2D extends VertexBuilder {
     float dy = tr.y() - tc.y();
     float screenRx = (float) Math.sqrt(dx * dx + dy * dy);
     int segments = (int) (screenRx * Math.PI * 0.5F);
-    return Math.clamp(segments, 8, 128);
+    return Mutil.clamp(segments, 8, 128);
   }
 
   private void drawRoundCorner(float centerX, float centerY, float radius, float startAngle, float endAngle) {

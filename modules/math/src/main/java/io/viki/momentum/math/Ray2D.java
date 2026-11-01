@@ -129,6 +129,7 @@ public record Ray2D(Vector2 origin, Vector2 direction) {
    *
    * <p>The origin tile is visited first, including when the maximum distance is zero. Returning
    * {@code false} from the visitor stops traversal immediately, including from the origin.
+   * The traversal takes O(n) time for n visited tiles.
    *
    * @param maximumDistance the largest distance to traverse, which must be non-negative
    * @param visitor         callback receiving tile coordinates and entry and exit distances

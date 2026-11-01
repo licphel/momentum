@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Immutable 3D double-precision vector.
  *
@@ -155,8 +157,8 @@ public record Vector3d(double x, double y, double z) {
    * @return clamped vector
    */
   public static Vector3d clamp(Vector3d v, Vector3d min, Vector3d max) {
-    return new Vector3d(Math.clamp(v.x, min.x, max.x), Math.clamp(v.y, min.y, max.y),
-        Math.clamp(v.z, min.z, max.z));
+    return new Vector3d(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y),
+        Mutil.clamp(v.z, min.z, max.z));
   }
 
   /**

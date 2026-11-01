@@ -233,7 +233,7 @@ public final class GlfwDesktopView extends DesktopView {
     lastInputPoll = now;
     try {
       glfwPollEvents();
-    } catch (Exception _) {
+    } catch (Exception ignored) {
       // Ignored
     }
     joystickInput.poll(snapshot(), focused);

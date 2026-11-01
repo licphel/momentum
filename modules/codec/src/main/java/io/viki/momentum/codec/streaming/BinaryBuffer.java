@@ -24,6 +24,8 @@
 
 package io.viki.momentum.codec.streaming;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.codec.Codec;
 import io.viki.momentum.codec.nbt.DataType;
 import io.viki.momentum.codec.nbt.NBT;
@@ -308,7 +310,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @throws IndexOutOfBoundsException if no byte is writable
    */
   public void writeNormFloatAsByte(float value) {
-    write((byte) Math.round(Math.clamp(value, 0F, 1F) * 255F));
+    write((byte) Math.round(Mutil.clamp(value, 0F, 1F) * 255F));
   }
 
   /**
@@ -318,7 +320,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @throws IndexOutOfBoundsException if no byte is writable
    */
   public void writeNormDoubleAsByte(double value) {
-    write((byte) Math.round(Math.clamp(value, 0D, 1D) * 255D));
+    write((byte) Math.round(Mutil.clamp(value, 0D, 1D) * 255D));
   }
 
   /**

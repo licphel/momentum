@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx.openal.ext;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import io.viki.momentum.sfx.Clip;
@@ -149,7 +151,7 @@ final class ExtEfxReverb implements SfxEffect.Binding {
         parameters.decayHFLimit() ? 1 : 0);
     EXTEfx.alAuxiliaryEffectSloti(slotId, EXTEfx.AL_EFFECTSLOT_EFFECT, effectId);
     EXTEfx.alAuxiliaryEffectSlotf(slotId, EXTEfx.AL_EFFECTSLOT_GAIN,
-        Math.clamp(parameters.sendGain(), 0F, 1F));
+        Mutil.clamp(parameters.sendGain(), 0F, 1F));
   }
 
   private void detachLocal() {
@@ -213,6 +215,6 @@ final class ExtEfxReverb implements SfxEffect.Binding {
   }
 
   private static float clamp(float value, float minimum, float maximum) {
-    return Math.clamp(value, minimum, maximum);
+    return Mutil.clamp(value, minimum, maximum);
   }
 }

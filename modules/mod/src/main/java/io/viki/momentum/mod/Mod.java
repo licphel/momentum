@@ -85,7 +85,7 @@ public interface Mod {
           .filter(part -> !part.isEmpty())
           .map(part -> Character.toUpperCase(part.charAt(0)) + part.substring(1).toLowerCase())
           .collect(Collectors.joining(" "));
-    } catch (Exception _) {
+    } catch (Exception ignored) {
       return modId();
     }
   }

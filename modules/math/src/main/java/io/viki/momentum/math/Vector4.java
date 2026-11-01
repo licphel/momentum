@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Immutable 4D float vector.
  *
@@ -117,8 +119,8 @@ public record Vector4(float x, float y, float z, float w) {
    * @return clamped vector
    */
   public static Vector4 clamp(Vector4 v, Vector4 min, Vector4 max) {
-    return new Vector4(Math.clamp(v.x, min.x, max.x), Math.clamp(v.y, min.y, max.y), Math.clamp(v.z, min.z, max.z),
-        Math.clamp(v.w, min.w, max.w));
+    return new Vector4(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y), Mutil.clamp(v.z, min.z, max.z),
+        Mutil.clamp(v.w, min.w, max.w));
   }
 
   /**

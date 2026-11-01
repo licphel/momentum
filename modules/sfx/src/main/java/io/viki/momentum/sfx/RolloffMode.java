@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Shared distance-gain law for positional clips.
  *
@@ -122,7 +124,7 @@ public record RolloffMode(Type type, float referenceDistance, float maxDistance,
       case EXPONENTIAL -> (float) Math.pow(distance / referenceDistance, -factor);
       default -> throw new IllegalStateException("Unexpected value: " + type);
     };
-    return Math.clamp(gain, 0F, 1F);
+    return Mutil.clamp(gain, 0F, 1F);
   }
 
   /**

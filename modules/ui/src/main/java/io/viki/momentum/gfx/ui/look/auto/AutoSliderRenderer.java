@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.look.auto;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.element.Element;
@@ -108,7 +110,7 @@ public final class AutoSliderRenderer implements ElementRenderer {
     Rectangle track = slider.trackAreaForRender(area);
     float trackHeight = slider.trackThicknessForRender();
     float thumbWidth = Math.min(track.width(), slider.thumbWidthForRender());
-    float value = Math.clamp(slider.normalizedValueForRender(), 0.0F, 1.0F);
+    float value = Mutil.clamp(slider.normalizedValueForRender(), 0.0F, 1.0F);
     // Draw the hover/pressed/focused state wash behind the slider track.
     drawInteractionSurface(graphics, slider, track);
     // Draw the unfilled slider track.

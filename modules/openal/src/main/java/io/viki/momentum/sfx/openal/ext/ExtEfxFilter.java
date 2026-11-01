@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx.openal.ext;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.logging.Log;
 import io.viki.momentum.logging.Logger;
 import io.viki.momentum.sfx.Clip;
@@ -65,7 +67,7 @@ final class ExtEfxFilter implements SfxEffect.Binding {
       highFrequencyGain = clamp(parameters.gainHighFrequency());
       return;
     }
-    float value = Math.clamp(parameters.strength(), 0F, 1F);
+    float value = Mutil.clamp(parameters.strength(), 0F, 1F);
     Arrays.sort(points, (first, second) -> Float.compare(first.position(), second.position()));
     lowFrequencyGain = gainAt(points, value, false);
     highFrequencyGain = gainAt(points, value, true);
@@ -98,7 +100,7 @@ final class ExtEfxFilter implements SfxEffect.Binding {
   }
 
   private static float clamp(float value) {
-    return Math.clamp(value, 0F, 1F);
+    return Mutil.clamp(value, 0F, 1F);
   }
 
   private static int sourceOf(Clip clip) {

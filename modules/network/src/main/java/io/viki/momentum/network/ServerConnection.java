@@ -72,10 +72,10 @@ import java.util.function.Supplier;
 public final class ServerConnection implements ConnectionHost {
   /** Maximum wire-frame size in bytes. */
   public static final int FRAME_MAX_SIZE = 2 * 1024 * 1024;
-  private static final int MAX_GLOBAL_QUEUED_PACKETS = 8_192;
-  private static final int MAX_QUEUED_PACKETS_PER_CONNECTION = 256;
-  private static final int MAX_PACKETS_PER_TICK = 1_024;
-  private static final int MAX_PACKETS_PER_SECOND_PER_CONNECTION = 240;
+  private static final int MAX_GLOBAL_QUEUED_PACKETS = 1 << 14;
+  private static final int MAX_QUEUED_PACKETS_PER_CONNECTION = 1 << 12;
+  private static final int MAX_PACKETS_PER_TICK = 1 << 12;
+  private static final int MAX_PACKETS_PER_SECOND_PER_CONNECTION = 1 << 12;
   private static final long RATE_WINDOW_NANOS = TimeUnit.SECONDS.toNanos(1);
   /**
    * Maximum permitted session inactivity in milliseconds. Sessions that have not sent or received data within this
@@ -87,7 +87,8 @@ public final class ServerConnection implements ConnectionHost {
    * this window of the TCP channel becoming active is aborted and — because agreement was never reached — never
    * surfaces as a connected session.
    */
-  public static final long HANDSHAKE_TIMEOUT_MS = 10_000;
+  public static final long HANDSHAKE_TIMEOUT_MS = 30_000;
+
   private final EventLoopGroup bossGroup;
   private final EventLoopGroup workerGroup;
   private final ChannelGroup channels;

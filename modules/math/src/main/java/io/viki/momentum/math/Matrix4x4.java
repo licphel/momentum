@@ -29,23 +29,23 @@ import io.viki.momentum.math.util.FastTrigonometric;
 /**
  * Immutable column-major 4×4 matrix.
  *
- * <p>Storage: {@code m[col][row]}, i.e. {@code m00} is column 0.0F, row 0.
+ * <p>Storage: {@code m[col][row]}, i.e. {@code m00} is column 0, row 0.
  * Multiplication follows standard math convention: {@code A * B} = A then B applied.
  *
- * @param m00 column 0.0F, row 0
- * @param m10 column 1.0F, row 0
+ * @param m00 column 0, row 0
+ * @param m10 column 1, row 0
  * @param m20 column 2, row 0
  * @param m30 column 3, row 0
- * @param m01 column 0.0F, row 1
- * @param m11 column 1.0F, row 1
+ * @param m01 column 0, row 1
+ * @param m11 column 1, row 1
  * @param m21 column 2, row 1
  * @param m31 column 3, row 1
- * @param m02 column 0.0F, row 2
- * @param m12 column 1.0F, row 2
+ * @param m02 column 0, row 2
+ * @param m12 column 1, row 2
  * @param m22 column 2, row 2
  * @param m32 column 3, row 2
- * @param m03 column 0.0F, row 3
- * @param m13 column 1.0F, row 3
+ * @param m03 column 0, row 3
+ * @param m13 column 1, row 3
  * @param m23 column 2, row 3
  * @param m33 column 3, row 3
  * @see Matrix2x2
@@ -54,6 +54,7 @@ import io.viki.momentum.math.util.FastTrigonometric;
  */
 public record Matrix4x4(float m00, float m10, float m20, float m30, float m01, float m11, float m21, float m31,
                         float m02, float m12, float m22, float m32, float m03, float m13, float m23, float m33) {
+  /** The identity transform, which leaves positions and directions unchanged. */
   public static final Matrix4x4 IDENTITY = new Matrix4x4(1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F, 0.0F, 0.0F, 0.0F, 0.0F,
       1.0F, 0.0F, 0.0F, 0.0F, 0.0F, 1.0F);
 

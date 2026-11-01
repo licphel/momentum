@@ -24,10 +24,12 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
- * Immutable unit quaternion for representing 3D rotations.
+ * Immutable quaternion for representing 3D rotations.
  *
  * <p>Convention: {@code q = xi + yj + zk + w}, where {@code w} is the scalar part.
  * Quaternions are not automatically normalized on construction — callers are responsible for passing unit quaternions
@@ -40,12 +42,13 @@ import io.viki.momentum.math.util.FastTrigonometric;
  * @see Euler
  */
 public record Quaternion(float x, float y, float z, float w) {
+  /** The unit quaternion that represents no rotation. */
   public static final Quaternion IDENTITY = new Quaternion(0.0F, 0.0F, 0.0F, 1.0F);
 
   /**
    * Creates a quaternion from an axis and angle.
    *
-   * @param axis    rotation axis (assumed normalized)
+   * @param axis    rotation axis, normalized by this method
    * @param radians rotation angle in radians
    * @return rotation quaternion
    */
@@ -122,7 +125,7 @@ public record Quaternion(float x, float y, float z, float w) {
    * @return interpolated quaternion
    */
   public static Quaternion slerp(Quaternion a, Quaternion b, float t) {
-    float dot = Math.clamp(a.dot(b), -1.0F, 1.0F);
+    float dot = Mutil.clamp(a.dot(b), -1.0F, 1.0F);
     Quaternion bAdjust = dot < 0.0F ? b.negate() : b;
     dot = Math.abs(dot);
 
@@ -295,7 +298,7 @@ public record Quaternion(float x, float y, float z, float w) {
    */
   public float[] toAxisAngle() {
     Quaternion q = normalize();
-    float angle = 2.0F * (float) Math.acos(Math.clamp(q.w, -1.0F, 1.0F));
+    float angle = 2.0F * (float) Math.acos(Mutil.clamp(q.w, -1.0F, 1.0F));
     float s = (float) Math.sqrt(1.0F - q.w * q.w);
     if (s < 1E-10F) {
       return new float[] {1.0F, 0.0F, 0.0F, angle};

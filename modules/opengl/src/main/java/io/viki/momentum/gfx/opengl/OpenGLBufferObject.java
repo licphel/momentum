@@ -24,7 +24,6 @@
 
 package io.viki.momentum.gfx.opengl;
 
-import io.viki.momentum.util.perf.Analysis;
 
 import io.viki.momentum.gfx.DirectBufferPool;
 import io.viki.momentum.gfx.GraphicsMetrics;
@@ -139,8 +138,6 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
   }
 
   private void queueUpload(ByteBuffer memory, int offset, boolean replacement) {
-    Analysis.start("buffer.copyUploadDataAndQueue");
-    try {
       /*
        * Copy first since the memory is volatile.
        * Users may pollute the memory after submission.
@@ -163,9 +160,6 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
       command.offset = offset;
       command.replacement = replacement;
       ctx.submit(command);
-    } finally {
-      Analysis.end("buffer.copyUploadDataAndQueue");
-    }
   }
 
   @Override
@@ -204,33 +198,18 @@ public final class OpenGLBufferObject implements BufferObject, Handle {
         buffer.ctx.cache.bindBuffer(buffer.target, buffer.handle);
         if (replacement) {
           int size = bytes.remaining();
-          Analysis.start("gl.bufferReplace");
-          try {
             glBufferData(buffer.target, bytes, buffer.hint);
             buffer.capacity = size;
-          } finally {
-            Analysis.end("gl.bufferReplace");
-          }
           GraphicsMetrics.recordBufferUpload(size);
           return;
         }
         int needed = offset + bytes.remaining();
         if (needed > buffer.capacity) {
           buffer.capacity = Math.max(needed, buffer.capacity * 2);
-          Analysis.start("gl.growBufferStorage");
-          try {
             glBufferData(buffer.target, buffer.capacity, buffer.hint);
-          } finally {
-            Analysis.end("gl.growBufferStorage");
-          }
         }
         int uploadedBytes = bytes.remaining();
-        Analysis.start("gl.bufferSubData");
-        try {
           glBufferSubData(buffer.target, offset, bytes);
-        } finally {
-          Analysis.end("gl.bufferSubData");
-        }
         GraphicsMetrics.recordBufferUpload(uploadedBytes);
       } finally {
         DirectBufferPool.MEDIUM.release(bytes);

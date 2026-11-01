@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.present;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.text.TextFormat;
 import io.viki.momentum.gfx.text.raster.LayoutGlyph;
 import io.viki.momentum.gfx.text.raster.LayoutRun;
@@ -57,7 +59,7 @@ public final class TextBoxContent implements ElementRenderer, TextBoxPresentatio
   }
 
   private static float offsetFor(LayoutRun run, int index) {
-    int localIndex = Math.clamp(index, 0, visibleLineLength(run.text()));
+    int localIndex = Mutil.clamp(index, 0, visibleLineLength(run.text()));
     LayoutGlyph[] glyphs = run.glyphs();
     float last = 0.0F;
     for (LayoutGlyph glyph : glyphs) {
@@ -159,7 +161,7 @@ public final class TextBoxContent implements ElementRenderer, TextBoxPresentatio
     }
     int hit = raster.hitTest(x - padding, y - padding);
     return hit < 0 ? textBox.text().length()
-        : Math.clamp(hit, 0, textBox.text().length());
+        : Mutil.clamp(hit, 0, textBox.text().length());
   }
 
   /**
@@ -184,7 +186,7 @@ public final class TextBoxContent implements ElementRenderer, TextBoxPresentatio
     updateContentSize(textBox, raster, padding);
     LayoutRun run = runAtCursor(textBox, raster);
     if (run != null) {
-      int localIndex = Math.clamp(textBox.cursorIndex() - run.textStart(),
+      int localIndex = Mutil.clamp(textBox.cursorIndex() - run.textStart(),
           0, visibleLineLength(run.text()));
       x += offsetFor(run, localIndex);
       y += caretTop(run);
@@ -223,7 +225,7 @@ public final class TextBoxContent implements ElementRenderer, TextBoxPresentatio
     float height = emptyLineHeight(area.height(), padding);
     LayoutRun run = runAtCursor(textBox, raster);
     if (run != null) {
-      int localIndex = Math.clamp(textBox.cursorIndex() - run.textStart(),
+      int localIndex = Mutil.clamp(textBox.cursorIndex() - run.textStart(),
           0, visibleLineLength(run.text()));
       offset = offsetFor(run, localIndex);
       top += caretTop(run);

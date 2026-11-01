@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
@@ -116,7 +118,7 @@ public record Vector2(float x, float y) {
    * @return clamped vector
    */
   public static Vector2 clamp(Vector2 v, Vector2 min, Vector2 max) {
-    return new Vector2(Math.clamp(v.x, min.x, max.x), Math.clamp(v.y, min.y, max.y));
+    return new Vector2(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y));
   }
 
   /**

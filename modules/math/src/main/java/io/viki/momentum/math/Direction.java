@@ -107,7 +107,7 @@ public enum Direction {
   }
 
   /**
-   * Returns the nearest direction to the given angle (in degrees).
+   * Returns the direction with the closest angle, using the stored degree values.
    *
    * @param angle angle in degrees
    * @return nearest direction
@@ -126,11 +126,12 @@ public enum Direction {
   }
 
   /**
-   * Returns the direction from a normalized offset vector.
+   * Returns the direction corresponding to a grid offset.
    *
    * @param dx x offset (-1, 0, or 1)
    * @param dy y offset (-1, 0, or 1)
-   * @return the corresponding direction, or null if not a valid direction
+   * @return the direction corresponding to the supplied offset
+   * @throws IllegalArgumentException if either component is outside {@code [-1, 1]} or both are zero
    */
   public static Direction fromOffset(int dx, int dy) {
     return switch (dx) {
@@ -156,18 +157,18 @@ public enum Direction {
   }
 
   /**
-   * Returns the next direction clockwise by 90°.
+   * Returns the direction 90 degrees clockwise from this one.
    *
-   * @return clockwise 90° neighbor (cardinal only)
+   * @return direction 90 degrees clockwise
    */
   public Direction cw90() {
     return ALL[(index + 2) % 8];
   }
 
   /**
-   * Returns the next direction counter-clockwise by 90°.
+   * Returns the direction 90 degrees counter-clockwise from this one.
    *
-   * @return counter-clockwise 90° neighbor (cardinal only)
+   * @return direction 90 degrees counter-clockwise
    */
   public Direction ccw90() {
     return ALL[(index + 6) % 8];
@@ -176,7 +177,7 @@ public enum Direction {
   /**
    * Returns the next direction clockwise by 45°.
    *
-   * @return clockwise 45° neighbour
+   * @return direction 45 degrees clockwise
    */
   public Direction cw45() {
     return ALL[(index + 1) % 8];
@@ -185,7 +186,7 @@ public enum Direction {
   /**
    * Returns the next direction counter-clockwise by 45°.
    *
-   * @return counter-clockwise 45° neighbour
+   * @return direction 45 degrees counter-clockwise
    */
   public Direction ccw45() {
     return ALL[(index + 7) % 8];
@@ -229,7 +230,7 @@ public enum Direction {
   }
 
   /**
-   * Returns this direction as a normalized {@link Vector2}.
+   * Returns this direction as an integer grid-offset {@link Vector2}.
    *
    * @return unit vector in this direction
    */

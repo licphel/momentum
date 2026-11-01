@@ -24,6 +24,8 @@
 
 package io.viki.momentum.sfx.ext;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Backend-neutral parameters for the standard EFX echo effect.
  *
@@ -44,7 +46,7 @@ public record Echo(float delay, float leftRightDelay, float damping,
    * @return echo parameters
    */
   public static Echo simple(float strength, float delay) {
-    float value = Math.clamp(strength, 0F, 1F);
+    float value = Mutil.clamp(strength, 0F, 1F);
     return new Echo(delay, Math.min(delay * 0.5F, 0.404F),
         0.35F + value * 0.45F, value * 0.75F, 0F, value);
   }

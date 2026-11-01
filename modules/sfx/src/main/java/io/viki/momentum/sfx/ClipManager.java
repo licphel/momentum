@@ -46,7 +46,7 @@ public final class ClipManager implements AutoCloseable {
     }
     try {
       clip.__enableNativeAutoClosure();
-    } catch (Exception _) {
+    } catch (Exception ignored) {
       clips.add(clip); // Native auto closure is not supported. Fallback to our management.
     }
   }

@@ -118,7 +118,7 @@ public final class FontInsta {
         return candidate;
       }
     }
-    return combinations.getLast().resolve(codepoint);
+    return combinations.get(combinations.size() - 1).resolve(codepoint);
   }
 
   /**

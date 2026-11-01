@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.math.util.Mutil;
+
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoScrollBarRenderer;
 import io.viki.momentum.input.KeyAction;
@@ -369,12 +371,12 @@ public final class ScrollBar extends Element {
 
   private void updateFromPointer(float thumbStart) {
     float travel = axisLength() - thumbLength();
-    double normalized = travel <= 0.0F ? 0.0 : Math.clamp(thumbStart / travel, 0.0F, 1.0F);
+    double normalized = travel <= 0.0F ? 0.0 : Mutil.clamp(thumbStart / travel, 0.0F, 1.0F);
     updateValue(minimum + normalized * (maximum - minimum), true);
   }
 
   private void updateValue(double candidate, boolean notify) {
-    double clamped = Math.clamp(candidate, minimum, maximum);
+    double clamped = Mutil.clamp(candidate, minimum, maximum);
     if (Double.compare(value, clamped) == 0) {
       return;
     }

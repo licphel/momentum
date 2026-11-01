@@ -30,8 +30,9 @@ package io.viki.momentum.math;
  * <p>The frustum represents the visible region of 3D space as defined by a camera.
  * It is used for culling objects that are outside the camera's view.
  *
- * <p>Planes are stored in order: Left, Right, Bottom, Top, Near, Far.
- * Corners are computed lazily from plane intersection and are available via {@link #corner}.
+ * <p>Planes are stored in order: Left, Right, Bottom, Top, Near, Far. Corners are calculated
+ * during construction and are available through {@link #corner(int)}. After construction,
+ * instances are immutable and safe for concurrent reads.
  */
 public final class Frustum {
   /**
@@ -60,7 +61,7 @@ public final class Frustum {
   }
 
   /**
-   * Creates a frustum from a combined view-projection matrix using Gribb/Hartmann extraction.
+   * Creates a frustum from a combined view-projection matrix using Gribb-Hartmann extraction.
    *
    * @param viewProjection combined VP matrix
    */
@@ -132,7 +133,7 @@ public final class Frustum {
   /**
    * Creates a frustum from separate view and projection matrices.
    *
-   * @param view       view matrix (camera to world)
+   * @param view       view matrix (world to camera)
    * @param projection projection matrix
    * @return view frustum in world space
    */
@@ -194,7 +195,7 @@ public final class Frustum {
   /**
    * Returns the center point of the frustum (average of all eight corners).
    *
-   * @return centre position
+   * @return center position
    */
   public Vector3 center() {
     float sx = 0;
@@ -405,11 +406,17 @@ public final class Frustum {
    * Symbolic indices for the six frustum planes.
    */
   public enum PlaneIndex {
+    /** Left clipping plane. */
     LEFT,
+    /** Right clipping plane. */
     RIGHT,
+    /** Bottom clipping plane. */
     BOTTOM,
+    /** Top clipping plane. */
     TOP,
+    /** Near clipping plane. */
     NEAR,
+    /** Far clipping plane. */
     FAR
   }
 }

@@ -128,7 +128,7 @@ public final class Rasterizer {
     if (runs.isEmpty()) {
       return 0;
     }
-    LayoutGlyph[] glyphs = runs.getLast().glyphs();
+    LayoutGlyph[] glyphs = runs.get(runs.size() - 1).glyphs();
     if (glyphs.length == 0) {
       return 0;
     }
@@ -184,7 +184,7 @@ public final class Rasterizer {
         widthAtPreviousSoftBreak = lineWidth;
       }
     }
-    if (result.isEmpty() || result.getLast().charOffset() < textLen) {
+    if (result.isEmpty() || result.get(result.size() - 1).charOffset() < textLen) {
       result.add(new BreakPoint(textLen, lineWidth, false));
     }
     return result;

@@ -24,6 +24,8 @@
 
 package io.viki.momentum.math;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Euler angles in radians (Y-X-Z order, also known as yaw-pitch-roll).
  *
@@ -44,6 +46,7 @@ package io.viki.momentum.math;
  * @see Quaternion
  */
 public record Euler(float yaw, float pitch, float roll) {
+  /** An Euler rotation with zero yaw, pitch, and roll. */
   public static final Euler ZERO = new Euler(0.0F, 0.0F, 0.0F);
 
   /**
@@ -77,7 +80,7 @@ public record Euler(float yaw, float pitch, float roll) {
    */
   private static float clampAngle(float angle) {
     float pi = (float) Math.PI;
-    return Math.clamp(angle, -pi, pi);
+    return Mutil.clamp(angle, -pi, pi);
   }
 
   /**
@@ -85,7 +88,7 @@ public record Euler(float yaw, float pitch, float roll) {
    */
   private static float clampPitch(float pitch) {
     float halfPi = (float) (Math.PI / 2);
-    return Math.clamp(pitch, -halfPi, halfPi);
+    return Mutil.clamp(pitch, -halfPi, halfPi);
   }
 
   /**
@@ -162,7 +165,7 @@ public record Euler(float yaw, float pitch, float roll) {
   /**
    * Converts to a {@link Vector3} using Y-X-Z order.
    *
-   * @return equivalent quaternion
+   * @return vector containing yaw, pitch, and roll, in that order
    */
   public Vector3 toVector3() {
     return new Vector3(yaw, pitch, roll);

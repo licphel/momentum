@@ -1,5 +1,7 @@
 package io.viki.momentum.input;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Pollable, directly injectable gamepad state. All access belongs to the owning input thread.
  */
@@ -160,8 +162,8 @@ public final class GamepadState {
    * @param right right trigger value
    */
   public void setTriggers(float left, float right) {
-    left = Math.clamp(left, 0F, 1F);
-    right = Math.clamp(right, 0F, 1F);
+    left = Mutil.clamp(left, 0F, 1F);
+    right = Mutil.clamp(right, 0F, 1F);
     if (leftTrigger == left && rightTrigger == right) {
       return;
     }

@@ -101,7 +101,7 @@ public final class TaskQueue implements AutoCloseable {
   public void enqueue(int priority, Runnable task) {
     enqueue(priority, plan -> plan.run(task), failures -> {
       if (!failures.isEmpty()) {
-        Throwable error = failures.getFirst();
+        Throwable error = failures.get(0);
         if (error instanceof RuntimeException runtime) {
           throw runtime;
         }
