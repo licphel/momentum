@@ -17,7 +17,7 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
+          java-version: '17'
       - name: Compile, lint and test
         run: ./gradlew build --no-daemon
         shell: bash

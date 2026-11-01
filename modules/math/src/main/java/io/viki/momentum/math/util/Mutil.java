@@ -35,6 +35,94 @@ public final class Mutil {
   }
 
   /**
+   * Converts a binary32 value to an IEEE 754 binary16 bit pattern using
+   * round-to-nearest-even semantics.
+   *
+   * <p>Java's {@code Float.floatToFloat16} was added after the Java 17 API.
+   * Keeping the conversion here lets the codec and renderer retain the same
+   * wire format while targeting Java 17.
+   *
+   * @param value value to convert
+   * @return the binary16 bits stored in a short
+   */
+  public static short floatToFloat16(float value) {
+    int bits = Float.floatToRawIntBits(value);
+    int sign = (bits >>> 16) & 0x8000;
+    int exponent = (bits >>> 23) & 0xFF;
+    int significand = bits & 0x7FFFFF;
+    if (exponent == 0xFF) {
+      if (significand == 0) {
+        return (short) (sign | 0x7C00);
+      }
+      int payload = significand >>> 13;
+      return (short) (sign | 0x7C00 | payload | 0x0200);
+    }
+
+    int halfExponent = exponent - 112;
+    if (halfExponent >= 0x1F) {
+      return (short) (sign | 0x7C00);
+    }
+    if (halfExponent <= 0) {
+      if (halfExponent < -10) {
+        return (short) sign;
+      }
+      int mantissa = significand | 0x00800000;
+      int rounded = roundShiftRight(mantissa, 14 - halfExponent);
+      return (short) (sign | rounded);
+    }
+
+    int rounded = roundShiftRight(significand, 13);
+    if (rounded == 0x400) {
+      rounded = 0;
+      halfExponent++;
+      if (halfExponent >= 0x1F) {
+        return (short) (sign | 0x7C00);
+      }
+    }
+    return (short) (sign | (halfExponent << 10) | rounded);
+  }
+
+  /**
+   * Converts an IEEE 754 binary16 bit pattern to an exactly representable
+   * binary32 value.
+   *
+   * @param bits binary16 bits stored in a short
+   * @return the converted float
+   */
+  public static float float16ToFloat(short bits) {
+    int value = bits & 0xFFFF;
+    int sign = (value & 0x8000) << 16;
+    int exponent = (value >>> 10) & 0x1F;
+    int significand = value & 0x03FF;
+    if (exponent == 0) {
+      if (significand == 0) {
+        return Float.intBitsToFloat(sign);
+      }
+      exponent = 1;
+      while ((significand & 0x0400) == 0) {
+        significand <<= 1;
+        exponent--;
+      }
+      significand &= 0x03FF;
+      return Float.intBitsToFloat(sign | ((exponent + 112) << 23) | (significand << 13));
+    }
+    if (exponent == 0x1F) {
+      return Float.intBitsToFloat(sign | 0x7F800000 | (significand << 13));
+    }
+    return Float.intBitsToFloat(sign | ((exponent + 112) << 23) | (significand << 13));
+  }
+
+  private static int roundShiftRight(int value, int shift) {
+    int result = value >>> shift;
+    int remainder = value & ((1 << shift) - 1);
+    int halfway = 1 << (shift - 1);
+    if (remainder > halfway || (remainder == halfway && (result & 1) != 0)) {
+      result++;
+    }
+    return result;
+  }
+
+  /**
    * Clamps an integer to an inclusive range.
    *
    * @param value value to clamp

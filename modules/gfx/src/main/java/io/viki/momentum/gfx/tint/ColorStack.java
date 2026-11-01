@@ -1,5 +1,7 @@
 package io.viki.momentum.gfx.tint;
 
+import io.viki.momentum.math.util.Mutil;
+
 import java.util.Arrays;
 
 /**
@@ -64,9 +66,9 @@ public final class ColorStack {
     }
     int offset = depth * CHANNELS;
     return Color.packF16LE(
-        Float.float16ToFloat((short) color) * products[offset],
-        Float.float16ToFloat((short) (color >>> 16)) * products[offset + 1],
-        Float.float16ToFloat((short) (color >>> 32)) * products[offset + 2],
-        Float.float16ToFloat((short) (color >>> 48)) * products[offset + 3]);
+        Mutil.float16ToFloat((short) color) * products[offset],
+        Mutil.float16ToFloat((short) (color >>> 16)) * products[offset + 1],
+        Mutil.float16ToFloat((short) (color >>> 32)) * products[offset + 2],
+        Mutil.float16ToFloat((short) (color >>> 48)) * products[offset + 3]);
   }
 }

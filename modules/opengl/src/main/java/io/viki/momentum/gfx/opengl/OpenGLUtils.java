@@ -61,9 +61,9 @@ public final class OpenGLUtils {
    */
   public static int bufferTarget(BufferType type) {
     return switch (type) {
-      case BufferType.VERTEX -> GL_ARRAY_BUFFER;
-      case BufferType.INDEX -> GL_ELEMENT_ARRAY_BUFFER;
-      case BufferType.UNIFORM -> GL_UNIFORM_BUFFER;
+      case VERTEX -> GL_ARRAY_BUFFER;
+      case INDEX -> GL_ELEMENT_ARRAY_BUFFER;
+      case UNIFORM -> GL_UNIFORM_BUFFER;
     };
   }
 
@@ -79,9 +79,9 @@ public final class OpenGLUtils {
    */
   public static int bufferUsage(BufferFrequency freq, boolean gpuWrite) {
     return switch (freq) {
-      case BufferFrequency.STATIC -> gpuWrite ? GL_STATIC_COPY : GL_STATIC_DRAW;
-      case BufferFrequency.DYNAMIC -> gpuWrite ? GL_DYNAMIC_COPY : GL_DYNAMIC_DRAW;
-      case BufferFrequency.STREAM -> gpuWrite ? GL_STREAM_COPY : GL_STREAM_DRAW;
+      case STATIC -> gpuWrite ? GL_STATIC_COPY : GL_STATIC_DRAW;
+      case DYNAMIC -> gpuWrite ? GL_DYNAMIC_COPY : GL_DYNAMIC_DRAW;
+      case STREAM -> gpuWrite ? GL_STREAM_COPY : GL_STREAM_DRAW;
     };
   }
 
@@ -93,14 +93,14 @@ public final class OpenGLUtils {
    */
   public static int vertexAttribType(VertexAttributeType type) {
     return switch (type) {
-      case VertexAttributeType.UINT8 -> GL_UNSIGNED_BYTE;
-      case VertexAttributeType.UINT16 -> GL_UNSIGNED_SHORT;
-      case VertexAttributeType.UINT32 -> GL_UNSIGNED_INT;
-      case VertexAttributeType.INT8 -> GL_BYTE;
-      case VertexAttributeType.INT16 -> GL_SHORT;
-      case VertexAttributeType.INT32 -> GL_INT;
-      case VertexAttributeType.FLOAT16 -> GL_HALF_FLOAT;
-      case VertexAttributeType.FLOAT32 -> GL_FLOAT;
+      case UINT8 -> GL_UNSIGNED_BYTE;
+      case UINT16 -> GL_UNSIGNED_SHORT;
+      case UINT32 -> GL_UNSIGNED_INT;
+      case INT8 -> GL_BYTE;
+      case INT16 -> GL_SHORT;
+      case INT32 -> GL_INT;
+      case FLOAT16 -> GL_HALF_FLOAT;
+      case FLOAT32 -> GL_FLOAT;
     };
   }
 
@@ -112,21 +112,21 @@ public final class OpenGLUtils {
    */
   public static int blendFactor(BlendFactor f) {
     return switch (f) {
-      case BlendFactor.ZERO -> GL_ZERO;
-      case BlendFactor.ONE -> GL_ONE;
-      case BlendFactor.SRC_COLOR -> GL_SRC_COLOR;
-      case BlendFactor.ONE_MINUS_SRC_COLOR -> GL_ONE_MINUS_SRC_COLOR;
-      case BlendFactor.DST_COLOR -> GL_DST_COLOR;
-      case BlendFactor.ONE_MINUS_DST_COLOR -> GL_ONE_MINUS_DST_COLOR;
-      case BlendFactor.SRC_ALPHA -> GL_SRC_ALPHA;
-      case BlendFactor.ONE_MINUS_SRC_ALPHA -> GL_ONE_MINUS_SRC_ALPHA;
-      case BlendFactor.DST_ALPHA -> GL_DST_ALPHA;
-      case BlendFactor.ONE_MINUS_DST_ALPHA -> GL_ONE_MINUS_DST_ALPHA;
-      case BlendFactor.CONSTANT_COLOR -> GL_CONSTANT_COLOR;
-      case BlendFactor.ONE_MINUS_CONSTANT_COLOR -> GL_ONE_MINUS_CONSTANT_COLOR;
-      case BlendFactor.CONSTANT_ALPHA -> GL_CONSTANT_ALPHA;
-      case BlendFactor.ONE_MINUS_CONSTANT_ALPHA -> GL_ONE_MINUS_CONSTANT_ALPHA;
-      case BlendFactor.SRC_ALPHA_SATURATE -> GL_SRC_ALPHA_SATURATE;
+      case ZERO -> GL_ZERO;
+      case ONE -> GL_ONE;
+      case SRC_COLOR -> GL_SRC_COLOR;
+      case ONE_MINUS_SRC_COLOR -> GL_ONE_MINUS_SRC_COLOR;
+      case DST_COLOR -> GL_DST_COLOR;
+      case ONE_MINUS_DST_COLOR -> GL_ONE_MINUS_DST_COLOR;
+      case SRC_ALPHA -> GL_SRC_ALPHA;
+      case ONE_MINUS_SRC_ALPHA -> GL_ONE_MINUS_SRC_ALPHA;
+      case DST_ALPHA -> GL_DST_ALPHA;
+      case ONE_MINUS_DST_ALPHA -> GL_ONE_MINUS_DST_ALPHA;
+      case CONSTANT_COLOR -> GL_CONSTANT_COLOR;
+      case ONE_MINUS_CONSTANT_COLOR -> GL_ONE_MINUS_CONSTANT_COLOR;
+      case CONSTANT_ALPHA -> GL_CONSTANT_ALPHA;
+      case ONE_MINUS_CONSTANT_ALPHA -> GL_ONE_MINUS_CONSTANT_ALPHA;
+      case SRC_ALPHA_SATURATE -> GL_SRC_ALPHA_SATURATE;
     };
   }
 
@@ -138,11 +138,11 @@ public final class OpenGLUtils {
    */
   public static int blendFunc(BlendFunc f) {
     return switch (f) {
-      case BlendFunc.ADD -> GL_FUNC_ADD;
-      case BlendFunc.SUBTRACT -> GL_FUNC_SUBTRACT;
-      case BlendFunc.REVERSE_SUBTRACT -> GL_FUNC_REVERSE_SUBTRACT;
-      case BlendFunc.MIN -> GL_MIN;
-      case BlendFunc.MAX -> GL_MAX;
+      case ADD -> GL_FUNC_ADD;
+      case SUBTRACT -> GL_FUNC_SUBTRACT;
+      case REVERSE_SUBTRACT -> GL_FUNC_REVERSE_SUBTRACT;
+      case MIN -> GL_MIN;
+      case MAX -> GL_MAX;
     };
   }
 
@@ -154,14 +154,14 @@ public final class OpenGLUtils {
    */
   public static int compareOp(CompareOp op) {
     return switch (op) {
-      case CompareOp.NEVER -> GL_NEVER;
-      case CompareOp.LESS -> GL_LESS;
-      case CompareOp.EQUAL -> GL_EQUAL;
-      case CompareOp.LESS_OR_EQUAL -> GL_LEQUAL;
-      case CompareOp.GREATER -> GL_GREATER;
-      case CompareOp.NOT_EQUAL -> GL_NOTEQUAL;
-      case CompareOp.GREATER_OR_EQUAL -> GL_GEQUAL;
-      case CompareOp.ALWAYS -> GL_ALWAYS;
+      case NEVER -> GL_NEVER;
+      case LESS -> GL_LESS;
+      case EQUAL -> GL_EQUAL;
+      case LESS_OR_EQUAL -> GL_LEQUAL;
+      case GREATER -> GL_GREATER;
+      case NOT_EQUAL -> GL_NOTEQUAL;
+      case GREATER_OR_EQUAL -> GL_GEQUAL;
+      case ALWAYS -> GL_ALWAYS;
     };
   }
 
@@ -173,14 +173,14 @@ public final class OpenGLUtils {
    */
   public static int stencilFunc(StencilFunc f) {
     return switch (f) {
-      case StencilFunc.KEEP -> GL_KEEP;
-      case StencilFunc.ZERO -> GL_ZERO;
-      case StencilFunc.REPLACE -> GL_REPLACE;
-      case StencilFunc.INVERT -> GL_INVERT;
-      case StencilFunc.INCR -> GL_INCR;
-      case StencilFunc.DECR -> GL_DECR;
-      case StencilFunc.INCR_WRAP -> GL_INCR_WRAP;
-      case StencilFunc.DECR_WRAP -> GL_DECR_WRAP;
+      case KEEP -> GL_KEEP;
+      case ZERO -> GL_ZERO;
+      case REPLACE -> GL_REPLACE;
+      case INVERT -> GL_INVERT;
+      case INCR -> GL_INCR;
+      case DECR -> GL_DECR;
+      case INCR_WRAP -> GL_INCR_WRAP;
+      case DECR_WRAP -> GL_DECR_WRAP;
     };
   }
 
@@ -192,13 +192,13 @@ public final class OpenGLUtils {
    */
   public static int topology(Topology t) {
     return switch (t) {
-      case Topology.TRIANGLE -> GL_TRIANGLES;
-      case Topology.TRIANGLE_FAN -> GL_TRIANGLE_FAN;
-      case Topology.TRIANGLE_STRIP -> GL_TRIANGLE_STRIP;
-      case Topology.LINE -> GL_LINES;
-      case Topology.LINE_STRIP -> GL_LINE_STRIP;
-      case Topology.LINE_LOOP -> GL_LINE_LOOP;
-      case Topology.POINT -> GL_POINTS;
+      case TRIANGLE -> GL_TRIANGLES;
+      case TRIANGLE_FAN -> GL_TRIANGLE_FAN;
+      case TRIANGLE_STRIP -> GL_TRIANGLE_STRIP;
+      case LINE -> GL_LINES;
+      case LINE_STRIP -> GL_LINE_STRIP;
+      case LINE_LOOP -> GL_LINE_LOOP;
+      case POINT -> GL_POINTS;
     };
   }
 
@@ -210,9 +210,9 @@ public final class OpenGLUtils {
    */
   public static int polygonMode(PolygonMode m) {
     return switch (m) {
-      case PolygonMode.FILL -> GL_FILL;
-      case PolygonMode.LINE -> GL_LINE;
-      case PolygonMode.POINT -> GL_POINT;
+      case FILL -> GL_FILL;
+      case LINE -> GL_LINE;
+      case POINT -> GL_POINT;
     };
   }
 
@@ -227,10 +227,10 @@ public final class OpenGLUtils {
    */
   public static int cullMode(CullMode m) {
     return switch (m) {
-      case CullMode.NONE -> -1;
-      case CullMode.FRONT -> GL_FRONT;
-      case CullMode.BACK -> GL_BACK;
-      case CullMode.FRONT_AND_BACK -> GL_FRONT_AND_BACK;
+      case NONE -> -1;
+      case FRONT -> GL_FRONT;
+      case BACK -> GL_BACK;
+      case FRONT_AND_BACK -> GL_FRONT_AND_BACK;
     };
   }
 
@@ -242,8 +242,8 @@ public final class OpenGLUtils {
    */
   public static int frontFace(FrontFace f) {
     return switch (f) {
-      case FrontFace.CLOCKWISE -> GL_CW;
-      case FrontFace.COUNTER_CLOCKWISE -> GL_CCW;
+      case CLOCKWISE -> GL_CW;
+      case COUNTER_CLOCKWISE -> GL_CCW;
     };
   }
 
@@ -255,9 +255,9 @@ public final class OpenGLUtils {
    */
   public static int textureTarget(TextureType t) {
     return switch (t) {
-      case TextureType.TEXTURE_1D -> GL_TEXTURE_1D;
-      case TextureType.TEXTURE_2D -> GL_TEXTURE_2D;
-      case TextureType.TEXTURE_3D -> GL_TEXTURE_3D;
+      case TEXTURE_1D -> GL_TEXTURE_1D;
+      case TEXTURE_2D -> GL_TEXTURE_2D;
+      case TEXTURE_3D -> GL_TEXTURE_3D;
     };
   }
 
@@ -269,10 +269,10 @@ public final class OpenGLUtils {
    */
   public static int textureWrap(TextureWrap w) {
     return switch (w) {
-      case TextureWrap.CLAMP_TO_EDGE -> GL_CLAMP_TO_EDGE;
-      case TextureWrap.CLAMP_TO_BORDER -> GL_CLAMP_TO_BORDER;
-      case TextureWrap.REPEAT -> GL_REPEAT;
-      case TextureWrap.MIRRORED_REPEAT -> GL_MIRRORED_REPEAT;
+      case CLAMP_TO_EDGE -> GL_CLAMP_TO_EDGE;
+      case CLAMP_TO_BORDER -> GL_CLAMP_TO_BORDER;
+      case REPEAT -> GL_REPEAT;
+      case MIRRORED_REPEAT -> GL_MIRRORED_REPEAT;
     };
   }
 
@@ -284,12 +284,12 @@ public final class OpenGLUtils {
    */
   public static int textureFilter(TextureFilter f) {
     return switch (f) {
-      case TextureFilter.NEAREST -> GL_NEAREST;
-      case TextureFilter.LINEAR -> GL_LINEAR;
-      case TextureFilter.NEAREST_MIPMAP_NEAREST -> GL_NEAREST_MIPMAP_NEAREST;
-      case TextureFilter.LINEAR_MIPMAP_NEAREST -> GL_LINEAR_MIPMAP_NEAREST;
-      case TextureFilter.LINEAR_MIPMAP_LINEAR -> GL_LINEAR_MIPMAP_LINEAR;
-      case TextureFilter.NEAREST_MIPMAP_LINEAR -> GL_NEAREST_MIPMAP_LINEAR;
+      case NEAREST -> GL_NEAREST;
+      case LINEAR -> GL_LINEAR;
+      case NEAREST_MIPMAP_NEAREST -> GL_NEAREST_MIPMAP_NEAREST;
+      case LINEAR_MIPMAP_NEAREST -> GL_LINEAR_MIPMAP_NEAREST;
+      case LINEAR_MIPMAP_LINEAR -> GL_LINEAR_MIPMAP_LINEAR;
+      case NEAREST_MIPMAP_LINEAR -> GL_NEAREST_MIPMAP_LINEAR;
     };
   }
 
@@ -301,22 +301,22 @@ public final class OpenGLUtils {
    */
   public static int[] textureFormat(TextureFormat f) {
     return switch (f) {
-      case TextureFormat.RED8 -> new int[] {GL_R8, GL_RED, GL_UNSIGNED_BYTE};
-      case TextureFormat.RG8 -> new int[] {GL_RG8, GL_RG, GL_UNSIGNED_BYTE};
-      case TextureFormat.RGB8 -> new int[] {GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE};
-      case TextureFormat.RGBA8 -> new int[] {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE};
-      case TextureFormat.RED16F -> new int[] {GL_R16F, GL_RED, GL_HALF_FLOAT};
-      case TextureFormat.RG16F -> new int[] {GL_RG16F, GL_RG, GL_HALF_FLOAT};
-      case TextureFormat.RGB16F -> new int[] {GL_RGB16F, GL_RGB, GL_HALF_FLOAT};
-      case TextureFormat.RGBA16F -> new int[] {GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT};
-      case TextureFormat.RED32F -> new int[] {GL_R32F, GL_RED, GL_FLOAT};
-      case TextureFormat.RG32F -> new int[] {GL_RG32F, GL_RG, GL_FLOAT};
-      case TextureFormat.RGB32F -> new int[] {GL_RGB32F, GL_RGB, GL_FLOAT};
-      case TextureFormat.RGBA32F -> new int[] {GL_RGBA32F, GL_RGBA, GL_FLOAT};
-      case TextureFormat.DEPTH16 -> new int[] {GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT};
-      case TextureFormat.DEPTH24 -> new int[] {GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
-      case TextureFormat.DEPTH32F -> new int[] {GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT};
-      case TextureFormat.DEPTH24_STENCIL8 -> new int[] {GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8};
+      case RED8 -> new int[] {GL_R8, GL_RED, GL_UNSIGNED_BYTE};
+      case RG8 -> new int[] {GL_RG8, GL_RG, GL_UNSIGNED_BYTE};
+      case RGB8 -> new int[] {GL_RGB8, GL_RGB, GL_UNSIGNED_BYTE};
+      case RGBA8 -> new int[] {GL_RGBA8, GL_RGBA, GL_UNSIGNED_BYTE};
+      case RED16F -> new int[] {GL_R16F, GL_RED, GL_HALF_FLOAT};
+      case RG16F -> new int[] {GL_RG16F, GL_RG, GL_HALF_FLOAT};
+      case RGB16F -> new int[] {GL_RGB16F, GL_RGB, GL_HALF_FLOAT};
+      case RGBA16F -> new int[] {GL_RGBA16F, GL_RGBA, GL_HALF_FLOAT};
+      case RED32F -> new int[] {GL_R32F, GL_RED, GL_FLOAT};
+      case RG32F -> new int[] {GL_RG32F, GL_RG, GL_FLOAT};
+      case RGB32F -> new int[] {GL_RGB32F, GL_RGB, GL_FLOAT};
+      case RGBA32F -> new int[] {GL_RGBA32F, GL_RGBA, GL_FLOAT};
+      case DEPTH16 -> new int[] {GL_DEPTH_COMPONENT16, GL_DEPTH_COMPONENT, GL_UNSIGNED_SHORT};
+      case DEPTH24 -> new int[] {GL_DEPTH_COMPONENT24, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT};
+      case DEPTH32F -> new int[] {GL_DEPTH_COMPONENT32F, GL_DEPTH_COMPONENT, GL_FLOAT};
+      case DEPTH24_STENCIL8 -> new int[] {GL_DEPTH24_STENCIL8, GL_DEPTH_STENCIL, GL_UNSIGNED_INT_24_8};
     };
   }
 
@@ -329,10 +329,10 @@ public final class OpenGLUtils {
    */
   public static int shaderType(ShaderType t) {
     return switch (t) {
-      case ShaderType.VERTEX -> GL_VERTEX_SHADER;
-      case ShaderType.FRAGMENT -> GL_FRAGMENT_SHADER;
-      case ShaderType.GEOMETRY -> GL_GEOMETRY_SHADER;
-      case ShaderType.COMPUTE -> GL_COMPUTE_SHADER;
+      case VERTEX -> GL_VERTEX_SHADER;
+      case FRAGMENT -> GL_FRAGMENT_SHADER;
+      case GEOMETRY -> GL_GEOMETRY_SHADER;
+      case COMPUTE -> GL_COMPUTE_SHADER;
     };
   }
 }

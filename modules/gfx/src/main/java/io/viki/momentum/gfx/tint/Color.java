@@ -24,6 +24,8 @@
 
 package io.viki.momentum.gfx.tint;
 
+import io.viki.momentum.math.util.Mutil;
+
 /**
  * Immutable float RGBA color.
  *
@@ -212,10 +214,10 @@ public record Color(float red, float green, float blue, float alpha) implements 
    * @return packed half-precision values
    */
   public static long packF16LE(float r, float g, float b, float a) {
-    long hr = Float.floatToFloat16(r) & 0xFFFFL;
-    long hg = Float.floatToFloat16(g) & 0xFFFFL;
-    long hb = Float.floatToFloat16(b) & 0xFFFFL;
-    long ha = Float.floatToFloat16(a) & 0xFFFFL;
+    long hr = Mutil.floatToFloat16(r) & 0xFFFFL;
+    long hg = Mutil.floatToFloat16(g) & 0xFFFFL;
+    long hb = Mutil.floatToFloat16(b) & 0xFFFFL;
+    long ha = Mutil.floatToFloat16(a) & 0xFFFFL;
     return hr | (hg << 16) | (hb << 32) | (ha << 48);
   }
 

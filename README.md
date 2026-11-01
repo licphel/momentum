@@ -1,7 +1,7 @@
 # Momentum
 
 [![License](https://img.shields.io/badge/License-MIT-2563eb?style=for-the-badge)](./LICENSE)
-[![Java](https://img.shields.io/badge/Java-25%2B-f59e0b?style=for-the-badge&logo=openjdk&logoColor=white)](https://jdk.java.net/25/)
+[![Java](https://img.shields.io/badge/Java-17%2B-f59e0b?style=for-the-badge&logo=openjdk&logoColor=white)](https://jdk.java.net/17/)
 [![Gradle](https://img.shields.io/badge/Gradle-9.x-02303a?style=for-the-badge&logo=gradle&logoColor=white)](https://gradle.org)
 
 **Momentum is a modular, backend-agnostic application framework for the modern JVM.**
@@ -71,7 +71,7 @@ the full modern JDK on the platforms where Java excels.
 
 ## Quick Start
 
-**Prerequisites:** JDK 21+
+**Prerequisites:** JDK 17+
 
 ```bash
 git clone https://github.com/licphel/momentum.git

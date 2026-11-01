@@ -31,6 +31,7 @@ import io.viki.momentum.util.Platform;
 import java.time.Duration;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Process-wide background task budget. All entry points are thread-safe.
@@ -41,10 +42,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
  *
  * <h2>Resource Limiting Strategy</h2>
  * <ul>
- *   <li><b>CPU work ({@link #cpu()})</b>: Uses at most two platform workers (one on devices with
- *       two or fewer logical processors).</li>
- *   <li><b>Blocking I/O ({@link #io()})</b>: Uses one virtual thread per task, with four tasks
- *       admitted at a time.</li>
+ *   <li><b>CPU work ({@link #cpu()})</b>: Uses at most 3 platform workers.</li>
+ *   <li><b>Blocking I/O ({@link #io()})</b>: Uses a shared 3-worker platform pool.</li>
  * </ul>
  *
  * <h2>Usage Constraints</h2>
@@ -64,39 +63,32 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
 public final class Parallel {
   /**
-   * I/O concurrency limit. At most {@code IO_CONCURRENCY} I/O tasks may hold execution permits
-   * simultaneously.
+   * I/O concurrency limit. Set to 1 on devices with two or fewer logical processors, otherwise 3.
    */
-  public static final int IO_CONCURRENCY = 4;
+  public static final int IO_CONCURRENCY = ExecutionMode.auto() == ExecutionMode.DEDICATED_THREAD ? 3 : 1;
   /**
-   * CPU concurrency limit. Set to 1 on devices with two or fewer logical processors, otherwise 2.
+   * CPU concurrency limit. Set to 1 on devices with two or fewer logical processors, otherwise 3.
    */
-  public static final int CPU_CONCURRENCY = Runtime.getRuntime().availableProcessors() <= 2 ? 1 : 2;
+  public static final int CPU_CONCURRENCY = ExecutionMode.auto() == ExecutionMode.DEDICATED_THREAD ? 3 : 1;
+
   /** Maximum queue capacity for the CPU executor. */
   private static final int CPU_QUEUE_CAPACITY = 256;
   private static final Logger LOGGER = Log.getLogger();
   private static final ThreadPoolExecutor CPU;
-  private static final Semaphore IO_PERMITS = new Semaphore(IO_CONCURRENCY);
-  private static final Executor IO;
-  private static final Executor IO_THREADS = Executors.newVirtualThreadPerTaskExecutor();
-  private static final ScheduledThreadPoolExecutor TIMER = new ScheduledThreadPoolExecutor(1,
-      Thread.ofPlatform().daemon().name("Parallel-Timer").factory());
+  private static final ThreadPoolExecutor IO;
+  private static final ScheduledThreadPoolExecutor TIMER;
 
   static {
     CPU = new ThreadPoolExecutor(
         CPU_CONCURRENCY, CPU_CONCURRENCY, 30, TimeUnit.SECONDS,
-        new ArrayBlockingQueue<>(CPU_QUEUE_CAPACITY),
-        Thread.ofPlatform().daemon().name("Parallel-CPU-", 0).factory());
+        new ArrayBlockingQueue<>(CPU_QUEUE_CAPACITY), threadFactory("Parallel-CPU-"));
+    IO = new ThreadPoolExecutor(
+        IO_CONCURRENCY, IO_CONCURRENCY, 30, TimeUnit.SECONDS,
+        new LinkedBlockingQueue<>(), threadFactory("Parallel-IO-"));
+    TIMER = new ScheduledThreadPoolExecutor(1, threadFactory("Parallel-Timer-"));
     CPU.allowCoreThreadTimeOut(true);
+    IO.allowCoreThreadTimeOut(true);
     TIMER.setRemoveOnCancelPolicy(true);
-    IO = task -> IO_THREADS.execute(() -> {
-      IO_PERMITS.acquireUninterruptibly();
-      try {
-        task.run();
-      } finally {
-        IO_PERMITS.release();
-      }
-    });
   }
 
   private Parallel() {
@@ -108,10 +100,19 @@ public final class Parallel {
    * their owner must stop and join them. Never use this for ordinary background tasks.
    *
    * @param prefix thread name prefix
+   * <p>Java 17 has no virtual-thread API, so this factory creates named daemon platform threads.
+   * Ordinary work should still use {@link #cpu()} or {@link #io()} so that the process-wide
+   * budget remains bounded.
+   *
    * @return a thread factory
    */
   public static ThreadFactory threadFactory(String prefix) {
-    return Thread.ofPlatform().daemon().name(prefix, 0).factory();
+    AtomicInteger sequence = new AtomicInteger();
+    return task -> {
+      Thread thread = new Thread(task, prefix + sequence.getAndIncrement());
+      thread.setDaemon(true);
+      return thread;
+    };
   }
 
   /**
@@ -143,9 +144,9 @@ public final class Parallel {
   /**
    * Returns the shared executor for blocking I/O.
    *
-   * <p>Because virtual threads are used, waiting virtual threads do not occupy CPU worker slots.
-   * At most {@link #IO_CONCURRENCY} tasks are admitted for execution at a time; excess tasks
-   * block within their virtual threads.
+   * <p>At most {@link #IO_CONCURRENCY} tasks execute at a time. Additional tasks are queued in the
+   * shared executor rather than allocating an unbounded number of threads, which keeps Java 17
+   * deployments predictable on desktop and mobile targets.
    *
    * @return the shared I/O executor, never {@code null}
    */

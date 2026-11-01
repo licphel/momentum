@@ -116,10 +116,10 @@ public record Pair<L, R>(L left, R right) {
     if (this == obj) {
       return true;
     }
-    if (!(obj instanceof Pair<?, ?>(Object left1, Object right1))) {
+    if (!(obj instanceof Pair<?, ?> pair)) {
       return false;
     }
-    return Objects.equals(left, left1) && Objects.equals(right, right1);
+    return Objects.equals(left, pair.left) && Objects.equals(right, pair.right);
   }
 
   @Override

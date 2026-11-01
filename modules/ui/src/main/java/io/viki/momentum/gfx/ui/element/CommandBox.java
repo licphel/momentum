@@ -114,7 +114,7 @@ public final class CommandBox extends TextBox {
     }
     if (commands.isEmpty() || !commands.get(commands.size() - 1).equals(value)) {
       if (commands.size() == MAX_COMMAND_HISTORY) {
-        commands.removeFirst();
+        commands.remove(0);
       }
       commands.add(value);
     }

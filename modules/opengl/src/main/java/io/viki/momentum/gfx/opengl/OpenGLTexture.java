@@ -108,10 +108,10 @@ public final class OpenGLTexture implements Texture, Handle {
 
       try {
         switch (desc.type()) {
-          case TextureType.TEXTURE_1D -> glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
-          case TextureType.TEXTURE_2D ->
+          case TEXTURE_1D -> glTexImage1D(target, 0, internal, desc.width(), 0, pixFmt, pixType, data);
+          case TEXTURE_2D ->
               glTexImage2D(target, 0, internal, desc.width(), desc.height(), 0, pixFmt, pixType, data);
-          case TextureType.TEXTURE_3D ->
+          case TEXTURE_3D ->
               glTexImage3D(target, 0, internal, desc.width(), desc.height(), desc.depth(), 0, pixFmt, pixType, data);
         }
       } finally {
@@ -343,10 +343,10 @@ public final class OpenGLTexture implements Texture, Handle {
             }
           } else {
             switch (texture.desc.type()) {
-              case TextureType.TEXTURE_1D -> glTexSubImage1D(texture.target, 0, x, width, fmt[1], fmt[2], bytes);
-              case TextureType.TEXTURE_2D ->
+              case TEXTURE_1D -> glTexSubImage1D(texture.target, 0, x, width, fmt[1], fmt[2], bytes);
+              case TEXTURE_2D ->
                   glTexSubImage2D(texture.target, 0, x, glY, width, height, fmt[1], fmt[2], bytes);
-              case TextureType.TEXTURE_3D ->
+              case TEXTURE_3D ->
                   glTexSubImage3D(texture.target, 0, x, glY, z, width, height, depth, fmt[1], fmt[2], bytes);
             }
           }

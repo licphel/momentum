@@ -59,9 +59,9 @@ public record Alignment(int horizontal, int vertical) {
     if (this == o) {
       return true;
     }
-    if (!(o instanceof Alignment(int horizontal1, int vertical1))) {
+    if (!(o instanceof Alignment al)) {
       return false;
     }
-    return horizontal == horizontal1 && vertical == vertical1;
+    return horizontal == al.horizontal && vertical == al.vertical;
   }
 }

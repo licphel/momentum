@@ -290,7 +290,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @throws IndexOutOfBoundsException if fewer than 2 bytes are writable
    */
   public void writeFloatAsFloat16(float value) {
-    writeShort(Float.floatToFloat16(value));
+    writeShort(Mutil.floatToFloat16(value));
   }
 
   /**
@@ -545,7 +545,7 @@ public abstract class BinaryBuffer implements AutoCloseable {
    * @throws IndexOutOfBoundsException if fewer than 2 bytes are readable
    */
   public float readFloatFromFloat16() {
-    return Float.float16ToFloat(readShort());
+    return Mutil.float16ToFloat(readShort());
   }
 
   /**

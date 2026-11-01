@@ -44,30 +44,27 @@ final class LanguageDownload implements HttpResponse.BodySubscriber<String> {
    */
   static String fetch(URI uri) throws IOException {
     LanguageDownload download = new LanguageDownload();
-    try (HttpClient client = HttpClient.newBuilder().executor(Parallel.io())
-        .followRedirects(HttpClient.Redirect.NORMAL).build()) {
-      ScheduledFuture<?> timer = Parallel.registerScheduledTask(25, download::checkSpeed);
-      CompletableFuture<HttpResponse<String>> request
-          = client.sendAsync(HttpRequest.newBuilder(uri).GET().build(), response -> {
-        if (response.statusCode() != 200) {
-          download.onError(new IOException("Language HTTP status: " + response.statusCode()));
-        }
-        return download;
-      });
-      request.whenComplete((response, error) -> {
-        if (error != null) {
-          download.onError(error);
-        }
-      });
-      try {
-        return download.body.join();
-      } catch (CompletionException e) {
-        throw new IOException("Language download failed: " + uri, e.getCause());
-      } finally {
-        timer.cancel(false);
-        request.cancel(true);
-        client.shutdownNow();
+    HttpClient client = HttpClient.newBuilder().executor(Parallel.io()).followRedirects(HttpClient.Redirect.NORMAL).build();
+    ScheduledFuture<?> timer = Parallel.registerScheduledTask(25, download::checkSpeed);
+    CompletableFuture<HttpResponse<String>> request
+        = client.sendAsync(HttpRequest.newBuilder(uri).GET().build(), response -> {
+      if (response.statusCode() != 200) {
+        download.onError(new IOException("Language HTTP status: " + response.statusCode()));
       }
+      return download;
+    });
+    request.whenComplete((response, error) -> {
+      if (error != null) {
+        download.onError(error);
+      }
+    });
+    try {
+      return download.body.join();
+    } catch (CompletionException e) {
+      throw new IOException("Language download failed: " + uri, e.getCause());
+    } finally {
+      timer.cancel(false);
+      request.cancel(true);
     }
   }
 

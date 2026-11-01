@@ -800,13 +800,13 @@ public final class OpenALMixer implements Mixer {
    */
   void track(OpenALClip clip) {
     if (!trackingList.contains(clip)) {
-      trackingList.addLast(clip);
+      trackingList.add(clip);
     }
   }
 
   void track(OpenALStreamingClip clip) {
     if (!streamingTrackingList.contains(clip)) {
-      streamingTrackingList.addLast(clip);
+      streamingTrackingList.add(clip);
     }
   }
 

@@ -26,8 +26,6 @@ package io.viki.momentum.gfx.text;
 
 import io.viki.momentum.gfx.GraphicsMetrics;
 import io.viki.momentum.gfx.text.raster.Raster;
-import io.viki.momentum.gfx.texture.Drawable2D;
-import io.viki.momentum.gfx.tint.Color;
 import io.viki.momentum.gfx.tint.Gradient;
 import org.jspecify.annotations.Nullable;
 
@@ -64,57 +62,6 @@ public final class Literal implements FormattableText<Literal> {
     return new Literal(text, TextFormat.of(), null);
   }
 
-  // Arbitrary gradients and metadata may be stateful: their borrowed identities are stable keys.
-  private static int gradientHash(Gradient value) {
-    return value instanceof Color ? value.hashCode() : System.identityHashCode(value);
-  }
-
-  private static boolean sameFormat(TextFormat a, TextFormat b) {
-    return a.font().equals(b.font()) && a.fontStyle() == b.fontStyle() && a.shadow().equals(b.shadow())
-           && (a.tint() == b.tint() || a.tint() instanceof Color && a.tint().equals(b.tint()));
-  }
-
-  private static int metadataHash(Meta value) {
-    if (value instanceof Href) {
-      return value.hashCode();
-    }
-    if (value instanceof Icon(
-        float width, float height, float baseline, Drawable2D drawable
-    )) {
-      return 31 * (31 * (31 * Float.hashCode(width) + Float.hashCode(height))
-                   + Float.hashCode(baseline)) + System.identityHashCode(drawable);
-    }
-    return System.identityHashCode(value);
-  }
-
-  private static boolean sameMetadata(Meta @Nullable [] a, Meta @Nullable [] b) {
-    if (a == b) {
-      return true;
-    }
-    if (a == null || b == null || a.length != b.length) {
-      return false;
-    }
-    for (int i = 0; i < a.length; i++) {
-      if (a[i] == b[i]) {
-        continue;
-      }
-      if (a[i] instanceof Href href && href.equals(b[i])) {
-        continue;
-      }
-      if (a[i] instanceof Icon(
-          float width1, float height1, float baseline1, Drawable2D drawable1
-      ) && b[i] instanceof Icon(
-          float width, float height, float baseline, Drawable2D drawable
-      )
-          && Float.compare(width1, width) == 0 && Float.compare(height1, height) == 0
-          && Float.compare(baseline1, baseline) == 0 && drawable1 == drawable) {
-        continue;
-      }
-      return false;
-    }
-    return true;
-  }
-
   @Override
   public Literal font(FontInsta value) {
     return with(format.font(value));
@@ -142,7 +89,7 @@ public final class Literal implements FormattableText<Literal> {
 
   @Override
   public Literal with(TextFormat value) {
-    return sameFormat(format, value) ? this : new Literal(text, value, meta);
+    return format.equals(value) ? this : new Literal(text, value, meta);
   }
 
   @Override
@@ -208,14 +155,13 @@ public final class Literal implements FormattableText<Literal> {
   @Override
   public int hashCode() {
     if (!hashed) {
-      int styleHash = 31 * (31 * format.font().hashCode() + format.fontStyle())
-                      + gradientHash(format.tint());
+      int styleHash = 31 * (31 * format.font().hashCode() + format.fontStyle()) + format.tint().hashCode();
       styleHash = 31 * styleHash + format.shadow().hashCode();
       int metadataHash = 0;
       if (meta != null) {
         metadataHash = 1;
         for (Meta value : meta) {
-          metadataHash = 31 * metadataHash + metadataHash(value);
+          metadataHash = 31 * metadataHash + value.hashCode();
         }
       }
       hash = 31 * (31 * text.hashCode() + styleHash) + metadataHash;
@@ -227,7 +173,7 @@ public final class Literal implements FormattableText<Literal> {
   @Override
   public boolean equals(@Nullable Object other) {
     return this == other || other instanceof Literal that && hashCode() == that.hashCode()
-                            && text.equals(that.text) && sameFormat(format, that.format) && sameMetadata(meta, that.meta);
+        && text.equals(that.text) && format.equals(that.format) && Arrays.equals(meta, that.meta);
   }
 
   @Override
