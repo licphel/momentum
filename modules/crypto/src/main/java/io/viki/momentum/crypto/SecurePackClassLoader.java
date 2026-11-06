@@ -29,6 +29,7 @@ import io.viki.momentum.resource.ResourceWalkableClassLoader;
 
 import java.io.InputStream;
 import java.nio.file.Path;
+import java.util.stream.Stream;
 
 /**
  * Loads classes from a {@link SecurePack} when the parent cannot find them and resolves packed
@@ -74,7 +75,7 @@ public final class SecurePackClassLoader extends ClassLoader implements AutoClos
   }
 
   @Override
-  public java.util.stream.Stream<String> walkResources(String directory) {
+  public Stream<String> walkResources(String directory) {
     return pack.walk(directory);
   }
 

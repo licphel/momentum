@@ -29,7 +29,7 @@ import io.viki.momentum.math.util.Mutil;
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
- * Immutable 3D float vector.
+ * Immutable, thread-safe 3D vector with single-precision components.
  *
  * @param x x coordinate position
  * @param y y coordinate position
@@ -38,10 +38,15 @@ import io.viki.momentum.math.util.FastTrigonometric;
  * @see Vector4
  */
 public record Vector3(float x, float y, float z) {
+  /** The zero vector. */
   public static final Vector3 ZERO = new Vector3(0.0F, 0.0F, 0.0F);
+  /** The vector with all components equal to one. */
   public static final Vector3 ONE = new Vector3(1.0F, 1.0F, 1.0F);
+  /** The positive unit vector along the X axis. */
   public static final Vector3 UNIT_X = new Vector3(1.0F, 0.0F, 0.0F);
+  /** The positive unit vector along the Y axis. */
   public static final Vector3 UNIT_Y = new Vector3(0.0F, 1.0F, 0.0F);
+  /** The positive unit vector along the Z axis. */
   public static final Vector3 UNIT_Z = new Vector3(0.0F, 0.0F, 1.0F);
 
   /**
@@ -126,6 +131,7 @@ public record Vector3(float x, float y, float z) {
    * @param min lower bound
    * @param max upper bound
    * @return clamped vector
+   * @throws IllegalArgumentException if any component has a lower bound greater than its upper bound
    */
   public static Vector3 clamp(Vector3 v, Vector3 min, Vector3 max) {
     return new Vector3(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y), Mutil.clamp(v.z, min.z, max.z));
@@ -327,7 +333,7 @@ public record Vector3(float x, float y, float z) {
   /**
    * Rotates this vector around an axis by the given angle.
    *
-   * @param axis    rotation axis (assumed normalized)
+   * @param axis    rotation axis, normalized by the rotation conversion
    * @param radians rotation angle in radians
    * @return rotated vector
    */
@@ -368,9 +374,9 @@ public record Vector3(float x, float y, float z) {
   }
 
   /**
-   * Reinterprets the vector as euler.
+   * Converts the vector components to yaw, pitch, and roll angles.
    *
-   * @return the euler
+   * @return Euler angles with these components as yaw, pitch, and roll
    */
   public Euler toEuler() {
     return new Euler(x, y, z);

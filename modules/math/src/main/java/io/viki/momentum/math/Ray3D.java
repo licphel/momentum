@@ -27,7 +27,7 @@ package io.viki.momentum.math;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Immutable 3D ray defined by an origin and a (normalized) direction.
+ * Immutable, thread-safe 3D ray defined by an origin and a normalized direction.
  *
  * <p>A ray is a half-line: {@code origin + t * direction} for {@code t >= 0}.
  * The direction is automatically normalized on construction.
@@ -307,6 +307,7 @@ public record Ray3D(Vector3 origin, Vector3 direction) {
    *
    * <p>The origin cell is visited first, including when the maximum distance is zero. Returning
    * {@code false} from the visitor stops traversal immediately, including from the origin.
+   * Traversal takes O(n) time for n visited cells.
    *
    * @param maximumDistance the largest distance to traverse, which must be non-negative
    * @param visitor callback receiving cell coordinates and entry and exit distances

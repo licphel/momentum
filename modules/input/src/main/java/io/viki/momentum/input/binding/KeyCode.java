@@ -22,15 +22,14 @@
  * SOFTWARE.
  */
 
-package io.viki.momentum.input;
+package io.viki.momentum.input.binding;
 
 import org.jspecify.annotations.Nullable;
 
 /**
  * Platform-agnostic keyboard codes based on the USB HID Usage Tables (Keyboard/Keypad Page 0x07).
  *
- * <p>Each backend maps its native key codes to these values. For example, a GLFW
- * backend maps {@code GLFW_KEY_A} → {@link #A}, an Android backend maps {@code KeyEvent.KEYCODE_A} → {@link #A}.
+ * <p>Each backend maps its native key codes to these platform-independent values.
  *
  * <p>Use {@link #fromHidCode(int)} for reverse mapping from HID usage IDs.
  */

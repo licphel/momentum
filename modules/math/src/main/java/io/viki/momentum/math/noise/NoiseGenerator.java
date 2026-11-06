@@ -25,10 +25,11 @@
 package io.viki.momentum.math.noise;
 
 /**
- * Base interface for noise generators. All values are normalized to {@code [0, 1]}.
+ * Base interface for deterministic noise generators. Many implementations return values in
+ * {@code [0, 1]}, while specialized generators may expose a configurable range.
  *
- * <p>All implementations must be deterministic: given the same initial seed or state,
- * they produce the same noise map.
+ * <p>Given the same configuration and coordinates, an implementation must return the same value.
+ * Implementations define whether concurrent generation is safe.
  */
 public interface NoiseGenerator {
   /**

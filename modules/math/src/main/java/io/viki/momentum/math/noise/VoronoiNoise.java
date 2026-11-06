@@ -27,7 +27,7 @@ package io.viki.momentum.math.noise;
 import io.viki.momentum.math.random.RandomGenerator;
 
 /**
- * Voronoi (cellular / Worley) noise.
+ * Immutable, thread-safe Voronoi noise generator.
  *
  * <p>Returns a deterministic value in {@code [0, 1)} based on the nearest cell point.
  * The seed is obtained from a {@link RandomGenerator} at construction time.
@@ -36,7 +36,7 @@ public final class VoronoiNoise implements NoiseGenerator {
   private final long seed;
 
   /**
-   * Creates the voronoi noise using the given rng to generate initial seed.
+   * Creates a Voronoi noise generator with a seed drawn from the supplied random source.
    *
    * @param random source of the initial seed value
    */

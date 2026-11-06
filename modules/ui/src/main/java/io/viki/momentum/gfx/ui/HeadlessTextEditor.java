@@ -24,9 +24,9 @@
 
 package io.viki.momentum.gfx.ui;
 
-import io.viki.momentum.input.InputModifiers;
-import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.binding.InputModifiers;
+import io.viki.momentum.input.binding.KeyAction;
+import io.viki.momentum.input.binding.KeyCode;
 import io.viki.momentum.util.InternalApi;
 import org.jspecify.annotations.Nullable;
 

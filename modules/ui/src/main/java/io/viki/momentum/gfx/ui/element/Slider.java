@@ -30,9 +30,9 @@ import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoSliderRenderer;
-import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.MouseButton;
+import io.viki.momentum.input.binding.KeyAction;
+import io.viki.momentum.input.binding.KeyCode;
+import io.viki.momentum.input.binding.MouseButton;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 

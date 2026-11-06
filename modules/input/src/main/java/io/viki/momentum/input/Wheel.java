@@ -25,29 +25,43 @@
 package io.viki.momentum.input;
 
 /**
- * Modifier key bitmask constants aligned with GLFW modifier flags.
- *
- * <p>Combine with bitwise OR: {@code InputModifiers.SHIFT | InputModifiers.CONTROL}.
- * Use {@link #ANY} in a binding definition to match regardless of modifier state.
+ * A two-dimensional relative or persistent input source. Thread safety belongs to the implementation.
+ * Deltas are changes accumulated since the frame boundary, never velocities.
  */
-public final class InputModifiers {
-  /** Sentinel value that matches any modifier combination. */
-  public static final int ANY = -1;
-  /** Bitmask requiring no modifier keys to be held. */
-  public static final int NONE = 0;
-  /** Bit of the Shift modifier, covering both left and right Shift. */
-  public static final int SHIFT = 0x1;
-  /** Bit of the Control modifier, covering both left and right Control. */
-  public static final int CONTROL = 0x2;
-  /** Bit of the Alt modifier, covering both left and right Alt. */
-  public static final int ALT = 0x4;
-  /** Bit of the Super (Windows/Command) modifier, covering both sides. */
-  public static final int SUPER = 0x8;
-  /** Bit of the Caps Lock toggle state. */
-  public static final int CAPS_LOCK = 0x10;
-  /** Bit of the Num Lock toggle state. */
-  public static final int NUM_LOCK = 0x20;
+public interface Wheel extends Input {
+  /**
+   * Returns the accumulated horizontal change for this frame.
+   *
+   * @return horizontal delta
+   */
+  double deltaX();
 
-  private InputModifiers() {
-  }
+  /**
+   * Returns the accumulated vertical change for this frame.
+   *
+   * @return vertical delta
+   */
+  double deltaY();
+
+  /**
+   * Returns the retained horizontal position, or zero for a relative-only source.
+   *
+   * @return horizontal position
+   */
+  double x();
+
+  /**
+   * Returns the retained vertical position, or zero for a relative-only source.
+   *
+   * @return vertical position
+   */
+  double y();
+
+  /**
+   * Reports whether positions persist across frames;
+   * consumers integrate these with elapsed time when scrolling.
+   *
+   * @return whether positions persist
+   */
+  boolean persistent();
 }

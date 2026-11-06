@@ -27,17 +27,18 @@ package io.viki.momentum.math.noise;
 import io.viki.momentum.math.random.RandomGenerator;
 
 /**
- * Classic Ken Perlin 3D noise.
+ * Deterministic three-dimensional Perlin noise with an instance-specific permutation.
  *
- * <p>Output is normalized to approximately {@code [0, 1]}.
+ * <p>Output is approximately {@code [0, 1]}. The generated permutation is immutable after
+ * construction, so instances are safe for concurrent reads.
  */
 public final class PerlinNoise implements NoiseGenerator {
   private final int[] perm = new int[512];
 
   /**
-   * Creates a perlin noise generator using the given rng for perms.
+   * Creates a Perlin noise generator using a supplied random source for its initial state.
    *
-   * @param rng perm-gen rng
+   * @param rng random source used to initialize this generator
    */
   public PerlinNoise(RandomGenerator rng) {
     int[] p = new int[256];

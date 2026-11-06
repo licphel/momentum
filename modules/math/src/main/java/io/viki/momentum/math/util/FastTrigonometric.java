@@ -27,15 +27,21 @@ package io.viki.momentum.math.util;
 /**
  * Provides table-based fast trigonometric calculations.
  *
- * <p>Uses a 4096-entry sine lookup table with linear interpolation.
+ * <p>Uses a 4096-entry sine lookup table with linear interpolation. Calls to {@link #sincos(float)} reuse a
+ * thread-local result array, so each call on the same thread overwrites the previous result.
  * Cosine is derived from sine via a quarter-period offset. Accuracy is approximately 3–4 decimal places; use
  * {@link Math#sin}/{@link Math#cos} when full precision is required.
  */
 public final class FastTrigonometric {
+  /** Number of samples in the periodic sine lookup table. */
   private static final int TABLE_SIZE = 4096;
+  /** One full turn in radians, represented as a float. */
   private static final float TWO_PI = (float) (Math.PI * 2.0);
+  /** Reciprocal of {@link #TWO_PI}, used to map angles to table positions. */
   private static final float INV_TWO_PI = 1.0F / TWO_PI;
+  /** Precomputed sine values sampled uniformly over one full turn. */
   private static final float[] TABLE = new float[TABLE_SIZE];
+  /** Per-thread result storage used by {@link #sincos(float)}. */
   private static final ThreadLocal<float[]> VARS = ThreadLocal.withInitial(() -> new float[2]);
 
   static {
@@ -51,7 +57,7 @@ public final class FastTrigonometric {
    * Looks up the sine and cosine of an angle using the pre-calculated table.
    *
    * @param radians the angle in radians (any value, not clamped)
-   * @return a two-element array that receives {@code [sin, cos]}
+   * @return a reusable two-element thread-local array containing {@code [sin, cos]}
    */
   public static float[] sincos(float radians) {
     float index = mod(radians) * INV_TWO_PI * TABLE_SIZE;
@@ -93,11 +99,13 @@ public final class FastTrigonometric {
     return lerp(TABLE[i], TABLE[next], index - (int) index);
   }
 
+  /** Wraps an angle into one full turn. */
   private static float mod(float rad) {
     rad %= TWO_PI;
     return rad < 0 ? rad + TWO_PI : rad;
   }
 
+  /** Linearly interpolates between two table samples. */
   private static float lerp(float a, float b, float t) {
     return a + (b - a) * t;
   }

@@ -27,7 +27,7 @@ package io.viki.momentum.math.curve;
 import io.viki.momentum.math.Vector3;
 
 /**
- * A cubic Bézier curve defined by four control points.
+ * Immutable, thread-safe cubic Bézier curve defined by four control points.
  *
  * @param p0 the start point
  * @param p1 the first control point

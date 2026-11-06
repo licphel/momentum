@@ -27,7 +27,7 @@ package io.viki.momentum.math.curve;
 import io.viki.momentum.math.Vector3;
 
 /**
- * A straight-line segment between two points.
+ * Immutable, thread-safe straight-line segment between two points.
  *
  * @param start the starting point
  * @param end the ending point

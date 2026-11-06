@@ -24,11 +24,13 @@
 
 package io.viki.momentum.gfx.ui.element;
 
+import io.viki.momentum.input.Key;
+
 import io.viki.momentum.gfx.text.Literal;
 import io.viki.momentum.gfx.text.Text;
 import io.viki.momentum.gfx.ui.present.ElementRenderer;
 import io.viki.momentum.gfx.ui.look.auto.AutoButtonRenderer;
-import io.viki.momentum.input.*;
+import io.viki.momentum.input.binding.*;
 import io.viki.momentum.math.shape.Rectangle;
 import org.jspecify.annotations.Nullable;
 
@@ -48,7 +50,7 @@ public final class Button extends Element {
   private boolean keyboardPressed;
   private @Nullable MouseButton pointerKey;
   private @Nullable KeyCode keyboardKey;
-  private @Nullable InputBinding activationBinding;
+  private @Nullable Key activationBinding;
   private @Nullable Runnable onClick;
 
   /**
@@ -77,8 +79,8 @@ public final class Button extends Element {
    * @param snapshot the input snapshot used to build transition matches
    * @return a binding that recognizes the standard button activation keys
    */
-  public static InputBinding makeConventionalActivationBinding(InputSnapshot snapshot) {
-    return snapshot.binding("button.activate",
+  public static Key makeConventionalActivationBinding(io.viki.momentum.input.binding.InputBindings snapshot) {
+    return snapshot.bind(new io.viki.momentum.input.Action("button.activate"),
         BindingDefinition.of("button.activate.mouse", "<Mouse>/leftButton"),
         BindingDefinition.of("button.activate.enter", "<Keyboard>/enter"),
         BindingDefinition.of("button.activate.keypad", "<Keyboard>/KP_ENTER"),
@@ -175,7 +177,7 @@ public final class Button extends Element {
    *
    * @param value the binding, or {@code null} to use default activation behavior
    */
-  public void setActivationBinding(@Nullable InputBinding value) {
+  public void setActivationBinding(@Nullable Key value) {
     activationBinding = value;
   }
 
@@ -190,7 +192,7 @@ public final class Button extends Element {
       return false;
     }
     if (action == KeyAction.PRESS) {
-      InputBinding binding = activationBinding();
+      Key binding = activationBinding();
       if (binding == null
           ? button != MouseButton.LEFT
           : !binding.transitioned()) {
@@ -218,7 +220,7 @@ public final class Button extends Element {
       return false;
     }
     if (action == KeyAction.PRESS) {
-      InputBinding binding = activationBinding();
+      Key binding = activationBinding();
       if (binding == null
           ? !isDefaultKeyboardActivation(key)
           : !binding.transitioned()) {
@@ -295,7 +297,7 @@ public final class Button extends Element {
     }
   }
 
-  private @Nullable InputBinding activationBinding() {
+  private @Nullable Key activationBinding() {
     return activationBinding;
   }
 

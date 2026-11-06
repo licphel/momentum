@@ -33,6 +33,7 @@ import java.nio.file.Path;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.stream.Stream;
 
 /**
  * Reads and writes authenticated encrypted resource packs whose paths and contents are protected.
@@ -180,7 +181,7 @@ public final class SecurePack implements AutoCloseable {
    * @return decrypted resource bytes, or {@code null} if the path is absent
    * @throws CryptoException if the resource fails authentication or decryption
    */
-  public java.util.stream.Stream<String> walk(String directory) {
+  public Stream<String> walk(String directory) {
     String prefix = directory.isEmpty() ? "" : directory + "/";
     return entries.keySet().stream().filter(path -> path.startsWith(prefix));
   }

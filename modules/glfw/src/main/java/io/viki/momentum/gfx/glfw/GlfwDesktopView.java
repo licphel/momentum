@@ -26,8 +26,8 @@ package io.viki.momentum.gfx.glfw;
 
 import io.viki.momentum.event.Event;
 import io.viki.momentum.gfx.GraphicsException;
-import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.MouseButton;
+import io.viki.momentum.input.binding.KeyCode;
+import io.viki.momentum.input.binding.MouseButton;
 import io.viki.momentum.input.event.*;
 import io.viki.momentum.gfx.io.ImageInfo;
 import io.viki.momentum.gfx.view.DesktopView;
@@ -237,7 +237,7 @@ public final class GlfwDesktopView extends DesktopView {
       // Ignored
     }
     joystickInput.poll(snapshot(), focused);
-    snapshot().updateBindings(delta);
+    bindings().update(snapshot(), delta);
   }
 
   @Override

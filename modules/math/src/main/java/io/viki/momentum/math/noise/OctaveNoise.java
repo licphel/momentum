@@ -25,7 +25,8 @@
 package io.viki.momentum.math.noise;
 
 /**
- * Fractal (octave) noise: sums multiple scaled layers of a base {@link NoiseGenerator}.
+ * Combines a base {@link NoiseGenerator} across several scales to provide multiresolution noise.
+ * The instance can be shared for concurrent reads when its base generator is thread-safe.
  */
 public final class OctaveNoise implements NoiseGenerator {
   private final NoiseGenerator base;
@@ -34,7 +35,7 @@ public final class OctaveNoise implements NoiseGenerator {
   private final double lacunarity;
 
   /**
-   * Creates an octave noise.
+   * Creates a multiscale noise generator from a base generator and octave parameters.
    *
    * @param base        the underlying noise function
    * @param octaves     number of frequency layers
@@ -48,6 +49,16 @@ public final class OctaveNoise implements NoiseGenerator {
     this.lacunarity = lacunarity;
   }
 
+  /**
+   * Generates a sample using the configured frequency layers.
+   *
+   * @param x sample X coordinate
+   * @param y sample Y coordinate
+   * @param z sample Z coordinate
+   * @return combined noise value, or zero when no layers are configured
+   *
+   * <p>Generation takes O(octaves) time.
+   */
   @Override
   public double generate(double x, double y, double z) {
     double value = 0.0;

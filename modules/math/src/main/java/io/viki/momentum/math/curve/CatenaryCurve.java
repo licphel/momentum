@@ -27,7 +27,7 @@ package io.viki.momentum.math.curve;
 import io.viki.momentum.math.Vector3;
 
 /**
- * A catenary curve, with z interpolated along the segment between its endpoints.
+ * Immutable catenary curve with Z interpolated along the segment between its endpoints.
  *
  * @param vertex the lowest point of the catenary in the x/y plane
  * @param a the positive catenary constant
@@ -60,6 +60,7 @@ public record CatenaryCurve(Vector3 vertex, float a, Vector3 start, Vector3 end)
    * @param p2 second endpoint
    * @param sag vertical drop from the line midpoint to the vertex; positive
    * @return a new catenary curve
+   * @throws IllegalArgumentException if {@code sag} is not positive
    */
   public static CatenaryCurve create(Vector3 p1, Vector3 p2, float sag) {
     if (sag <= 0) {

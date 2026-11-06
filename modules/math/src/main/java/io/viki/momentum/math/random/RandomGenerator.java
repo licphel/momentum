@@ -33,7 +33,8 @@ import java.util.List;
  * they produce the same sequence of random numbers. This is essential for reproducible simulations.
  *
  * <p>The default instance is {@link Xoroshiro128Random}, a fast, high-quality
- * generator suitable for most scenarios.
+ * generator suitable for most scenarios. Implementations are mutable; instances are not thread-safe unless
+ * documented otherwise.
  */
 public interface RandomGenerator {
   /** Per-thread random sources. Mutable generator state is never shared between threads. */
@@ -53,12 +54,7 @@ public interface RandomGenerator {
     }
   }
 
-  /**
-   * Global default instance (Xoroshiro128+).
-   *
-   * <p>This generator is thread-safe but not recommended for concurrent
-   * use from multiple threads. For multithreaded scenarios, create separate instances per thread.
-   */
+  /** Shared default instance (Xoroshiro128+); mutable and not thread-safe. */
   RandomGenerator DEFAULT = new Xoroshiro128Random();
 
   /**
@@ -78,7 +74,7 @@ public interface RandomGenerator {
    *
    * @param min lower bound (inclusive)
    * @param max upper bound (exclusive); must be greater than {@code min}
-   * @return a random double in the specified range
+   * @return a random float in the specified range
    */
   default float nextFloat(float min, float max) {
     return Math.min(min + nextFloat() * (max - min), Math.nextDown(max));
@@ -190,7 +186,7 @@ public interface RandomGenerator {
    * Returns the current internal state of the generator as a string. The length and interpretation of the string are
    * implementation-specific.
    *
-   * @return a copy of the current state
+   * @return the current state representation
    */
   String state();
 

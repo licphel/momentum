@@ -31,13 +31,14 @@ package io.viki.momentum.math;
  * bounding volume checks, culling, and collision detection.
  *
  * @param center the center point of the sphere
- * @param radius the radius (must be non-negative)
+ * @param radius the radius; negative values are clamped to zero during construction
  */
 public record Sphere(Vector3 center, float radius) {
+  /** A zero-radius sphere centered at the origin. */
   public static final Sphere ZERO = new Sphere(Vector3.ZERO, 0.0F);
 
   /**
-   * Creates a sphere.
+   * Creates a sphere, clamping a negative radius to zero.
    *
    * @param center the center point
    * @param radius the radius; negative values are clamped to zero

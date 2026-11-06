@@ -30,8 +30,8 @@ import java.util.List;
 /**
  * Xoroshiro128+ pseudo-random number generator.
  *
- * <p>Period: 2^128 − 1. Passes BigCrush. Supports parallel streams via
- * {@link #jump()} (2^64 advance) and {@link #longJump()} (2^96 advance).
+ * <p>Period: 2^128 − 1. Supports parallel streams via {@link #jump()} (2^64 advance) and
+ * {@link #longJump()} (2^96 advance). Instances are mutable and not thread-safe.
  */
 public final class Xoroshiro128Random implements RandomGenerator {
   private final long initS0;
@@ -40,14 +40,14 @@ public final class Xoroshiro128Random implements RandomGenerator {
   private long s1;
 
   /**
-   * Creates a Xoroshiro128+ rng from current date.
+   * Creates a Xoroshiro128+ generator seeded from the current system time.
    */
   public Xoroshiro128Random() {
     this(System.nanoTime());
   }
 
   /**
-   * Creates a Xoroshiro128+ rng from a long seed.
+   * Creates a Xoroshiro128+ generator from a single seed, expanded with SplitMix64.
    *
    * @param seed the long seed
    */
@@ -59,7 +59,7 @@ public final class Xoroshiro128Random implements RandomGenerator {
   }
 
   /**
-   * Creates a Xoroshiro128+ rng from two long seed.
+   * Creates a Xoroshiro128+ generator from its two state words.
    *
    * @param s0 seed A
    * @param s1 seed B
@@ -75,6 +75,7 @@ public final class Xoroshiro128Random implements RandomGenerator {
     return (x << k) | (x >>> (64 - k));
   }
 
+  /** Expands a seed into a well-mixed 64-bit state word. */
   private static long splitMix64(long x) {
     x += 0x9e3779b97f4a7c15L;
     x = (x ^ (x >>> 30)) * 0xbf58476d1ce4e5b9L;
@@ -82,6 +83,7 @@ public final class Xoroshiro128Random implements RandomGenerator {
     return x ^ (x >>> 31);
   }
 
+  /** Advances the state once and returns the next 64-bit output. */
   private long nextLong() {
     final long result = s0 + s1;
     final long t = s1 ^ s0;
@@ -142,19 +144,21 @@ public final class Xoroshiro128Random implements RandomGenerator {
   }
 
   /**
-   * Advances the state by 2^64 steps — equivalent to that many calls to {@link #nextLong()}.
+   * Advances the state by 2^64 steps, equivalent to that many calls to {@link #nextLong()}.
+   * The operation takes a fixed number of state transitions.
    */
   public void jump() {
     applyJump(new long[] {0xdf900294d8f554a5L, 0x170865df4b3201fcL});
   }
 
   /**
-   * Advances the state by 2^96 steps.
+   * Advances the state by 2^96 steps, using a fixed number of state transitions.
    */
   public void longJump() {
     applyJump(new long[] {0xd2a98b26625eee7bL, 0xdddf9b1090aa7ac1L});
   }
 
+  /** Applies one of the generator's jump polynomials to advance its state. */
   private void applyJump(long[] jump) {
     long s0 = 0;
     long s1 = 0;

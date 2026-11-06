@@ -29,7 +29,7 @@ import io.viki.momentum.math.util.Mutil;
 import io.viki.momentum.math.util.FastTrigonometric;
 
 /**
- * Immutable 2D float vector.
+ * Immutable, thread-safe 2D vector with single-precision components.
  *
  * @param x x coordinate position
  * @param y y coordinate position
@@ -37,16 +37,20 @@ import io.viki.momentum.math.util.FastTrigonometric;
  * @see Vector4
  */
 public record Vector2(float x, float y) {
+  /** The zero vector. */
   public static final Vector2 ZERO = new Vector2(0.0F, 0.0F);
+  /** The vector with both components equal to one. */
   public static final Vector2 ONE = new Vector2(1.0F, 1.0F);
+  /** The positive unit vector along the X axis. */
   public static final Vector2 UNIT_X = new Vector2(1.0F, 0.0F);
+  /** The positive unit vector along the Y axis. */
   public static final Vector2 UNIT_Y = new Vector2(0.0F, 1.0F);
 
   /**
    * Creates a vector from polar coordinates.
    *
    * @param radius the radius
-   * @param angle  the angle
+   * @param angle  angle in radians
    * @return a vector of the given (r, alpha)
    */
   public static Vector2 polar(float radius, float angle) {
@@ -116,6 +120,7 @@ public record Vector2(float x, float y) {
    * @param min lower bound
    * @param max upper bound
    * @return clamped vector
+   * @throws IllegalArgumentException if either component has a lower bound greater than its upper bound
    */
   public static Vector2 clamp(Vector2 v, Vector2 min, Vector2 max) {
     return new Vector2(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y));

@@ -123,11 +123,10 @@ public final class Poly implements Shape<Poly> {
   }
 
   /**
-   * Creates a polygon from a non-degenerate rectangle.
+   * Creates a polygon from rectangles, preserving their order as convex components.
    *
    * @param rectangles source rectangles
    * @return immutable polygon
-   * @throws IllegalArgumentException if the rectangle has non-positive dimensions
    */
   public static Poly of(Rectangle... rectangles) {
     List<ConvexPart> parts = new ArrayList<>();
@@ -365,6 +364,7 @@ public final class Poly implements Shape<Poly> {
     return false;
   }
 
+  /** Tests a point against the three oriented edges of a counter-clockwise triangle. */
   private static boolean pointInTriangle(float[] coordinates, int point, int a, int b, int c) {
     return cross(coordinates, a, b, point) >= -GEOMETRY_EPSILON
         && cross(coordinates, b, c, point) >= -GEOMETRY_EPSILON
@@ -520,8 +520,8 @@ public final class Poly implements Shape<Poly> {
   /**
    * Returns whether the polygon interiors overlap. Edge or vertex contact alone
    * does not count as an intersection. Empty polygons never intersect.
-   * The check allocates no objects and takes O(sum(n * m * (n + m))) time
-   * over pairs of convex components with n and m vertices.
+   * The check allocates no objects and takes O(sum((n + m)^2)) time over pairs of convex components with n and m
+   * vertices.
    *
    * @param other polygon to test in the same coordinate space
    * @return whether any convex component interiors overlap
@@ -549,7 +549,6 @@ public final class Poly implements Shape<Poly> {
    * @param sx x scale factor
    * @param sy y scale factor
    * @return scaled polygon
-   * @throws IllegalArgumentException if either scale factor is zero
    */
   @Override
   public Poly scale(float sx, float sy) {
@@ -682,6 +681,7 @@ public final class Poly implements Shape<Poly> {
       return vertexIndex * COORDINATE_STRIDE;
     }
 
+    /** Tests whether the point lies inside or on the boundary of this convex component. */
     private boolean contains(float x, float y) {
       int count = vertexCount();
       for (int i = 0; i < count; i++) {
@@ -697,6 +697,7 @@ public final class Poly implements Shape<Poly> {
       return true;
     }
 
+    /** Returns whether an edge-normal axis separates this component from another convex component. */
     private boolean hasSeparatingAxis(ConvexPart other) {
       for (int i = 0; i < coordinates.length; i += COORDINATE_STRIDE) {
         int next = (i + COORDINATE_STRIDE) % coordinates.length;

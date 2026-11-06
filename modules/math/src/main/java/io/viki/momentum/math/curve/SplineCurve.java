@@ -27,7 +27,9 @@ package io.viki.momentum.math.curve;
 import io.viki.momentum.math.Vector3;
 
 /**
- * A Catmull-Rom spline passing through a sequence of control points.
+ * Catmull-Rom spline passing through a sequence of control points.
+ * The input array is copied at construction; modifying the array returned by the generated
+ * {@code controlPoints()} accessor while evaluating is not thread-safe.
  *
  * @param controlPoints the points the curve passes through
  */
@@ -36,6 +38,7 @@ public record SplineCurve(Vector3[] controlPoints) implements Curve {
    * Creates a Catmull-Rom spline through the given points.
    *
    * @param controlPoints the points the curve passes through; at least two required
+   * @throws IllegalArgumentException if fewer than two control points are supplied
    */
   public SplineCurve {
     if (controlPoints.length < 2) {
@@ -70,7 +73,7 @@ public record SplineCurve(Vector3[] controlPoints) implements Curve {
   /**
    * Evaluates the spline at parameter {@code t}.
    *
-   * @param t the curve parameter in {@code [0, 1]}
+   * @param t curve parameter; values outside {@code [0, 1]} select the corresponding endpoint
    * @return the point on the spline
    */
   @Override

@@ -25,10 +25,8 @@
 package io.viki.momentum.math.noise;
 
 /**
- * Turbulence octave noise — sums the absolute value of each layer to produce fluid, folded patterns.
- *
- * <p>Each octave applies {@code n = |n * 2 − 1|} before accumulating, which
- * creates sharp edges and a "turbulent" appearance.
+ * Combines a base generator across several scales to produce a configurable turbulence pattern.
+ * The instance can be shared for concurrent reads when its base generator is thread-safe.
  */
 public final class OctaveTurbulenceNoise implements NoiseGenerator {
   private final NoiseGenerator base;
@@ -39,7 +37,7 @@ public final class OctaveTurbulenceNoise implements NoiseGenerator {
   private final double frequencyScale;
 
   /**
-   * Creates a turbulence noise.
+   * Creates a turbulence generator with explicit scale parameters.
    *
    * @param base           underlying noise generator
    * @param octaves        number of frequency layers
@@ -59,7 +57,7 @@ public final class OctaveTurbulenceNoise implements NoiseGenerator {
   }
 
   /**
-   * Creates a turbulence noise with default parameters (persistence=0.5, lacunarity=2, scale=1).
+   * Creates a turbulence generator with common persistence, lacunarity, and scale defaults.
    *
    * @param base    underlying noise generator
    * @param octaves number of frequency layers
@@ -68,6 +66,16 @@ public final class OctaveTurbulenceNoise implements NoiseGenerator {
     this(base, octaves, 0.5, 2.0, 1.0, 1.0);
   }
 
+  /**
+   * Generates a turbulence sample using the configured frequency layers.
+   *
+   * @param x sample X coordinate
+   * @param y sample Y coordinate
+   * @param z sample Z coordinate
+   * @return combined turbulence value, or zero when no layers contribute
+   *
+   * <p>Generation takes O(octaves) time.
+   */
   @Override
   public double generate(double x, double y, double z) {
     double amplitude = 1.0;

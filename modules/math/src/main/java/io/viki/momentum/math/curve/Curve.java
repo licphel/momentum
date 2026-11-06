@@ -27,8 +27,8 @@ package io.viki.momentum.math.curve;
 import io.viki.momentum.math.Vector3;
 
 /**
- * A parametric curve that evaluates to a point for a parameter in {@code [0, 1]}.
- * Although retained for graphics API compatibility, curve points are three-dimensional.
+ * A parametric curve that evaluates to a three-dimensional point for a parameter in {@code [0, 1]}.
+ * Implementations define whether concurrent evaluation is safe.
  */
 @FunctionalInterface
 public interface Curve {

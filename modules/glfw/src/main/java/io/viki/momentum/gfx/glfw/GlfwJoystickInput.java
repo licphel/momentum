@@ -1,9 +1,9 @@
 package io.viki.momentum.gfx.glfw;
 
-import io.viki.momentum.input.GamepadButton;
-import io.viki.momentum.input.GamepadState;
-import io.viki.momentum.input.InputSnapshot;
-import io.viki.momentum.input.JoystickState;
+import io.viki.momentum.input.binding.GamepadButton;
+import io.viki.momentum.input.binding.GamepadState;
+import io.viki.momentum.input.binding.InputSnapshot;
+import io.viki.momentum.input.binding.JoystickState;
 import org.lwjgl.glfw.GLFWGamepadState;
 import org.lwjgl.system.MemoryStack;
 

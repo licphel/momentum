@@ -25,8 +25,8 @@
 package io.viki.momentum.input.event;
 
 import io.viki.momentum.event.Event;
-import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
+import io.viki.momentum.input.binding.KeyAction;
+import io.viki.momentum.input.binding.KeyCode;
 
 /**
  * A keyboard key event (press, release, or repeat).

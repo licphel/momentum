@@ -25,10 +25,8 @@
 package io.viki.momentum.math.noise;
 
 /**
- * Ridge octave noise — sums ridge-transformed layers to produce sharp, vein-like patterns.
- *
- * <p>Each octave applies the transform {@code n = ridgeOffset − |n * 2 − 1|} before
- * accumulating, which folds the signal around its peak to create ridges.
+ * Combines a base generator across several scales to produce a configurable ridged pattern.
+ * The instance can be shared for concurrent reads when its base generator is thread-safe.
  */
 public final class OctaveRidgeNoise implements NoiseGenerator {
   private final NoiseGenerator base;
@@ -40,7 +38,7 @@ public final class OctaveRidgeNoise implements NoiseGenerator {
   private final double ridgeOffset;
 
   /**
-   * Creates a ridge noise.
+   * Creates a ridged noise generator with explicit scale and ridge parameters.
    *
    * @param base           underlying noise generator
    * @param octaves        number of frequency layers
@@ -62,7 +60,7 @@ public final class OctaveRidgeNoise implements NoiseGenerator {
   }
 
   /**
-   * Creates a ridge noise with default parameters (persistence=0.5, lacunarity=2, scale=1, ridge=1).
+   * Creates a ridged noise generator with common persistence, lacunarity, and scale defaults.
    *
    * @param base    underlying noise generator
    * @param octaves number of frequency layers
@@ -71,6 +69,16 @@ public final class OctaveRidgeNoise implements NoiseGenerator {
     this(base, octaves, 0.5, 2.0, 1.0, 1.0, 1.0);
   }
 
+  /**
+   * Generates a ridged sample using the configured frequency layers.
+   *
+   * @param x sample X coordinate
+   * @param y sample Y coordinate
+   * @param z sample Z coordinate
+   * @return combined ridged noise value, or zero when no layers contribute
+   *
+   * <p>Generation takes O(octaves) time.
+   */
   @Override
   public double generate(double x, double y, double z) {
     double amplitude = 1.0;

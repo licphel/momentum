@@ -27,7 +27,7 @@ package io.viki.momentum.math;
 import io.viki.momentum.math.util.Mutil;
 
 /**
- * Immutable 4D float vector.
+ * Immutable, thread-safe 4D vector with single-precision components.
  *
  * @param x x coordinate position
  * @param y y coordinate position
@@ -37,11 +37,17 @@ import io.viki.momentum.math.util.Mutil;
  * @see Vector3
  */
 public record Vector4(float x, float y, float z, float w) {
+  /** The zero vector. */
   public static final Vector4 ZERO = new Vector4(0.0F, 0.0F, 0.0F, 0.0F);
+  /** The vector with all components equal to one. */
   public static final Vector4 ONE = new Vector4(1.0F, 1.0F, 1.0F, 1.0F);
+  /** The positive unit vector along the X axis. */
   public static final Vector4 UNIT_X = new Vector4(1.0F, 0.0F, 0.0F, 0.0F);
+  /** The positive unit vector along the Y axis. */
   public static final Vector4 UNIT_Y = new Vector4(0.0F, 1.0F, 0.0F, 0.0F);
+  /** The positive unit vector along the Z axis. */
   public static final Vector4 UNIT_Z = new Vector4(0.0F, 0.0F, 1.0F, 0.0F);
+  /** The positive unit vector along the W axis. */
   public static final Vector4 UNIT_W = new Vector4(0.0F, 0.0F, 0.0F, 1.0F);
 
   /**
@@ -117,6 +123,7 @@ public record Vector4(float x, float y, float z, float w) {
    * @param min lower bound
    * @param max upper bound
    * @return clamped vector
+   * @throws IllegalArgumentException if any component has a lower bound greater than its upper bound
    */
   public static Vector4 clamp(Vector4 v, Vector4 min, Vector4 max) {
     return new Vector4(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y), Mutil.clamp(v.z, min.z, max.z),

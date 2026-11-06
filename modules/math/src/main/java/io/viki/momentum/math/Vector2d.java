@@ -27,7 +27,7 @@ package io.viki.momentum.math;
 import io.viki.momentum.math.util.Mutil;
 
 /**
- * Immutable 2D double-precision vector.
+ * Immutable, thread-safe 2D vector with double-precision components.
  *
  * @param x x coordinate position
  * @param y y coordinate position
@@ -35,9 +35,13 @@ import io.viki.momentum.math.util.Mutil;
  * @see Vector3d
  */
 public record Vector2d(double x, double y) {
+  /** The zero vector. */
   public static final Vector2d ZERO = new Vector2d(0.0, 0.0);
+  /** The vector with both components equal to one. */
   public static final Vector2d ONE = new Vector2d(1.0, 1.0);
+  /** The positive unit vector along the X axis. */
   public static final Vector2d UNIT_X = new Vector2d(1.0, 0.0);
+  /** The positive unit vector along the Y axis. */
   public static final Vector2d UNIT_Y = new Vector2d(0.0, 1.0);
 
   /**
@@ -53,7 +57,7 @@ public record Vector2d(double x, double y) {
    * Creates a vector from polar coordinates.
    *
    * @param radius the radius
-   * @param angle  the angle
+   * @param angle  angle in radians
    * @return a vector of the given (r, alpha)
    */
   public static Vector2d polar(double radius, double angle) {
@@ -124,6 +128,7 @@ public record Vector2d(double x, double y) {
    * @param min lower bound
    * @param max upper bound
    * @return clamped vector
+   * @throws IllegalArgumentException if either component has a lower bound greater than its upper bound
    */
   public static Vector2d clamp(Vector2d v, Vector2d min, Vector2d max) {
     return new Vector2d(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y));

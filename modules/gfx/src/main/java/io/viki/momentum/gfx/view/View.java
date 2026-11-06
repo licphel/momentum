@@ -26,7 +26,7 @@ package io.viki.momentum.gfx.view;
 
 import io.viki.momentum.event.EventBus;
 import io.viki.momentum.gfx.Device;
-import io.viki.momentum.input.InputSnapshot;
+import io.viki.momentum.input.binding.InputSnapshot;
 import io.viki.momentum.math.Vector2;
 
 /**
@@ -67,6 +67,10 @@ public abstract class View implements AutoCloseable {
    *
    * @return mutable input snapshot owned by the display
    */
+  private final io.viki.momentum.input.binding.InputBindings bindings = new io.viki.momentum.input.binding.InputBindings();
+
+  public final io.viki.momentum.input.binding.InputBindings bindings() { return bindings; }
+
   public final InputSnapshot snapshot() {
     return snapshot;
   }

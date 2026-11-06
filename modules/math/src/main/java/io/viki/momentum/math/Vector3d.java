@@ -27,7 +27,7 @@ package io.viki.momentum.math;
 import io.viki.momentum.math.util.Mutil;
 
 /**
- * Immutable 3D double-precision vector.
+ * Immutable, thread-safe 3D vector with double-precision components.
  *
  * @param x x coordinate position
  * @param y y coordinate position
@@ -36,10 +36,15 @@ import io.viki.momentum.math.util.Mutil;
  * @see Vector2d
  */
 public record Vector3d(double x, double y, double z) {
+  /** The zero vector. */
   public static final Vector3d ZERO = new Vector3d(0.0, 0.0, 0.0);
+  /** The vector with all components equal to one. */
   public static final Vector3d ONE = new Vector3d(1.0, 1.0, 1.0);
+  /** The positive unit vector along the X axis. */
   public static final Vector3d UNIT_X = new Vector3d(1.0, 0.0, 0.0);
+  /** The positive unit vector along the Y axis. */
   public static final Vector3d UNIT_Y = new Vector3d(0.0, 1.0, 0.0);
+  /** The positive unit vector along the Z axis. */
   public static final Vector3d UNIT_Z = new Vector3d(0.0, 0.0, 1.0);
 
   /**
@@ -155,6 +160,7 @@ public record Vector3d(double x, double y, double z) {
    * @param min lower bound
    * @param max upper bound
    * @return clamped vector
+   * @throws IllegalArgumentException if any component has a lower bound greater than its upper bound
    */
   public static Vector3d clamp(Vector3d v, Vector3d min, Vector3d max) {
     return new Vector3d(Mutil.clamp(v.x, min.x, max.x), Mutil.clamp(v.y, min.y, max.y),

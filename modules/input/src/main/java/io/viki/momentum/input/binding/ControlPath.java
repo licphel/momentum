@@ -1,4 +1,28 @@
-package io.viki.momentum.input;
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package io.viki.momentum.input.binding;
 
 import org.jspecify.annotations.Nullable;
 
@@ -34,6 +58,15 @@ public final class ControlPath {
    * @throws IllegalArgumentException if the path is unsupported or malformed
    */
   public static ControlPath parse(String path) {
+    int wheelIndex = switch (path) {
+      case "<Mouse>/scroll" -> 0;
+      case "<Gamepad>/leftStick" -> 1;
+      case "<Gamepad>/rightStick" -> 2;
+      default -> -1;
+    };
+    if (wheelIndex >= 0) {
+      return new ControlPath(Device.WHEEL, wheelIndex, 0, path, path);
+    }
     if (path.startsWith("<Keyboard>/")) {
       String name = path.substring(11);
       if (name.length() == 1 && Character.isDigit(name.charAt(0))) {
@@ -127,9 +160,9 @@ public final class ControlPath {
   /**
    * Compiles a directional axis path and assigns its sign and physical channel.
    *
-   * @param device source device
+   * @param device    source device
    * @param direction named direction or neutral axis component
-   * @param prefix canonical path prefix
+   * @param prefix    canonical path prefix
    * @return compiled directional path
    */
   private static ControlPath directional(Device device, String direction, String prefix) {
@@ -167,6 +200,8 @@ public final class ControlPath {
    */
   public float value(InputSnapshot input) {
     double value = switch (device) {
+      case WHEEL -> (float) Math.max(Math.abs(wheel(input).x()), Math.max(Math.abs(wheel(input).y()),
+          Math.max(Math.abs(wheel(input).deltaX()), Math.abs(wheel(input).deltaY()))));
       case KEYBOARD -> input.keyboard().isDown(KEYS[index]) ? 1 : 0;
       case MOUSE -> input.mouse().isDown(MouseButton.fromIndex(index)) ? 1 : 0;
       case GAMEPAD_BUTTON -> input.gamepad().connected() && input.gamepad().isDown(BUTTONS[index]) ? 1 : 0;
@@ -180,11 +215,43 @@ public final class ControlPath {
   }
 
   /**
+   * Tests whether this control reported a press transition in the snapshot.
+   *
+   * @param input input snapshot to read
+   * @return whether this control was pressed
+   */
+  boolean pressed(InputSnapshot input) {
+    return switch (device) {
+      case KEYBOARD -> input.key(KEYS[index]).transitioned();
+      case MOUSE -> input.button(MouseButton.fromIndex(index)).transitioned();
+      case GAMEPAD_BUTTON -> input.button(BUTTONS[index]).transitioned();
+      case JOYSTICK_BUTTON -> input.joystick().isTransitioned(index);
+      default -> false;
+    };
+  }
+
+  /**
+   * Tests whether this control reported a release transition in the snapshot.
+   *
+   * @param input input snapshot to read
+   * @return whether this control was released
+   */
+  boolean released(InputSnapshot input) {
+    return switch (device) {
+      case KEYBOARD -> input.key(KEYS[index]).released();
+      case MOUSE -> input.button(MouseButton.fromIndex(index)).released();
+      case GAMEPAD_BUTTON -> input.button(BUTTONS[index]).released();
+      case JOYSTICK_BUTTON -> input.joystick().isReleased(index);
+      default -> false;
+    };
+  }
+
+  /**
    * Tests whether this control is active.
    *
    * <p>Digital sources use their actual key state; analog sources use the supplied hysteresis threshold.
    *
-   * @param input input snapshot to read
+   * @param input     input snapshot to read
    * @param threshold minimum absolute analog value for activation
    * @return whether the control is active
    */
@@ -212,6 +279,34 @@ public final class ControlPath {
   }
 
   /**
+   * Reports whether this path represents a two-dimensional wheel source.
+   *
+   * @return whether the path is a wheel source
+   */
+  boolean isWheel() {
+    return device == Device.WHEEL;
+  }
+
+  /**
+   * Returns the wheel state represented by this path.
+   *
+   * @param input input snapshot to read
+   * @return wheel state for the path
+   * @throws IllegalStateException if this path is not a wheel source
+   */
+  io.viki.momentum.input.Wheel wheel(InputSnapshot input) {
+    if (!isWheel()) {
+      throw new IllegalStateException("Control is not a Wheel: " + path);
+    }
+    return switch (index) {
+      case 0 -> input.mouse().scroll();
+      case 1 -> input.gamepad().leftStick();
+      case 2 -> input.gamepad().rightStick();
+      default -> throw new IllegalStateException("Invalid Wheel control: " + path);
+    };
+  }
+
+  /**
    * Identifies the physical channel for conflict consumption; opposite axis directions share it.
    *
    * @return physical channel identifier
@@ -230,6 +325,7 @@ public final class ControlPath {
   }
 
   private enum Device {
+    WHEEL,
     KEYBOARD,
     MOUSE,
     GAMEPAD_BUTTON,

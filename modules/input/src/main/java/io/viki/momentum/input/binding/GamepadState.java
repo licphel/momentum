@@ -1,5 +1,30 @@
-package io.viki.momentum.input;
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
 
+package io.viki.momentum.input.binding;
+
+import io.viki.momentum.input.Wheel;
 import io.viki.momentum.math.util.Mutil;
 
 /**
@@ -41,7 +66,7 @@ public final class GamepadState {
    *
    * @return left stick coordinates
    */
-  public Scroller leftStick() {
+  public Wheel leftStick() {
     return left;
   }
 
@@ -50,7 +75,7 @@ public final class GamepadState {
    *
    * @return right stick coordinates
    */
-  public Scroller rightStick() {
+  public Wheel rightStick() {
     return right;
   }
 
@@ -118,7 +143,7 @@ public final class GamepadState {
    * Injects a button state.
    *
    * @param button button to update
-   * @param held whether the button is held
+   * @param held   whether the button is held
    */
   public void setButton(GamepadButton button, boolean held) {
     int bit = 1 << button.ordinal();
@@ -158,7 +183,7 @@ public final class GamepadState {
   /**
    * Injects analog trigger values, clamped to {@code [0, 1]}.
    *
-   * @param left left trigger value
+   * @param left  left trigger value
    * @param right right trigger value
    */
   public void setTriggers(float left, float right) {
@@ -172,7 +197,13 @@ public final class GamepadState {
     changed.run();
   }
 
-  /** Applies radial deadzone shaping to a stick and notifies listeners on change. */
+  /**
+   * Applies radial deadzone shaping to a stick and notifies listeners on change.
+   *
+   * @param stick stick state to update
+   * @param x raw horizontal coordinate
+   * @param y raw vertical coordinate
+   */
   private void setStick(ScrollState stick, double x, double y) {
     double oldX = stick.x(), oldY = stick.y();
     double length = Math.hypot(x, y);

@@ -1,4 +1,28 @@
-package io.viki.momentum.input;
+/*
+ * MIT License
+ *
+ * Copyright (c) 2026 Licphel
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+package io.viki.momentum.input.binding;
 
 import java.util.Arrays;
 
@@ -92,11 +116,11 @@ public final class JoystickState {
   /**
    * Connects the joystick and allocates its raw controls.
    *
-   * @param name reported device name
-   * @param guid reported device GUID
-   * @param axisCount number of axes
+   * @param name        reported device name
+   * @param guid        reported device GUID
+   * @param axisCount   number of axes
    * @param buttonCount number of buttons
-   * @param hatCount number of hats
+   * @param hatCount    number of hats
    * @throws IllegalArgumentException if a control count is negative
    */
   public void connect(String name, String guid, int axisCount, int buttonCount, int hatCount) {
@@ -188,7 +212,7 @@ public final class JoystickState {
    * Updates a raw button state.
    *
    * @param index button index
-   * @param held whether the button is held
+   * @param held  whether the button is held
    */
   public void setButton(int index, boolean held) {
     if (buttons[index] == held) {
@@ -207,7 +231,7 @@ public final class JoystickState {
   /**
    * Updates a hat direction bitmask.
    *
-   * @param index hat index
+   * @param index      hat index
    * @param directions combination of {@link #HAT_UP}, {@link #HAT_RIGHT}, {@link #HAT_DOWN}, and {@link #HAT_LEFT}
    */
   public void setHat(int index, int directions) {

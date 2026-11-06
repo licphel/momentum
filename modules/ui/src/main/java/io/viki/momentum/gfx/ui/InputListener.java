@@ -24,9 +24,9 @@
 
 package io.viki.momentum.gfx.ui;
 
-import io.viki.momentum.input.KeyAction;
-import io.viki.momentum.input.KeyCode;
-import io.viki.momentum.input.MouseButton;
+import io.viki.momentum.input.binding.KeyAction;
+import io.viki.momentum.input.binding.KeyCode;
+import io.viki.momentum.input.binding.MouseButton;
 
 /**
  * Receives direct input callbacks for one UI element.

@@ -29,12 +29,12 @@ import io.viki.momentum.math.Vector2;
 /**
  * Immutable axis-aligned 2D bounding box defined by min and max corners.
  *
+ * <p>Instances are immutable and thread-safe.
+ *
  * @param minX minimum x coordinate (left)
  * @param minY minimum y coordinate (bottom)
  * @param maxX maximum x coordinate (right)
  * @param maxY maximum y coordinate (top)
- *             <p>
- *             Instances are immutable and thread-safe.
  */
 public record Rectangle(float minX, float minY, float maxX, float maxY) implements Shape<Rectangle> {
   /** A zero-area rectangle whose coordinates are all zero. */
@@ -104,7 +104,8 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    * Creates the tightest box enclosing an array of points.
    *
    * @param points array of points
-   * @return bounding box
+   * @return bounding box enclosing all points
+   * @throws ArrayIndexOutOfBoundsException if {@code points} is empty
    */
   public static Rectangle createByPoints(Vector2[] points) {
     float mnX = points[0].x();
@@ -153,7 +154,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
    *
    * @param a first box
    * @param b second box
-   * @return intersecting box, or an empty box if they do not intersect
+   * @return intersection bounds; a disjoint pair produces inverted bounds
    */
   public static Rectangle getIntersection(Rectangle a, Rectangle b) {
     return new Rectangle(Math.max(a.minX, b.minX), Math.max(a.minY, b.minY), Math.min(a.maxX, b.maxX), Math.min(a.maxY,
@@ -235,7 +236,7 @@ public record Rectangle(float minX, float minY, float maxX, float maxY) implemen
   }
 
   /**
-   * Returns whether this box intersects another.
+   * Returns whether this box overlaps another with positive area; touching edges alone do not count.
    *
    * @param o the other box
    * @return true if they intersect
